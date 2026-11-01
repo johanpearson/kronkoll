@@ -31,3 +31,8 @@ export async function migratedDb(): Promise<{ db: D1Database; dispose: () => Pro
   }
   return { db, dispose: () => proxy.dispose() };
 }
+
+/** En ny slumpad SESSION_ENC_KEY per testkörning. Ingen nyckel finns i repot (KK-12). */
+export function randomSecret(): string {
+  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+}
