@@ -1,0 +1,39 @@
+# Spike #8 mot Enable Bankings sandbox (KK-6). Startas för hand: Actions → spike-enable-banking →
+# Run workflow (fungerar i GitHub-appen). Resultatet hamnar i körningens sammanfattning.
+# Sandbox-nyckeln ligger bara i miljön "sandbox", som är låst till main. Produktionsnyckeln
+# används aldrig här (D-secrets).
+name: spike-enable-banking
+
+on:
+  workflow_dispatch:
+    inputs:
+      country:
+        description: Landskod
+        default: SE
+      look_for:
+        description: Bank att leta efter
+        default: Skandia
+
+permissions:
+  contents: read
+
+jobs:
+  spike:
+    name: spike
+    runs-on: ubuntu-latest
+    environment: sandbox
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # Skriptet använder bara Node och signeraren i packages/, så inga beroenden installeras.
+      - name: Fråga sandboxen
+        env:
+          EB_APP_ID: ${{ secrets.EB_SANDBOX_APP_ID }}
+          EB_PRIVATE_KEY: ${{ secrets.EB_SANDBOX_KEY }}
+          EB_COUNTRY: ${{ inputs.country }}
+          EB_LOOK_FOR: ${{ inputs.look_for }}
+        run: node scripts/spike-enable-banking.ts
