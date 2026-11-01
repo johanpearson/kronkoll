@@ -39,8 +39,12 @@ export interface TransactionPage {
 export type ProviderErrorCode = "UNAUTHORIZED" | "RATE_LIMITED" | "UNAVAILABLE" | "BAD_RESPONSE" | "FAILED";
 
 export class ProviderError extends Error {
-  constructor(readonly code: ProviderErrorCode) {
+  // Vanligt fält i stället för parameter property, så att Node kan köra filen utan transpilering.
+  readonly code: ProviderErrorCode;
+
+  constructor(code: ProviderErrorCode) {
     super(`Banken svarade med fel: ${code}`);
+    this.code = code;
     this.name = "ProviderError";
   }
 }

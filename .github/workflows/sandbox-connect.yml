@@ -1,0 +1,64 @@
+# Kopplar Enable Bankings sandbox så att kontraktstestet kan köras varje natt (#24).
+# Startas för hand i två steg: Actions → sandbox-connect → Run workflow (fungerar i GitHub-appen).
+#   1. step = start: länken till testbanken visas i körningens sammanfattning.
+#   2. step = finish: klistra in adressen du hamnade på efter godkännandet.
+# Bara sandbox-nyckeln används. Session-id:t visas aldrig: det skrivs direkt till secreten
+# EB_SANDBOX_SESSION_ID i miljön "sandbox", som är låst till main (D-secrets).
+name: sandbox-connect
+
+on:
+  workflow_dispatch:
+    inputs:
+      step:
+        description: Steg
+        type: choice
+        options: [start, finish]
+        default: start
+      redirected_to:
+        description: "Bara för finish: hela adressen efter godkännandet (https://kronkoll-25e.pages.dev/koppla/klar?code=…)"
+        default: ""
+      aspsp:
+        description: Testbank
+        default: Mock ASPSP
+      country:
+        description: Land för testbanken
+        default: FI
+
+permissions:
+  contents: read
+
+jobs:
+  connect:
+    name: connect
+    runs-on: ubuntu-latest
+    environment: sandbox
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      # Skriptet använder bara Node och signeraren i packages/, så inga beroenden installeras.
+      - name: Koppla
+        env:
+          STEP: ${{ inputs.step }}
+          REDIRECTED_TO: ${{ inputs.redirected_to }}
+          EB_ASPSP: ${{ inputs.aspsp }}
+          EB_COUNTRY: ${{ inputs.country }}
+          EB_APP_ID: ${{ secrets.EB_SANDBOX_APP_ID }}
+          EB_PRIVATE_KEY: ${{ secrets.EB_SANDBOX_KEY }}
+          SESSION_OUT: ${{ runner.temp }}/session
+        run: node scripts/sandbox-connect.ts
+
+      # Kräver en fine-grained token med behörigheten Secrets: Read and write för det här repot,
+      # sparad som SANDBOX_SECRETS_TOKEN i miljön "sandbox".
+      - name: Spara sessionen som secret
+        if: inputs.step == 'finish'
+        env:
+          GH_TOKEN: ${{ secrets.SANDBOX_SECRETS_TOKEN }}
+          SESSION_FILE: ${{ runner.temp }}/session
+        run: |
+          echo "::add-mask::$(cat "$SESSION_FILE")"
+          gh secret set EB_SANDBOX_SESSION_ID --env sandbox --repo "$GITHUB_REPOSITORY" < "$SESSION_FILE"
+          rm -f "$SESSION_FILE"
