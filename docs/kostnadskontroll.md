@@ -46,8 +46,9 @@ Kontrollera också att `kronkoll-api` och `kronkoll` står på planen **Free**. 
 - Inga aktiva prenumerationer eller tillägg (till exempel *Workers Paid*, *Argo* eller *R2*).
 - Inga fakturor med belopp.
 
-Om ett betalkort är registrerat (Zero Trust kan kräva det även för gratisplanen) ska det bara vara
-för Zero Trust. Notera det i protokollet nedan.
+Ett betalkort är registrerat, eftersom Zero Trust kräver det även för gratisplanen (A-3). Därför
+kan Cloudflare faktiskt debitera om en betald tjänst slås på. Kontrollera extra noga att inga
+tillägg är aktiva och att inga fakturor har belopp. Kortet ska bara användas för Zero Trust free.
 
 ## 5. GitHub
 
