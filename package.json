@@ -11,7 +11,7 @@
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
     "test:coverage": "pnpm -r --if-present test:coverage",
-    "architecture": "depcruise packages --config .dependency-cruiser.json && node scripts/no-payment-endpoints.ts"
+    "architecture": "depcruise packages apps --config .dependency-cruiser.json && node scripts/no-payment-endpoints.ts"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

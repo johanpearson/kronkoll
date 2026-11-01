@@ -30,6 +30,29 @@
       }
     },
     {
+      "name": "paket-beror-inte-pa-appar",
+      "comment": "KK-14: paketen (domain och adaptrar) är byggstenar. De får aldrig importera från apps/, annars blir beroendena cirkulära i praktiken.",
+      "severity": "error",
+      "from": {
+        "path": "^packages/"
+      },
+      "to": {
+        "path": "^apps/"
+      }
+    },
+    {
+      "name": "appar-beror-inte-pa-varandra",
+      "comment": "Webbappen och API-workern deployas var för sig och pratar bara via HTTP och service binding. Delad kod hör hemma i packages/.",
+      "severity": "error",
+      "from": {
+        "path": "^apps/([^/]+)/"
+      },
+      "to": {
+        "path": "^apps/",
+        "pathNot": "^apps/$1/"
+      }
+    },
+    {
       "name": "inga-cirkulara-beroenden",
       "severity": "error",
       "from": {},

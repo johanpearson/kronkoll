@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 
 const FORBIDDEN = /\/payments\b|payment[-_]?initiation/i;
 
-const files = execFileSync("git", ["ls-files", "packages/*/src/**", "apps/*/src/**"], { encoding: "utf8" })
+const files = execFileSync("git", ["ls-files", "packages/*/src/**", "apps/*/src/**", "apps/*/functions/**", "apps/*/server/**"], { encoding: "utf8" })
   .split("\n")
   .filter((f) => f.endsWith(".ts") || f.endsWith(".tsx"));
 
