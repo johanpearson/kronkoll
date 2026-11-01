@@ -35,3 +35,16 @@ export {
   type LearnInput,
   type LearnResult,
 } from "./categorize.ts";
+export {
+  CATEGORY_TEMPLATE,
+  TEMPLATE_RULES,
+  addCategory,
+  archiveCategory,
+  mergeCategories,
+  renameCategory,
+  type AddCategoryInput,
+  type Category,
+  type CategoryKind,
+  type MergeInput,
+  type MergeResult,
+} from "./categories.ts";
