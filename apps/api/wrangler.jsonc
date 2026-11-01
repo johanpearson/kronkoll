@@ -8,6 +8,13 @@
   "workers_dev": false,
   "preview_urls": false,
   "observability": { "enabled": false },
+  // Åtkomstkontrollen (KK-2-B, KK-29-B). ACCESS_AUD och ACCESS_ALLOWED_EMAILS är secrets och
+  // sätts i Cloudflare (Workers & Pages → kronkoll-api → Settings → Variables and Secrets).
+  // Saknas något av de fyra värdena nekar workern alla anrop.
+  "vars": {
+    "ACCESS_TEAM_DOMAIN": "https://nameless-wildflower-f9e8.cloudflareaccess.com",
+    "APP_ORIGIN": "https://kronkoll-25e.pages.dev"
+  },
   // Databasens id är inte hemligt. Åtkomst kräver Cloudflare-token.
   "d1_databases": [
     {

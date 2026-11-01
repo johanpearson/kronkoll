@@ -1,7 +1,10 @@
-// API-workern. Nås bara via service binding från Pages Function (D-origin, workers_dev = false).
-// Validering av Access-token i själva workern (KK-2-B) läggs till i #12.
+// API-workern. Nås bara via service binding från Pages Function (D-origin, workers_dev = false),
+// men litar ändå inte på det: varje anrop kräver giltig Access-token (KK-2-B) och ändrande
+// anrop dessutom CSRF-skydd (KK-29-B).
+import { createLogger } from "@kronkoll/logging";
+import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
 
-export interface Env {
+export interface Env extends AccessEnv {
   DB: D1Database;
 }
 
@@ -22,7 +25,7 @@ async function databaseReachable(db: D1Database): Promise<boolean> {
   }
 }
 
-export async function handle(request: Request, env: Env): Promise<Response> {
+async function route(request: Request, env: Env): Promise<Response> {
   const { pathname } = new URL(request.url);
 
   if (pathname === "/api/health") {
@@ -37,6 +40,17 @@ export async function handle(request: Request, env: Env): Promise<Response> {
   return json({ error: "not_found" }, 404);
 }
 
+export async function handle(request: Request, env: Env, deps: GuardDeps): Promise<Response> {
+  return (await guard(request, env, deps)) ?? route(request, env);
+}
+
+const defaultDeps: GuardDeps = {
+  verifierFor: (config) => cachedVerifier(config),
+  logger: createLogger((line) => {
+    console.log(JSON.stringify(line));
+  }),
+};
+
 export default {
-  fetch: (request, env) => handle(request, env),
+  fetch: (request, env) => handle(request, env, defaultDeps),
 } satisfies ExportedHandler<Env>;

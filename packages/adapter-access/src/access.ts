@@ -10,7 +10,7 @@ export interface AccessJwk extends JsonWebKeyLike {
 
 /** Minimal JWK-form så att typen fungerar i både Workers och Node. */
 export interface JsonWebKeyLike {
-  readonly kty?: string;
+  readonly kty: string;
   readonly n?: string;
   readonly e?: string;
   readonly alg?: string;
