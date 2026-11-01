@@ -173,10 +173,25 @@ jobs:
       - name: Unit-tester med coverage-tröskel (domain ≥ 90 %)
         run: pnpm test:coverage
 
+  architecture:
+    name: architecture
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Domänlagret är rent och inga betalnings-endpoints (KK-14-A, KK-5-A)
+        run: pnpm architecture
+
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [secret-scan, workflow-lint, pr-size, pr-description, lint, typecheck, unit]
+    needs: [secret-scan, workflow-lint, pr-size, pr-description, lint, typecheck, unit, architecture]
     runs-on: ubuntu-latest
     steps:
       - name: Alla grindar gröna?
