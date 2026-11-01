@@ -547,14 +547,14 @@
     },
     {
       "id": "KK-28",
-      "title": "En användare i MVP, förberett för hushåll",
+      "title": "En användare, inget hushåll",
       "normative_strength": "should",
-      "statement": "MVP har en användare, men datamodellen har household och ägare per konto så att en partner och delade/egna konton kan läggas till senare utan migrering av befintlig data.",
-      "verification_note": "Granskning av datamodellen; migreringstest som lägger till en andra användare på syntetisk data.",
+      "statement": "Kronkoll är byggd för en användare: ägaren. Hushåll med flera användare, partnerinbjudan och delade eller egna konton ingår inte (ägarens beslut 2026-11-01). (Motiv: Håller datamodell, behörigheter och UI enkla. Enable Bankings villkor tillåter dessutom bara att läsa konton som tillhör den som länkade dem.)",
+      "verification_note": "Granskning av datamodellen och Access-policyn; den manuella Access-kontrollen visar att bara ägarens e-post släpps in.",
       "acceptance_criteria": [
         {
           "id": "KK-28-A",
-          "text": "Alla domänobjekt hör till ett household; konton har owner_user_id och visibility (shared/private)."
+          "text": "Datamodellen har inga hushålls-, ägar- eller synlighetsfält, och appen har inga funktioner för att bjuda in eller växla mellan personer. Appens inställningar (t.ex. periodens startdag) ligger i en enda inställningspost."
         }
       ]
     },
