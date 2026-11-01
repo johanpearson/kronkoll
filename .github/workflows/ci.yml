@@ -1,0 +1,72 @@
+# CI-grindar för Kronkoll (KK-16, KK-12, KK-31).
+# Branch protection kräver bara statuskontrollen "ci-ok". Den blir grön först när
+# alla jobb i `needs` är gröna. Nya grindar (lint, typecheck, unit, coverage,
+# integration, mutation, e2e) läggs till i `needs` under M0, utan att rulesetet ändras.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  merge_group:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    name: secret-scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
+
+  workflow-lint:
+    name: workflow-lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - name: actionlint
+        run: |
+          bash <(curl -sSfL https://raw.githubusercontent.com/rhysd/actionlint/393031adb9afb225ee52ae2ccd7a5af5525e03e8/scripts/download-actionlint.bash) 1.7.11
+          ./actionlint -color
+      - name: Actions pinnade på commit-SHA och permissions satta (KK-31-A)
+        run: |
+          fail=0
+          if grep -rnE '^\s*-?\s*uses:\s*[^.][^ ]*@' .github/workflows | grep -vE '@[0-9a-f]{40}(\s|$)'; then
+            echo "::error::Alla 'uses:' måste pinnas på en fullständig commit-SHA"; fail=1
+          fi
+          for f in .github/workflows/*.yml; do
+            grep -qE '^permissions:' "$f" || { echo "::error file=$f::Saknar explicit 'permissions:' på toppnivå"; fail=1; }
+          done
+          exit $fail
+
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [secret-scan, workflow-lint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Alla grindar gröna?
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "Resultat: $RESULTS"
+          for r in $RESULTS; do
+            [ "$r" = "success" ] || { echo "::error::Minst en grind är inte grön ($r)"; exit 1; }
+          done

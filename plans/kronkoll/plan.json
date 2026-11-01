@@ -1,7 +1,7 @@
 {
   "$schema": "https://github.com/system-verification/reqplan/skills/reqplan/schema/plan.schema.json",
-  "title": "Kronkoll – personlig budgetapp (plan v2)",
-  "summary": "**Kronkoll** är en privat, gratis och säker budgetapp för Johans hushåll. Den hämtar transaktioner från Skandia via Enable Banking (endast läsbehörighet), kategoriserar dem med regler som lär sig, och visar budget, sparmål och hur föräldraledighet påverkar inkomsten. Allt körs på Cloudflare free tier (Pages + Worker + D1 + Access) och deployas från GitHub Actions bakom hårda kvalitetsgrindar.\n\n**Så läser du planen**\n- **Prototyp** (mobil): Översikt → Transaktioner → Budget → Sparmål → Inkomst, plus koppla bank, CSV-import, inställningar och radering.\n- **Flöden**: dataflödet *bank → databas → kategori → budget* (`F-dataflode`), koppla bank/koppla om, samtyckets och transaktionens livscykel, regelinlärning och omräkning vid föräldraledighet.\n- **Data & arkitektur**: ports & adapters – `domain` är ren TypeScript; Enable Banking, CSV, D1, Web Push och Access ligger i adaptrar.\n- **Risker**: risker `R-*` och en kort **hotmodell enligt STRIDE** (`T-*`).\n- **Verifiering**: varje krav och AC är kopplat till unit-, integrations-, kontrakts-, E2E- eller manuella tester – se spårbarhetsmatrisen.\n- **Etapper**: M0 fundament + spike, **M1 = MVP**, M2 sparmål & inkomst, M3 insikter & notiser, M4 hushåll.\n\n**v2 (granskning godkänd 2026-11-01):** publikt repo, 2 synkar/dygn, preliminära räknas i budget, transaktioner sparas tills du raderar, ingen överföring av budgetrest, mutationströskel 85 %. Sparmål och ledighet ligger kvar i M2. Skandia är sett på Enable Bankings webbplats; kortet och villkoren verifieras i spiken. Se de accepterade besluten D-repo, D-sync, D-pending, D-retention, D-rollover och D-mutation.\n\n> **Notera:** American Express går inte att koppla i Sverige. Amex-kort hanteras med CSV-import (KK-6-B, KK-10).\n\n### Antaganden (A-1 … A-11)\nAllt nedan är **antaget av agenten** och ska verifieras – främst i spiken i M0.\n1. **A-1** Enable Banking *Restricted Production* är kostnadsfritt för privat bruk med egna konton. Verifiera villkoren.\n2. **A-2** Skandia finns som ASPSP i SE med AIS. Samtycke max ~180 dagar; historikdjup vid första samtycket är okänt (ofta 13–24 mån, därefter ~90 dagar per hämtning).\n3. **A-3** Cloudflare free-gränser (nov 2026): Workers 100 000 anrop/dygn och 10 ms CPU per anrop, 5 Cron Triggers per konto, D1 5 GB lagring, 5 M lästa rader/dygn, 100 000 skrivna rader/dygn och Time Travel 7 dagar, Access gratis upp till 50 användare. Verifiera mot aktuella villkor.\n4. **A-4** Cloudflare Access kan skydda produktionsvärden `kronkoll.pages.dev` som en self-hosted application.\n5. **A-5** Föräldrapenning ≈ 80 % av SGI × 0,97 / 365 per dag, tak 10 prisbasbelopp. Prisbasbelopp 2026 = 59 200 kr. Lagras som årsparametrar, aldrig hårdkodat.\n6. **A-6** Utbetalningar från Försäkringskassan syns med motpart som innehåller \"FORSAKRINGSKASSAN\"/\"FÖRSÄKRINGSKASSAN\".\n7. **A-7** iOS ≥ 16.4 och Android stöder Web Push för installerad PWA.\n8. **A-8** GitHub secret scanning och push protection är gratis för publika repon men inte för privata (där kräver de GitHub Advanced Security). gitleaks i CI är gratis i båda fallen.\n9. **A-9** Skattesatsen för nettouppskattning anges av användaren (från lönebeskedet) och beräknas inte från skattetabeller.\n10. **A-10** All exempeldata i prototypen är påhittad.\n11. **A-11** Tröskelvärdena (14 dagars banner, 10 dagar för försvunna preliminära, 15 min manuell synk, avvikelse 30 %/500 kr, cache 24 h, push 14/3/0) är bekräftade som startvärden och kan konfigureras.",
+  "title": "Kronkoll – personlig budgetapp (plan v3)",
+  "summary": "**Kronkoll** är en privat, gratis och säker budgetapp för Johans hushåll. Den hämtar transaktioner från Skandia via Enable Banking (endast läsbehörighet), kategoriserar dem med regler som lär sig, och visar budget, sparmål och hur föräldraledighet påverkar inkomsten. Allt körs på Cloudflare free tier (Pages + Worker + D1 + Access) och deployas från GitHub Actions bakom hårda kvalitetsgrindar.\n\n**Så läser du planen**\n- **Prototyp** (mobil): Översikt → Transaktioner → Budget → Sparmål → Inkomst, plus koppla bank, CSV-import, inställningar och radering.\n- **Flöden**: dataflödet *bank → databas → kategori → budget* (`F-dataflode`), koppla bank/koppla om, samtyckets och transaktionens livscykel, regelinlärning och omräkning vid föräldraledighet.\n- **Data & arkitektur**: ports & adapters – `domain` är ren TypeScript; Enable Banking, CSV, D1, Web Push och Access ligger i adaptrar.\n- **Risker**: risker `R-*` och en kort **hotmodell enligt STRIDE** (`T-*`).\n- **Verifiering**: varje krav och AC är kopplat till unit-, integrations-, kontrakts-, E2E- eller manuella tester – se spårbarhetsmatrisen.\n- **Etapper**: M0 fundament + spike, **M1 = MVP**, M2 sparmål & inkomst, M3 insikter & notiser, M4 hushåll.\n\n**v2 (granskning godkänd 2026-11-01):** publikt repo, 2 synkar/dygn, preliminära räknas i budget, transaktioner sparas tills du raderar, ingen överföring av budgetrest, mutationströskel 85 %. Sparmål och ledighet ligger kvar i M2. Skandia är sett på Enable Bankings webbplats; kortet och villkoren verifieras i spiken. **v3:** KK-29–KK-35 (tidigare SYN-1–SYN-7) är nu ordinarie krav. Branch protection och CI-grinden finns i repot (D-branch). Se de accepterade besluten D-branch, D-repo, D-sync, D-pending, D-retention, D-rollover och D-mutation.\n\n> **Notera:** American Express går inte att koppla i Sverige. Amex-kort hanteras med CSV-import (KK-6-B, KK-10).\n\n### Antaganden (A-1 … A-11)\nAllt nedan är **antaget av agenten** och ska verifieras – främst i spiken i M0.\n1. **A-1** Enable Banking *Restricted Production* är kostnadsfritt för privat bruk med egna konton. Verifiera villkoren.\n2. **A-2** Skandia finns som ASPSP i SE med AIS. Samtycke max ~180 dagar; historikdjup vid första samtycket är okänt (ofta 13–24 mån, därefter ~90 dagar per hämtning).\n3. **A-3** Cloudflare free-gränser (nov 2026): Workers 100 000 anrop/dygn och 10 ms CPU per anrop, 5 Cron Triggers per konto, D1 5 GB lagring, 5 M lästa rader/dygn, 100 000 skrivna rader/dygn och Time Travel 7 dagar, Access gratis upp till 50 användare. Verifiera mot aktuella villkor.\n4. **A-4** Cloudflare Access kan skydda produktionsvärden `kronkoll.pages.dev` som en self-hosted application.\n5. **A-5** Föräldrapenning ≈ 80 % av SGI × 0,97 / 365 per dag, tak 10 prisbasbelopp. Prisbasbelopp 2026 = 59 200 kr. Lagras som årsparametrar, aldrig hårdkodat.\n6. **A-6** Utbetalningar från Försäkringskassan syns med motpart som innehåller \"FORSAKRINGSKASSAN\"/\"FÖRSÄKRINGSKASSAN\".\n7. **A-7** iOS ≥ 16.4 och Android stöder Web Push för installerad PWA.\n8. **A-8** GitHub secret scanning och push protection är gratis för publika repon men inte för privata (där kräver de GitHub Advanced Security). gitleaks i CI är gratis i båda fallen.\n9. **A-9** Skattesatsen för nettouppskattning anges av användaren (från lönebeskedet) och beräknas inte från skattetabeller.\n10. **A-10** All exempeldata i prototypen är påhittad.\n11. **A-11** Tröskelvärdena (14 dagars banner, 10 dagar för försvunna preliminära, 15 min manuell synk, avvikelse 30 %/500 kr, cache 24 h, push 14/3/0) är bekräftade som startvärden och kan konfigureras.",
   "requirements": "./requirements.json",
   "prototype": { "app_name": "Kronkoll", "device": "mobile" },
   "theme": {
@@ -24,74 +24,6 @@
     { "label": "Budget", "goto": "budget" },
     { "label": "Sparmål", "goto": "sparmal" },
     { "label": "Inkomst", "goto": "inkomst" }
-  ],
-
-  "synthetic_requirements": [
-    {
-      "id": "SYN-1", "title": "CSRF-skydd och signerad state i bankflödet", "type": "quality_requirement", "normative_strength": "must",
-      "statement": "Ändrande API-anrop kräver samma origin och en egen header. Callbacken från banken accepteras bara med ett engångs-state som är HMAC-signerat, kort giltigt och bundet till den inloggade användaren.",
-      "why": "Callbacken är ett klassiskt mål för CSRF och för att injicera någon annans koppling. Access-cookien skyddar inte mot det.",
-      "verification_note": "Integrationstest: callback med manipulerat, återanvänt eller utgånget state ger 400; POST utan X-Kronkoll-header eller med fel Origin ger 403.",
-      "acceptance_criteria": [
-        { "id": "SYN-1-A", "given": "ett state som redan använts eller är äldre än 15 min", "when": "callbacken anropas", "then": "avvisas den med 400 och ingen session skapas" },
-        { "id": "SYN-1-B", "text": "POST/PUT/PATCH/DELETE utan header X-Kronkoll: 1 eller med främmande Origin avvisas med 403." }
-      ]
-    },
-    {
-      "id": "SYN-2", "title": "Strikt CSP och säker rendering av banktexter", "type": "quality_requirement", "normative_strength": "must",
-      "statement": "Motpartsnamn och beskrivningar från banken behandlas som opålitlig indata: de renderas alltid som text, och appen levereras med en strikt Content-Security-Policy utan inline-skript.",
-      "why": "Butiker och avsändare styr själva texten i transaktionerna. En betalning med ett namn som innehåller HTML eller skript får inte kunna köras i appen (lagrad XSS).",
-      "verification_note": "Unit-/komponenttest med fixture vars motpart innehåller <img onerror>; E2E kontrollerar CSP-headern; lint förbjuder dangerouslySetInnerHTML.",
-      "acceptance_criteria": [
-        { "id": "SYN-2-A", "text": "En transaktion med motparten `<img src=x onerror=alert(1)>` visas som ren text och inget skript körs." },
-        { "id": "SYN-2-B", "text": "Svaren har CSP med default-src 'self', script-src 'self', frame-ancestors 'none' och connect-src 'self'." }
-      ]
-    },
-    {
-      "id": "SYN-3", "title": "Härdad leveranskedja", "type": "quality_requirement", "normative_strength": "must",
-      "statement": "GitHub Actions pinnas på commit-SHA. GITHUB_TOKEN har minsta behörighet och Cloudflare-API-token är begränsad till Workers/Pages/D1 för ett konto. Beroenden hålls få, låses i lockfile, installeras med --ignore-scripts och bevakas av Dependabot.",
-      "why": "Med ett publikt repo och en Worker som har bankens privata nyckel är ett skadligt beroende eller en kapad action den mest sannolika vägen till dataläcka.",
-      "verification_note": "CI-lint (t.ex. zizmor/actionlint) på workflows; manuell granskning av tokenbehörigheter.",
-      "acceptance_criteria": [
-        { "id": "SYN-3-A", "text": "Alla `uses:` i workflows pekar på en fullständig commit-SHA och varje workflow deklarerar `permissions:` explicit." }
-      ]
-    },
-    {
-      "id": "SYN-4", "title": "Backup och radering med kända gränser", "type": "quality_requirement", "normative_strength": "should",
-      "statement": "D1 Time Travel används som backup. Raderingskvittensen säger ärligt att raderad data finns kvar i Cloudflares återställningspunkter i upp till 7 dagar (antagande A-3) och sedan är borta.",
-      "why": "Kravet på tydlig radering (KK-11) måste stämma med hur plattformen faktiskt sparar ögonblicksbilder.",
-      "verification_note": "Manuell kontroll av D1 Time Travel-inställningen och kvittenstexten i E2E.",
-      "acceptance_criteria": [
-        { "id": "SYN-4-A", "text": "Kvittensen efter radering anger vad som raderats och att återställningspunkter förfaller inom 7 dagar." }
-      ]
-    },
-    {
-      "id": "SYN-5", "title": "Månadsgränser i svensk tid", "type": "business_rule", "normative_strength": "must",
-      "statement": "Alla månads- och dagsgränser (budget, översikt, prognoser) räknas i Europe/Stockholm, och bokföringsdatum (datum utan tid) tolkas som svenska kalenderdagar.",
-      "why": "Workers körs i UTC. Ett kortköp den 31:a kl. 23.30 hamnar annars i fel månad.",
-      "verification_note": "Unit-tester med en klocka som injiceras via Clock-porten, runt månadsskifte och sommartidsomställning.",
-      "acceptance_criteria": [
-        { "id": "SYN-5-A", "given": "en transaktion med booking_date 2026-10-31", "when": "budget för oktober och november räknas", "then": "räknas den i oktober oavsett serverns UTC-tid" }
-      ]
-    },
-    {
-      "id": "SYN-6", "title": "Budgetperiod kan börja på lönedagen", "type": "business_rule", "normative_strength": "should",
-      "statement": "Budgetperioden kan vara en kalendermånad (standard) eller börja på en valbar dag, t.ex. den 25:e (lönedag). Har lönedagen redan passerat i månaden flyttas starten till närmast föregående bankdag.",
-      "why": "Många svenska hushåll budgeterar från lön till lön, och föräldrapenning betalas ut på andra datum än lönen. Det påverkar \"kvar att spendera\".",
-      "verification_note": "Unit-tester av periodberäkningen med helgdagar och bankdagar.",
-      "acceptance_criteria": [
-        { "id": "SYN-6-A", "text": "Med periodstart 25 och 25 dec 2026 på en helgdag börjar perioden den 23 dec 2026 (närmast föregående bankdag)." }
-      ]
-    },
-    {
-      "id": "SYN-7", "title": "Kort session och rensning på enheten", "type": "quality_requirement", "normative_strength": "should",
-      "statement": "Access-sessionen varar högst 24 h, eller 7 dagar om användaren väljer det. \"Logga ut\" rensar service worker-cache, IndexedDB och push-prenumeration på enheten.",
-      "why": "En borttappad mobil med installerad PWA får inte ge långvarig åtkomst till bankdata.",
-      "verification_note": "E2E: efter Logga ut finns ingen cachad API-data i Cache Storage eller IndexedDB.",
-      "acceptance_criteria": [
-        { "id": "SYN-7-A", "text": "Efter Logga ut innehåller Cache Storage och IndexedDB inga API-svar och användaren omdirigeras till Access." }
-      ]
-    }
   ],
 
   "screens": [
@@ -448,12 +380,12 @@
           { "type": "text", "text": "På iPhone krävs att Kronkoll är installerad på hemskärmen (iOS 16.4+)." }
         ] },
         { "id": "appearance", "type": "radio", "label": "Utseende", "options": ["Följ systemet", "Ljust", "Mörkt"], "value": "Följ systemet", "satisfies": ["KK-26-A"] },
-        { "type": "select", "label": "Budgetperiod börjar", "options": ["Den 1:a (kalendermånad)", "Den 25:e (lönedag)"], "value": "Den 1:a (kalendermånad)", "satisfies": ["SYN-6"] },
+        { "type": "select", "label": "Budgetperiod börjar", "options": ["Den 1:a (kalendermånad)", "Den 25:e (lönedag)"], "value": "Den 1:a (kalendermånad)", "satisfies": ["KK-34"] },
         { "type": "button", "label": "Kategorier och regler", "variant": "secondary", "goto": "kategorier" },
-        { "id": "logout", "type": "button", "label": "Logga ut och rensa enheten", "variant": "danger", "goto": "login", "satisfies": ["SYN-7-A"] }
+        { "id": "logout", "type": "button", "label": "Logga ut och rensa enheten", "variant": "danger", "goto": "login", "satisfies": ["KK-35-A"] }
       ],
       "states": [
-        { "id": "deleted", "label": "Koppling raderad", "satisfies": ["KK-11-B", "SYN-4-A"], "description": "**Skandia-kopplingen är raderad.** Sessionen hos Enable Banking är återkallad. 3 konton, 1 842 transaktioner och 37 uppdelningar är borttagna. Cloudflares återställningspunkter förfaller inom 7 dagar." }
+        { "id": "deleted", "label": "Koppling raderad", "satisfies": ["KK-11-B", "KK-32-A"], "description": "**Skandia-kopplingen är raderad.** Sessionen hos Enable Banking är återkallad. 3 konton, 1 842 transaktioner och 37 uppdelningar är borttagna. Cloudflares återställningspunkter förfaller inom 7 dagar." }
       ]
     },
     {
@@ -631,7 +563,7 @@
         "200": { "body": { "transaction": { "id": "tx_01J…", "category_source": "manual" }, "rule": { "id": "rule_ica", "pattern": "ICA", "match": "counterparty_prefix", "category_id": "cat_mat_livs" }, "retroactive_candidates": 23, "protected_manual": 2 } },
         "403": { "description": "CSRF-skydd: fel Origin eller saknad X-Kronkoll-header", "body": { "error": "forbidden" } }
       },
-      "satisfies": ["KK-18-B", "KK-18-C", "SYN-1-B"]
+      "satisfies": ["KK-18-B", "KK-18-C", "KK-29-B"]
     },
     {
       "id": "api-rule-apply", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "POST", "path": "/api/rules/{id}/apply",
@@ -692,8 +624,8 @@
       "summary": "Starta en koppling: anropar Enable Banking POST /auth och returnerar bankens URL",
       "request": { "aspsp": { "name": "Skandia", "country": "SE" }, "psu_type": "personal" },
       "responses": { "200": { "body": { "redirect_url": "https://tilisy.enablebanking.com/…", "state_expires_at": "2026-11-01T08:25:00Z" } } },
-      "description": "`state` = HMAC-signerat engångsvärde, bundet till användaren och giltigt i 15 min (SYN-1). `valid_until` sätts till ASPSP:ns `maximum_consent_validity`. `access` begär bara AIS: konton, saldon och transaktioner.",
-      "satisfies": ["KK-5-A", "KK-5", "SYN-1-A"]
+      "description": "`state` = HMAC-signerat engångsvärde, bundet till användaren och giltigt i 15 min (KK-29). `valid_until` sätts till ASPSP:ns `maximum_consent_validity`. `access` begär bara AIS: konton, saldon och transaktioner.",
+      "satisfies": ["KK-5-A", "KK-5", "KK-29-A"]
     },
     {
       "id": "api-conn-callback", "group": "API: bankkoppling", "method": "POST", "path": "/api/connections/callback",
@@ -703,7 +635,7 @@
         "201": { "body": { "connection_id": "conn_skandia", "accounts": 3, "initial_sync": "started" } },
         "400": { "description": "Ogiltigt, utgånget eller återanvänt state", "body": { "error": "invalid_state" } }
       },
-      "satisfies": ["SYN-1-A", "KK-5-C", "KK-8-B"]
+      "satisfies": ["KK-29-A", "KK-5-C", "KK-8-B"]
     },
     {
       "id": "api-conn-renew", "group": "API: bankkoppling", "method": "POST", "path": "/api/connections/{id}/renew",
@@ -716,7 +648,7 @@
       "summary": "Radera koppling: DELETE /sessions/{id} hos Enable Banking och, med purge, all data för kopplingen",
       "params": [{ "name": "purge", "in": "query", "type": "bool", "description": "true = radera konton, transaktioner, uppdelningar och saldon" }],
       "responses": { "200": { "body": { "revoked": true, "deleted": { "accounts": 3, "transactions": 1842, "splits": 37 }, "backup_expiry_days": 7 } } },
-      "satisfies": ["KK-11-A", "KK-11-B", "SYN-4-A"]
+      "satisfies": ["KK-11-A", "KK-11-B", "KK-32-A"]
     },
     {
       "id": "api-sync", "group": "API: bankkoppling", "method": "POST", "path": "/api/sync",
@@ -800,8 +732,8 @@
     {
       "id": "port-notify", "kind": "other", "group": "Portar (TypeScript-gränssnitt i domain)", "name": "Notifier · Clock · Crypto",
       "summary": "Notifier.send(topic, text) · Clock.now() (Europe/Stockholm) · Crypto.encrypt/decrypt för session-id",
-      "description": "`Notifier` implementeras av `adapter-webpush` (VAPID + aes128gcm via WebCrypto) och av en `InAppNotifier` som alltid fyller appens banner/inkorg. `Clock` gör månadsgränser testbara (SYN-5).",
-      "satisfies": ["KK-14", "KK-27", "SYN-5"]
+      "description": "`Notifier` implementeras av `adapter-webpush` (VAPID + aes128gcm via WebCrypto) och av en `InAppNotifier` som alltid fyller appens banner/inkorg. `Clock` gör månadsgränser testbara (KK-33).",
+      "satisfies": ["KK-14", "KK-27", "KK-33"]
     }
   ],
 
@@ -821,7 +753,7 @@
         { "id": "s-store", "label": "Spara i D1 (batch per konto)", "actor": "adapter-d1", "next": ["s-transfer"], "satisfies": ["KK-7-A"] },
         { "id": "s-transfer", "label": "Klassa interna överföringar och kortfaktura", "actor": "domain/transfers", "description": "Par av motsatta belopp mellan egna konton inom 3 dagar, samt betalning till Skandia Visa från privatkontot.", "next": ["s-categorize"], "satisfies": ["KK-20-C"] },
         { "id": "s-categorize", "label": "Kategorisera + inkomsttyp", "actor": "domain/categorize", "description": "Regler i prioritetsordning: manuell (rörs aldrig) > inlärd > mall > okategoriserad.", "next": ["s-aggregate"], "satisfies": ["KK-18-B", "KK-18-C", "KK-22-A"] },
-        { "id": "s-aggregate", "label": "Räkna budgetutfall per period och kategori", "actor": "domain/budget", "next": ["s-rules"], "satisfies": ["KK-20-B", "KK-17-B", "SYN-5-A"] },
+        { "id": "s-aggregate", "label": "Räkna budgetutfall per period och kategori", "actor": "domain/budget", "next": ["s-rules"], "satisfies": ["KK-20-B", "KK-17-B", "KK-33-A"] },
         { "id": "s-rules", "label": "Över budget / nya avvikelser?", "kind": "decision", "actor": "domain/notify-rules", "next": [{ "to": "s-push", "label": "ja" }, { "to": "s-end", "label": "nej" }] },
         { "id": "s-push", "label": "Web Push + in-app", "actor": "adapter-webpush", "next": ["s-end"], "satisfies": ["KK-27-A"] },
         { "id": "s-end", "label": "SyncRun sparad", "kind": "end" }
@@ -829,18 +761,18 @@
     },
     {
       "id": "F-koppla", "title": "Koppla Skandia (första gången)", "kind": "sequence",
-      "satisfies": ["KK-5", "KK-5-C", "SYN-1"],
+      "satisfies": ["KK-5", "KK-5-C", "KK-29"],
       "participants": ["Användare", "PWA (pages.dev)", "API Worker", "D1", "Enable Banking", "Skandia + BankID"],
       "steps": [
         { "from": "Användare", "to": "PWA (pages.dev)", "label": "Koppla bank → Skandia" },
         { "from": "PWA (pages.dev)", "to": "API Worker", "label": "POST /api/connections" },
-        { "from": "API Worker", "to": "D1", "label": "spara engångs-state (HMAC, 15 min)", "satisfies": ["SYN-1-A"] },
+        { "from": "API Worker", "to": "D1", "label": "spara engångs-state (HMAC, 15 min)", "satisfies": ["KK-29-A"] },
         { "from": "API Worker", "to": "Enable Banking", "label": "POST /auth (AIS, valid_until = max)", "satisfies": ["KK-5-A"] },
         { "from": "Enable Banking", "to": "API Worker", "label": "url", "reply": true },
         { "from": "PWA (pages.dev)", "to": "Skandia + BankID", "label": "redirect – legitimera med BankID, godkänn läsbehörighet" },
         { "from": "Skandia + BankID", "to": "PWA (pages.dev)", "label": "redirect /koppla/klar?code&state", "reply": true, "note": "Sidan ligger bakom Access, så användaren är fortfarande inloggad." },
         { "from": "PWA (pages.dev)", "to": "API Worker", "label": "POST /api/connections/callback {code, state}" },
-        { "from": "API Worker", "to": "API Worker", "label": "verifiera state: signatur, ålder, användare, oanvänt", "satisfies": ["SYN-1-A"] },
+        { "from": "API Worker", "to": "API Worker", "label": "verifiera state: signatur, ålder, användare, oanvänt", "satisfies": ["KK-29-A"] },
         { "from": "API Worker", "to": "Enable Banking", "label": "POST /sessions {code}" },
         { "from": "Enable Banking", "to": "API Worker", "label": "session_id, konton, giltig till", "reply": true },
         { "from": "API Worker", "to": "D1", "label": "spara BankConnection (session_id AES-GCM-krypterat) + Account (maskerat)", "satisfies": ["KK-11-C"] },
@@ -866,14 +798,14 @@
     {
       "id": "F-auth", "title": "Åtkomst: Access → Pages → Worker", "kind": "sequence",
       "description": "Samma origin: PWA och `/api/*` ligger på `kronkoll.pages.dev`. En Pages Function vidarebefordrar `/api/*` till API-workern via **service binding**. Workern har `workers_dev = false` och saknar publik URL. Se beslut `D-origin`.",
-      "satisfies": ["KK-2", "KK-2-A", "KK-2-B", "SYN-1-B"],
+      "satisfies": ["KK-2", "KK-2-A", "KK-2-B", "KK-29-B"],
       "participants": ["Webbläsare", "Cloudflare Access", "Pages + Function", "API Worker"],
       "steps": [
         { "from": "Webbläsare", "to": "Cloudflare Access", "label": "GET kronkoll.pages.dev" },
         { "from": "Cloudflare Access", "to": "Webbläsare", "label": "inloggning (engångskod / GitHub); ej inbjuden → nekad", "reply": true, "satisfies": ["KK-2-A"] },
         { "from": "Webbläsare", "to": "Pages + Function", "label": "GET /api/overview (CF_Authorization-cookie)" },
         { "from": "Pages + Function", "to": "API Worker", "label": "service binding fetch + Cf-Access-Jwt-Assertion" },
-        { "from": "API Worker", "to": "API Worker", "label": "verifiera JWT mot team-JWKS (aud, iss, exp, e-post i allowlist); vid ändrande anrop även Origin + X-Kronkoll", "satisfies": ["KK-2-B", "SYN-1-B"] },
+        { "from": "API Worker", "to": "API Worker", "label": "verifiera JWT mot team-JWKS (aud, iss, exp, e-post i allowlist); vid ändrande anrop även Origin + X-Kronkoll", "satisfies": ["KK-2-B", "KK-29-B"] },
         { "from": "API Worker", "to": "Webbläsare", "label": "200 JSON (Cache-Control: no-store)", "reply": true }
       ]
     },
@@ -890,7 +822,7 @@
         { "id": "deleted", "description": "All data för kopplingen raderad", "satisfies": ["KK-11-B"] }
       ],
       "transitions": [
-        { "from": "pending_auth", "to": "active", "on": "callback med giltigt state", "effect": "skapa session + initial hämtning", "satisfies": ["KK-5-C", "SYN-1-A"] },
+        { "from": "pending_auth", "to": "active", "on": "callback med giltigt state", "effect": "skapa session + initial hämtning", "satisfies": ["KK-5-C", "KK-29-A"] },
         { "from": "pending_auth", "to": "deleted", "on": "timeout / avbrutet", "effect": "inget sparas" },
         { "from": "active", "to": "expiring", "on": "daily: dagar kvar ≤ 14", "effect": "banner + push", "satisfies": ["KK-8-A", "KK-27-B"] },
         { "from": "expiring", "to": "expired", "on": "utgångsdatum / 401 från bank", "effect": "synk pausas" },
@@ -948,11 +880,11 @@
     },
     {
       "id": "F-ci", "title": "CI/CD: kvalitetsgrindar före deploy", "kind": "process",
-      "description": "GitHub Actions. Gratis för publika repon. För privata repon ingår 2 000 min/mån (risk `R-7`).",
-      "satisfies": ["KK-16", "KK-1-C", "KK-12", "SYN-3"],
+      "description": "GitHub Actions. Gratis för publika repon. Alla grindar samlas i jobbet `ci-ok`, som är den enda obligatoriska statuskontrollen i rulesetet för main (D-branch). Finns i `.github/workflows/ci.yml` från start med secret-scan och workflow-lint. Övriga grindar läggs till i M0.",
+      "satisfies": ["KK-16", "KK-1-C", "KK-12", "KK-31"],
       "steps": [
         { "id": "c-start", "label": "push / pull_request", "kind": "start", "next": ["c-static"] },
-        { "id": "c-static", "label": "lint + typecheck + arkitekturregler + gitleaks + actionlint", "actor": "GitHub Actions", "next": ["c-unit"], "satisfies": ["KK-3-A", "KK-14-A", "KK-12-B", "SYN-3-A"] },
+        { "id": "c-static", "label": "lint + typecheck + arkitekturregler + gitleaks + actionlint", "actor": "GitHub Actions", "next": ["c-unit"], "satisfies": ["KK-3-A", "KK-14-A", "KK-12-B", "KK-31-A"] },
         { "id": "c-unit", "label": "Vitest unit + coverage (domain ≥ 90 %)", "next": ["c-int"], "satisfies": ["KK-16-A"] },
         { "id": "c-int", "label": "Integration: vitest-pool-workers (Worker + D1)", "next": ["c-mut"] },
         { "id": "c-mut", "label": "Stryker på domain ≥ 85 % (inkrementellt i PR, fullt nattligt)", "next": ["c-e2e"], "satisfies": ["KK-16-A"] },
@@ -984,8 +916,8 @@
       "fields": [
         { "name": "id", "type": "text (ulid)", "required": true },
         { "name": "name", "type": "text", "description": "\"Hushållet\"" },
-        { "name": "budget_period_start_day", "type": "int 1–28", "description": "1 = kalendermånad, 25 = lönedag", "satisfies": ["SYN-6-A"] },
-        { "name": "timezone", "type": "text", "description": "Europe/Stockholm", "satisfies": ["SYN-5-A"] }
+        { "name": "budget_period_start_day", "type": "int 1–28", "description": "1 = kalendermånad, 25 = lönedag", "satisfies": ["KK-34-A"] },
+        { "name": "timezone", "type": "text", "description": "Europe/Stockholm", "satisfies": ["KK-33-A"] }
       ],
       "relations": [{ "to": "User", "cardinality": "1..*" }, { "to": "BankConnection", "cardinality": "0..*" }, { "to": "Category", "cardinality": "1..*" }]
     },
@@ -1188,13 +1120,13 @@
       "id": "web", "name": "web (PWA)", "kind": "frontend", "tech": "React 19 + Vite + TypeScript, TanStack Query, vite-plugin-pwa, Motion, visx (diagram)",
       "description": "`apps/web`. Mobile first och installbar. Intl.NumberFormat/DateTimeFormat('sv-SE'). Tema via CSS-variabler för ljust och mörkt läge. Service worker cachar app-skalet och senaste översikt i högst 24 h.",
       "depends_on": [{ "to": "pages-fn", "label": "/api/* (samma origin)" }],
-      "satisfies": ["KK-25", "KK-26", "KK-4", "KK-3", "SYN-2"]
+      "satisfies": ["KK-25", "KK-26", "KK-4", "KK-3", "KK-30"]
     },
     {
       "id": "pages-fn", "name": "Pages Function /api/[[path]]", "kind": "service", "tech": "Cloudflare Pages Functions (TS)",
       "description": "Tunn proxy: vidarebefordrar till `api` via **service binding** och sätter säkerhetsheaders (CSP, HSTS, no-store). Räknas mot samma gratiskvot på 100 000 anrop/dygn som Workers (A-3).",
       "depends_on": [{ "to": "api", "label": "service binding" }],
-      "satisfies": ["KK-2", "SYN-2-B", "KK-1"]
+      "satisfies": ["KK-2", "KK-30-B", "KK-1"]
     },
     {
       "id": "api", "name": "api (Worker)", "kind": "service", "tech": "Cloudflare Workers + Hono + Zod",
@@ -1233,8 +1165,8 @@
       "depends_on": [{ "to": "access", "label": "JWKS /cdn-cgi/access/certs" }],
       "satisfies": ["KK-2-B"]
     },
-    { "id": "d1", "name": "D1 (SQLite)", "kind": "database", "tech": "Cloudflare D1 free, Time Travel 7 dagar", "description": "Krypterad i vila av Cloudflare. Session-id dessutom krypterat på applikationsnivå.", "satisfies": ["KK-1", "SYN-4"] },
-    { "id": "access", "name": "Cloudflare Access", "kind": "external", "tech": "Zero Trust free (≤ 50 användare)", "description": "Self-hosted application för kronkoll.pages.dev (A-4). Policy: e-post i allowlist. Sessionslängd 24 h (SYN-7).", "satisfies": ["KK-2", "KK-2-A"] },
+    { "id": "d1", "name": "D1 (SQLite)", "kind": "database", "tech": "Cloudflare D1 free, Time Travel 7 dagar", "description": "Krypterad i vila av Cloudflare. Session-id dessutom krypterat på applikationsnivå.", "satisfies": ["KK-1", "KK-32"] },
+    { "id": "access", "name": "Cloudflare Access", "kind": "external", "tech": "Zero Trust free (≤ 50 användare)", "description": "Self-hosted application för kronkoll.pages.dev (A-4). Policy: e-post i allowlist. Sessionslängd 24 h (KK-35).", "satisfies": ["KK-2", "KK-2-A"] },
     { "id": "eb", "name": "Enable Banking", "kind": "external", "tech": "Restricted Production (A-1) / Sandbox", "depends_on": [{ "to": "skandia", "label": "PSD2 AIS" }], "satisfies": ["KK-5"] },
     { "id": "skandia", "name": "Skandia (ASPSP)", "kind": "external", "tech": "BankID-SCA", "description": "Konto, sparkonto och Visa (om exponerat – spike). **American Express går inte att koppla i Sverige** → CSV.", "satisfies": ["KK-6", "KK-6-B"] },
     { "id": "push", "name": "Push-tjänster (Apple/Google/Mozilla)", "kind": "external", "tech": "Gratis Web Push", "satisfies": ["KK-27"] },
@@ -1242,7 +1174,7 @@
       "id": "gha", "name": "GitHub Actions", "kind": "ci", "tech": "Wrangler, Vitest, Playwright, Stryker, gitleaks, actionlint",
       "description": "Workflows: `ci.yml` (PR + main), `deploy.yml` (needs: alla grindar), `nightly.yml` (full Stryker och kontraktstest mot sandbox). Secrets: `CLOUDFLARE_API_TOKEN` (avgränsad), `CLOUDFLARE_ACCOUNT_ID`, `EB_SANDBOX_*`.",
       "depends_on": [{ "to": "api", "label": "wrangler deploy" }, { "to": "web", "label": "wrangler pages deploy" }, { "to": "d1", "label": "migrations apply" }],
-      "satisfies": ["KK-16", "KK-1-C", "KK-12-B", "SYN-3"]
+      "satisfies": ["KK-16", "KK-1-C", "KK-12-B", "KK-31"]
     }
   ],
 
@@ -1257,7 +1189,7 @@
       ],
       "chosen": "Pages + Pages Function-proxy via service binding",
       "rationale": "Minst attackyta och enklast auth. Kvoten räcker med god marginal: en användare med 2 cron-synkar/dygn gör uppskattningsvis < 2 000 anrop/dygn.",
-      "satisfies": ["KK-2", "KK-1", "SYN-1-B"]
+      "satisfies": ["KK-2", "KK-1", "KK-29-B"]
     },
     {
       "id": "D-money", "title": "Belopp som heltal öre", "status": "proposed",
@@ -1335,6 +1267,13 @@
     {
       "id": "D-notify", "title": "Notiskanal", "status": "accepted",
       "context": "Ditt svar 2026-11-01. Appens banner finns alltid som baslinje, eftersom push på iOS kräver installerad PWA.", "chosen": "Web Push i PWA + in-app", "satisfies": ["KK-27"]
+    },
+    {
+      "id": "D-branch", "title": "Skydd av main: ruleset + samlad CI-grind", "status": "accepted",
+      "context": "Din begäran 2026-11-01. Rulesetet ligger i `.github/rulesets/main.json` och importeras i GitHub-UI:t (steg i `docs/github-setup.md`).",
+      "chosen": "Ruleset main-skydd: bara PR (squash), statuskontrollen ci-ok måste vara grön, grenen uppdaterad, konversationer lösta, linjär historik, ingen force push eller radering, inga bypass-aktörer",
+      "rationale": "En samlande grind (`ci-ok`) gör att nya grindar bara läggs till i `needs:` i ci.yml. 0 godkännanden krävs eftersom du är ensam och inte kan godkänna din egen PR. Höjs till 1 i M4. Deploy-hemligheter ligger bara i miljön production, som är låst till main.",
+      "satisfies": ["KK-16", "KK-16-B", "KK-31", "KK-12-B"]
     },
     {
       "id": "D-repo", "title": "Publikt repo", "status": "accepted",
@@ -1456,15 +1395,15 @@
     { "id": "R-7", "risk": "Om repot någon gång görs privat: GitHub Actions-minuter (2 000/mån) tar slut på grund av Stryker och Playwright, och secret scanning blir betalt. Repot är publikt (D-repo), så risken gäller bara vid ett byte.", "likelihood": "low", "impact": "medium", "mitigation": "Inkrementell Stryker i PR och full nattligt bara vid ändringar i domain. Playwright bara med Chromium och mobil viewport. gitleaks i stället för GHAS. Repot är publikt enligt beslut D-repo.", "satisfies": ["KK-1-A", "KK-16"] },
     { "id": "R-8", "risk": "Dedup slår ihop två legitima, identiska köp (två kaffe à 45 kr samma dag hos samma motpart).", "likelihood": "medium", "impact": "low", "mitigation": "Löpnummer i fingeravtrycket och provider-id först. Egenskapsbaserade tester.", "satisfies": ["KK-9-A"] },
     { "id": "T-S1", "risk": "[Hot · STRIDE S – Spoofing] Någon anropar API-workern direkt och kringgår Access.", "likelihood": "low", "impact": "high", "mitigation": "workers_dev=false (ingen publik URL), bara service binding. Workern validerar ändå Access-JWT (signatur mot JWKS, aud, iss, exp) och e-post mot allowlist.", "satisfies": ["KK-2-B"] },
-    { "id": "T-S2", "risk": "[Hot · S] Inloggnings-CSRF i bankcallbacken: en angripare får sin egen bankkoppling inlagd hos dig, eller tvärtom.", "likelihood": "low", "impact": "medium", "mitigation": "HMAC-signerat engångs-state, bundet till användaren, giltigt i 15 min (SYN-1).", "satisfies": ["SYN-1-A"] },
-    { "id": "T-T1", "risk": "[Hot · T – Tampering] CSRF mot ändrande endpoints (radera koppling, ändra budget).", "likelihood": "low", "impact": "medium", "mitigation": "SameSite-cookie från Access, Origin-kontroll och krav på X-Kronkoll-header. Destruktiva åtgärder kräver bekräftelse i UI.", "satisfies": ["SYN-1-B"] },
-    { "id": "T-T2", "risk": "[Hot · T] Lagrad XSS via motpartsnamn eller beskrivning från banken.", "likelihood": "low", "impact": "high", "mitigation": "React-escaping, lint förbjuder dangerouslySetInnerHTML, strikt CSP utan inline-skript (SYN-2).", "satisfies": ["SYN-2-A", "SYN-2-B"] },
+    { "id": "T-S2", "risk": "[Hot · S] Inloggnings-CSRF i bankcallbacken: en angripare får sin egen bankkoppling inlagd hos dig, eller tvärtom.", "likelihood": "low", "impact": "medium", "mitigation": "HMAC-signerat engångs-state, bundet till användaren, giltigt i 15 min (KK-29).", "satisfies": ["KK-29-A"] },
+    { "id": "T-T1", "risk": "[Hot · T – Tampering] CSRF mot ändrande endpoints (radera koppling, ändra budget).", "likelihood": "low", "impact": "medium", "mitigation": "SameSite-cookie från Access, Origin-kontroll och krav på X-Kronkoll-header. Destruktiva åtgärder kräver bekräftelse i UI.", "satisfies": ["KK-29-B"] },
+    { "id": "T-T2", "risk": "[Hot · T] Lagrad XSS via motpartsnamn eller beskrivning från banken.", "likelihood": "low", "impact": "high", "mitigation": "React-escaping, lint förbjuder dangerouslySetInnerHTML, strikt CSP utan inline-skript (KK-30).", "satisfies": ["KK-30-A", "KK-30-B"] },
     { "id": "T-R1", "risk": "[Hot · R – Repudiation] Oklart vem eller vad som raderade eller kopplade om en bank.", "likelihood": "low", "impact": "low", "mitigation": "Minimal säkerhetslogg (händelse, tid, e-post-hash) utan bankdata, sparad i 90 dagar.", "satisfies": ["KK-13-A"] },
     { "id": "T-I1", "risk": "[Hot · I – Information disclosure] Den privata RSA-nyckeln läcker (repo, CI-logg, laptop).", "likelihood": "low", "impact": "high", "mitigation": "Bara som Worker secret, med sandbox-nyckel lokalt. gitleaks + push protection. Rutin för nyckelrotation (ny nyckel i Enable Banking-kontrollpanelen). Restricted Production begränsar skadan till egna konton och endast läsning.", "satisfies": ["KK-12", "KK-5"] },
     { "id": "T-I2", "risk": "[Hot · I] Bankdata hamnar i loggar (Workers Logs, CI, felrapporter).", "likelihood": "medium", "impact": "medium", "mitigation": "Logger med vitlista (KK-13-A). Inga request bodies loggas, felkoder i stället för svarstext. Syntetiska fixtures. Ingen tredjeparts felrapportering.", "satisfies": ["KK-13-A", "KK-13-B"] },
-    { "id": "T-I3", "risk": "[Hot · I] En stulen eller upplåst mobil med installerad PWA visar bankdata.", "likelihood": "medium", "impact": "medium", "mitigation": "Access-session 24 h, cache högst 24 h och Cache-Control: no-store på API. Logga ut rensar enheten (SYN-7). Push-texter innehåller inga belopp per transaktion.", "satisfies": ["KK-25-B", "SYN-7-A", "KK-27-A"] },
-    { "id": "T-I4", "risk": "[Hot · I] Databasdump (D1-export, kapad Cloudflare-token) läcker session-id och transaktioner.", "likelihood": "low", "impact": "high", "mitigation": "Session-id krypterat med AES-GCM. Utan JWT-nyckeln är det ändå oanvändbart. IBAN lagras bara som HMAC-hash. CLOUDFLARE_API_TOKEN avgränsad och bara i GitHub Environments med skydd för main. 2FA på Cloudflare och GitHub.", "satisfies": ["KK-11-C", "SYN-3"] },
-    { "id": "T-I5", "risk": "[Hot · I] Leveranskedjeattack: ett skadligt npm-paket eller en kapad action exfiltrerar secrets.", "likelihood": "medium", "impact": "high", "mitigation": "SYN-3: pinnade actions (SHA), minimal permissions, npm ci --ignore-scripts, få beroenden i Workern, Dependabot. Deploy-jobbet har inga sandbox-hemligheter och testjobben inga produktionshemligheter.", "satisfies": ["SYN-3-A"] },
+    { "id": "T-I3", "risk": "[Hot · I] En stulen eller upplåst mobil med installerad PWA visar bankdata.", "likelihood": "medium", "impact": "medium", "mitigation": "Access-session 24 h, cache högst 24 h och Cache-Control: no-store på API. Logga ut rensar enheten (KK-35). Push-texter innehåller inga belopp per transaktion.", "satisfies": ["KK-25-B", "KK-35-A", "KK-27-A"] },
+    { "id": "T-I4", "risk": "[Hot · I] Databasdump (D1-export, kapad Cloudflare-token) läcker session-id och transaktioner.", "likelihood": "low", "impact": "high", "mitigation": "Session-id krypterat med AES-GCM. Utan JWT-nyckeln är det ändå oanvändbart. IBAN lagras bara som HMAC-hash. CLOUDFLARE_API_TOKEN avgränsad och bara i GitHub Environments med skydd för main. 2FA på Cloudflare och GitHub.", "satisfies": ["KK-11-C", "KK-31"] },
+    { "id": "T-I5", "risk": "[Hot · I] Leveranskedjeattack: ett skadligt npm-paket eller en kapad action exfiltrerar secrets.", "likelihood": "medium", "impact": "high", "mitigation": "KK-31: pinnade actions (SHA), minimal permissions, npm ci --ignore-scripts, få beroenden i Workern, Dependabot. Deploy-jobbet har inga sandbox-hemligheter och testjobben inga produktionshemligheter.", "satisfies": ["KK-31-A"] },
     { "id": "T-D1", "risk": "[Hot · D – Denial of service] Kvoten (100 000 anrop/dygn) förbrukas av obehöriga eller av en loop.", "likelihood": "low", "impact": "low", "mitigation": "Access stoppar obehöriga redan i kanten, före Workern. Manuell synk är begränsad (KK-7-C). Daglig synk är idempotent. Free tier har inget överdebiteringsläge: tjänsten stängs av i stället för att faktureras (A-3).", "satisfies": ["KK-7-C", "KK-1-A"] },
     { "id": "T-E1", "risk": "[Hot · E – Elevation of privilege] Kronkoll används för att initiera betalningar.", "likelihood": "low", "impact": "high", "mitigation": "Bara AIS-scope i /auth. Ingen PIS-kod. Test/lintregel förbjuder /payments (KK-5-A). Enable Banking-appen registreras endast för AIS (antagande).", "satisfies": ["KK-5-A"] }
   ],
@@ -1499,7 +1438,7 @@
 
   "verification": [
     { "id": "V-u-money", "title": "domain/money + format: sv-SE belopp och datum", "type": "unit", "given": "1234567 öre, 2026-11-03", "when": "formatAmount / formatDate", "then": "\"12 345,67 kr\", \"3 nov. 2026\", \"2026-11-03\"; veckostart måndag", "satisfies": ["KK-4-A", "KK-4-B"] },
-    { "id": "V-u-period", "title": "domain/period: svensk tid och lönedagsperiod", "type": "unit", "given": "Clock i UTC 2026-10-31T23:30Z (00:30 svensk tid 1 nov.) och booking_date 2026-10-31", "when": "perioden räknas", "then": "rätt period i Europe/Stockholm; startdag 25 flyttas till närmast föregående bankdag", "satisfies": ["SYN-5-A", "SYN-6-A"] },
+    { "id": "V-u-period", "title": "domain/period: svensk tid och lönedagsperiod", "type": "unit", "given": "Clock i UTC 2026-10-31T23:30Z (00:30 svensk tid 1 nov.) och booking_date 2026-10-31", "when": "perioden räknas", "then": "rätt period i Europe/Stockholm; startdag 25 flyttas till närmast föregående bankdag", "satisfies": ["KK-33-A", "KK-34-A"] },
     { "id": "V-u-reconcile", "title": "domain/reconcile: dedup och PDNG→BOOK (TDD + fast-check)", "type": "unit", "given": "syntetiska serier från fixture-fabriken", "when": "samma batch importeras 1–n gånger, i olika ordning, med id-byte vid bokföring", "then": "exakt en rad per verklig transaktion; preliminär ersätts och behåller kategori och uppdelning; försvunnen preliminär efter 10 dagar → removed; CSV-dubbletter ignoreras", "satisfies": ["KK-9-A", "KK-9-B", "KK-9-C", "KK-10-B"] },
     { "id": "V-u-transfers", "title": "domain/transfers: interna överföringar och kortfaktura", "type": "unit", "given": "−5 000 kr från privatkonto och +5 000 kr på sparkonto samma dag; betalning till Visa", "when": "classify körs", "then": "båda markeras interna och räknas inte i budgetutfall", "satisfies": ["KK-20-C"] },
     { "id": "V-u-categorize", "title": "domain/normalize + categorize: regler och inlärning", "type": "unit", "given": "\"ICA NARA SOFO STHLM\", \"K*ICA KVANTUM\", manuellt kategoriserad ICA-rad", "when": "en regel lärs in och appliceras bakåt", "then": "normaliseras till ICA och regeln matchar; den manuella raden ändras inte; prioritet manuell > inlärd > mall", "satisfies": ["KK-18-B", "KK-18-C"] },
@@ -1514,12 +1453,12 @@
     { "id": "V-u-logger", "title": "Logger med vitlista (redaction)", "type": "unit", "given": "ett loggobjekt med amount, counterparty och iban", "when": "det loggas", "then": "endast vitlistade fält skrivs ut, övrigt blir [redacted]", "satisfies": ["KK-13-A"] },
     { "id": "V-u-jwt", "title": "adapter-enablebanking: JWT via WebCrypto", "type": "unit", "given": "genererat testnyckelpar (aldrig riktig nyckel)", "when": "JWT byggs", "then": "RS256, kid = app id, exp − iat ≤ 300 s, verifierbar med publik nyckel", "satisfies": ["KK-5-B"] },
     { "id": "V-u-csv", "title": "adapter-csv: parser och mappning", "type": "unit", "given": "syntetisk CSV (semikolon, komma-decimal, BOM)", "when": "dry_run + import", "then": "rätt antal nya och dubbletter, belopp i öre", "satisfies": ["KK-10-A"] },
-    { "id": "V-u-xss", "title": "Rendering av opålitliga banktexter", "type": "unit", "given": "fixture med motpart `<img src=x onerror=alert(1)>`", "when": "TransactionRow renderas (Vitest + Testing Library)", "then": "texten visas som ren text och inget img-element skapas", "satisfies": ["SYN-2-A"] },
+    { "id": "V-u-xss", "title": "Rendering av opålitliga banktexter", "type": "unit", "given": "fixture med motpart `<img src=x onerror=alert(1)>`", "when": "TransactionRow renderas (Vitest + Testing Library)", "then": "texten visas som ren text och inget img-element skapas", "satisfies": ["KK-30-A"] },
     { "id": "V-i-access", "title": "Worker: Access-JWT-validering", "type": "integration", "given": "vitest-pool-workers med testad JWKS", "when": "anrop med giltig, fel aud, utgången och saknad JWT", "then": "200 / 401 / 401 / 401; inget innehåll loggas", "satisfies": ["KK-2-B"] },
-    { "id": "V-i-csrf", "title": "Worker: CSRF och bank-state", "type": "integration", "given": "inloggad användare", "when": "POST utan X-Kronkoll, callback med återanvänt eller utgånget state", "then": "403 respektive 400; ingen session skapas", "satisfies": ["SYN-1-A", "SYN-1-B"] },
+    { "id": "V-i-csrf", "title": "Worker: CSRF och bank-state", "type": "integration", "given": "inloggad användare", "when": "POST utan X-Kronkoll, callback med återanvänt eller utgånget state", "then": "403 respektive 400; ingen session skapas", "satisfies": ["KK-29-A", "KK-29-B"] },
     { "id": "V-i-sync", "title": "Worker scheduled(): synk mot fejkad BankDataProvider + riktig D1", "type": "integration", "given": "två konton, ett som ger 429", "when": "scheduled-handlern körs två gånger", "then": "det friska kontot synkas och last_success_at sätts; det trasiga loggas med felkod och försöks igen; ingen dubblett; manuell synk ger 429 inom 15 min", "satisfies": ["KK-7-A", "KK-7-B", "KK-7-C"] },
     { "id": "V-i-renew", "title": "Koppla om: kontomatchning och glapp", "type": "integration", "given": "utgången koppling med 3 konton, ny session med nya uid", "when": "renew + callback", "then": "konton matchas via IBAN-hash; glappet hämtas; 0 dubbletter", "satisfies": ["KK-8-B"] },
-    { "id": "V-i-delete", "title": "Radering med och utan purge", "type": "integration", "given": "koppling med konton, transaktioner och uppdelningar i D1", "when": "DELETE ?purge=true", "then": "fejkad EB får DELETE /sessions; 0 kvarvarande rader för kopplingen; svaret anger att backup förfaller efter 7 dagar", "satisfies": ["KK-11-A", "KK-11-B", "SYN-4-A"] },
+    { "id": "V-i-delete", "title": "Radering med och utan purge", "type": "integration", "given": "koppling med konton, transaktioner och uppdelningar i D1", "when": "DELETE ?purge=true", "then": "fejkad EB får DELETE /sessions; 0 kvarvarande rader för kopplingen; svaret anger att backup förfaller efter 7 dagar", "satisfies": ["KK-11-A", "KK-11-B", "KK-32-A"] },
     { "id": "V-i-storage", "title": "Lagringsminimering", "type": "integration", "given": "en import från fejkad EB med fullt rått svar", "when": "D1 inspekteras", "then": "inga råa JSON-kolumner; kontonummer maskerat; session_id krypterat och inte i klartext", "satisfies": ["KK-11-C"] },
     { "id": "V-i-household", "title": "Migrering: lägg till andra användare", "type": "integration", "given": "syntetisk databas med en användare", "when": "en andra användare och ett privat konto läggs till", "then": "befintliga rader orörda; visibility filtrerar korrekt", "satisfies": ["KK-28-A"] },
     { "id": "V-i-push", "title": "adapter-webpush mot lokal mottagare", "type": "integration", "given": "testprenumeration med kända nycklar", "when": "Notifier.send körs", "then": "giltig VAPID-JWT och dekrypterbar aes128gcm-payload; 410 tar bort prenumerationen", "satisfies": ["KK-27-A"] },
@@ -1528,7 +1467,8 @@
     { "id": "V-ci-gates", "title": "CI: grindar blockerar deploy", "type": "integration", "given": "en PR som sänker coverage i domain till 85 %", "when": "CI körs", "then": "coverage-steget faller och deploy körs inte; deploy.yml har needs på alla grindar; tsc strict körs för alla paket", "satisfies": ["KK-16-A", "KK-16-B", "KK-3-A", "KK-1-C"] },
     { "id": "V-ci-mutation", "title": "Stryker på domain", "type": "integration", "given": "nattlig full körning", "when": "mutation score < 85 % (D-mutation)", "then": "jobbet fallerar och deploy av domain-ändringar blockeras", "satisfies": ["KK-16-A", "KK-15-A"] },
     { "id": "V-ci-secrets", "title": "Hemligheter: gitleaks + push protection", "type": "integration", "given": "en testgren med en påhittad PEM-nyckel", "when": "push", "then": "push protection eller gitleaks stoppar; .gitignore innehåller .dev.vars, .env*, *.pem och *.key", "satisfies": ["KK-12-A", "KK-12-B"] },
-    { "id": "V-ci-supply", "title": "Workflow-lint (actionlint/zizmor)", "type": "integration", "given": "workflows", "when": "CI körs", "then": "alla uses pinnade på SHA och permissions satt explicit", "satisfies": ["SYN-3-A"] },
+    { "id": "V-m-ruleset", "title": "Branch protection för main", "type": "manual", "given": "rulesetet main-skydd importerat och inställningarna i docs/github-setup.md gjorda", "when": "direkt push till main, och en PR med röd ci-ok", "then": "pushen nekas och PR:en kan inte mergas", "satisfies": ["KK-16-B"] },
+    { "id": "V-ci-supply", "title": "Workflow-lint (actionlint/zizmor)", "type": "integration", "given": "workflows", "when": "CI körs", "then": "alla uses pinnade på SHA och permissions satt explicit", "satisfies": ["KK-31-A"] },
     { "id": "V-e2e-connect", "title": "E2E: koppla bank (sandbox) och samtyckesbanner", "type": "e2e", "given": "Playwright i mobil viewport mot preview, EB sandbox", "when": "Koppla bank → Mock ASPSP → tillbaka", "then": "konton syns, historik hämtad; med klocka 14 dagar före utgång syns bannern med Koppla om", "satisfies": ["KK-15-B", "KK-8-A"] },
     { "id": "V-e2e-categorize", "title": "E2E: kategorisera och dela upp", "type": "e2e", "given": "syntetiska transaktioner seedade", "when": "byt kategori med Gör alltid så; dela upp 1 240 kr", "then": "regeln skapas och syns under Regler; uppdelningen syns i listan; fel summa blockerar Spara", "satisfies": ["KK-18-B", "KK-19-A", "KK-19-B", "KK-15-B"] },
     { "id": "V-e2e-budget", "title": "E2E: sätta budget", "type": "e2e", "given": "november utan budget", "when": "Föreslå från snitt, justera Mat till 6 300, spara", "then": "Mat visar 104 % – över (färg + text)", "satisfies": ["KK-20-A", "KK-20-B", "KK-15-B"] },
@@ -1537,8 +1477,8 @@
     { "id": "V-e2e-dashboard", "title": "E2E: översikt", "type": "e2e", "given": "syntetisk månad", "when": "öppna appen", "then": "saldo, in, ut, kvar att spendera, senaste synk och 12-månaderstrend stämmer mot fixture", "satisfies": ["KK-17-A", "KK-17-C"] },
     { "id": "V-e2e-pwa", "title": "PWA: Lighthouse installability + offline", "type": "e2e", "given": "produktionsbygge", "when": "Lighthouse CI och Playwright offline-läge", "then": "manifest, ikoner och service worker godkända; offline visar senaste översikt med tidsstämpel; cache > 24 h ignoreras", "satisfies": ["KK-25-A", "KK-25-B"] },
     { "id": "V-e2e-a11y", "title": "Tillgänglighet och rörelse", "type": "e2e", "given": "ljust och mörkt läge", "when": "axe körs på huvudvyerna och prefers-reduced-motion emuleras", "then": "inga AA-kontrastfel; animationer avstängda", "satisfies": ["KK-26-A", "KK-26-B"] },
-    { "id": "V-e2e-csp", "title": "Säkerhetsheaders", "type": "e2e", "given": "preview-deploy", "when": "hämta / och /api/overview", "then": "CSP enligt SYN-2-B, no-store på API", "satisfies": ["SYN-2-B"] },
-    { "id": "V-e2e-logout", "title": "Logga ut rensar enheten", "type": "e2e", "given": "inloggad med cachad översikt", "when": "Logga ut och rensa enheten", "then": "Cache Storage och IndexedDB tomma; omdirigering till Access", "satisfies": ["SYN-7-A"] },
+    { "id": "V-e2e-csp", "title": "Säkerhetsheaders", "type": "e2e", "given": "preview-deploy", "when": "hämta / och /api/overview", "then": "CSP enligt KK-30-B, no-store på API", "satisfies": ["KK-30-B"] },
+    { "id": "V-e2e-logout", "title": "Logga ut rensar enheten", "type": "e2e", "given": "inloggad med cachad översikt", "when": "Logga ut och rensa enheten", "then": "Cache Storage och IndexedDB tomma; omdirigering till Access", "satisfies": ["KK-35-A"] },
     { "id": "V-e2e-csv", "title": "E2E: CSV-import", "type": "e2e", "given": "syntetisk Amex-CSV", "when": "importera två gånger", "then": "första gången 142 nya; andra gången 0 nya och 142 dubbletter", "satisfies": ["KK-10-A", "KK-10-B"] },
     { "id": "V-m-spike", "title": "Spike-protokoll Skandia", "type": "manual", "given": "EB sandbox + Restricted Production", "when": "ASPSP-lista, koppling och hämtning", "then": "protokollet besvarar KK-6-A; Amex-notisen finns i UI och plan", "satisfies": ["KK-6-A", "KK-6-B"] },
     { "id": "V-m-access", "title": "Manuell Access-kontroll", "type": "manual", "given": "en icke inbjuden e-post", "when": "öppna kronkoll.pages.dev", "then": "nekad; inga /api-anrop når Workern (kontrollera Workers-analytics)", "satisfies": ["KK-2-A"] },
