@@ -1,7 +1,7 @@
 <!--
 Write for a human who will not read the code. See AGENTS.md → Pull requests.
 Title: English, imperative, ≤ 72 characters, describe the effect (e.g. "Deduplicate pending transactions when the bank changes ids (KK-9)").
-Size: aim for ≤ 400 changed lines. More than 700 requires the label large-pr and a justification below.
+Size: aim for ≤ 400 changed lines. More than 800 requires the label large-pr and a justification below.
 All four headings are checked by CI and must not be empty.
 -->
 

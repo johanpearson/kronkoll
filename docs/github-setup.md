@@ -55,7 +55,7 @@ Settings → Environments → **production**:
 
 ## 7. Etikett för stora PR:er (large-pr)
 
-Issues → Labels → **New label** `large-pr` ("More than 700 changed lines – justified in the description"). Används av CI-jobbet
+Issues → Labels → **New label** `large-pr` ("More than 800 changed lines – justified in the description"). Används av CI-jobbet
 `pr-size` (se AGENTS.md → Små PR:er).
 
 ## Verifiera (V-m-ruleset)
