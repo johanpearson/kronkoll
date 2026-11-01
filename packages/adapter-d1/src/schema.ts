@@ -12,8 +12,8 @@
  */
 import { sql } from "drizzle-orm";
 import {
-  blob,
   check,
+  customType,
   index,
   integer,
   primaryKey,
@@ -26,6 +26,12 @@ import {
 const oneOf = (column: string, values: readonly string[]) =>
   sql.raw(`${column} IN (${values.map((v) => `'${v}'`).join(", ")})`);
 const isoDate = (column: string) => sql.raw(`${column} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'`);
+/** BLOB som Uint8Array, utan Node:s Buffer, så att det fungerar i Workern. D1 returnerar BLOB som tal-array. */
+const bytes = customType<{ data: Uint8Array; driverData: Uint8Array | ArrayBuffer | number[] }>({
+  dataType: () => "blob",
+  toDriver: (value) => value,
+  fromDriver: (value) => (value instanceof Uint8Array ? value : Array.isArray(value) ? Uint8Array.from(value) : new Uint8Array(value)),
+});
 const createdAt = () => text("created_at").notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`);
 
 export const settings = sqliteTable(
@@ -61,7 +67,7 @@ export const bankConnections = sqliteTable(
     provider: text("provider", { enum: ["enablebanking", "csv"] }).notNull(),
     aspspName: text("aspsp_name"),
     /** Enable Bankings session-id, krypterat med SESSION_ENC_KEY (AES-GCM). Aldrig i klartext. */
-    sessionIdEnc: blob("session_id_enc", { mode: "buffer" }),
+    sessionIdEnc: bytes("session_id_enc"),
     status: text("status", { enum: CONNECTION_STATUS }).notNull().default("pending_auth"),
     consentExpiresOn: text("consent_expires_on"),
     lastSuccessAt: text("last_success_at"),
