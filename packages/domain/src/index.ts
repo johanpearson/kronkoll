@@ -4,3 +4,21 @@ export { assertMinor, parseAmount, sumMinor } from "./money.ts";
 export { fixedClock, stockholmDate, todayInStockholm, type Clock } from "./clock.ts";
 export { easterSunday, isBankDay, previousBankDayOnOrBefore, swedishBankHolidays } from "./bankdays.ts";
 export { budgetPeriodForKey, budgetPeriodOf, currentBudgetPeriod, weekStart, type BudgetPeriod } from "./period.ts";
+export {
+  reconcile,
+  MATCH_WINDOW_DAYS,
+  PENDING_GRACE_DAYS,
+  type ImportedTransaction,
+  type ReconcileInput,
+  type ReconcileResult,
+  type StoredTransaction,
+  type TransactionStatus,
+} from "./reconcile.ts";
+export {
+  classifyTransfers,
+  TRANSFER_WINDOW_DAYS,
+  type ClassifyTransfersInput,
+  type OwnAccount,
+  type TransferClassification,
+  type TransferInput,
+} from "./transfers.ts";
