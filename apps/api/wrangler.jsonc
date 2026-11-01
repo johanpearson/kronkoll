@@ -7,5 +7,14 @@
   "compatibility_date": "2026-10-01",
   "workers_dev": false,
   "preview_urls": false,
-  "observability": { "enabled": false }
+  "observability": { "enabled": false },
+  // Databasens id är inte hemligt. Åtkomst kräver Cloudflare-token.
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "kronkoll",
+      "database_id": "0e4be508-471c-418a-8547-c320e4076268",
+      "migrations_dir": "migrations"
+    }
+  ]
 }
