@@ -86,8 +86,14 @@ function idsCompatible(existing: StoredTransaction, incoming: ImportedTransactio
   return existing.status !== "booked" && incoming.status === "booked";
 }
 
+/**
+ * Fingeravtryck: samma konto, belopp och motpart inom ±3 dagar. En preliminär från banken
+ * matchas aldrig mot en redan bokförd här, eftersom det i praktiken är ett nytt köp. Bara
+ * samma bank-id får knyta ihop dem.
+ */
 function sameFingerprint(existing: StoredTransaction, incoming: ImportedTransaction): boolean {
   return (
+    !(existing.status === "booked" && incoming.status === "pending") &&
     existing.accountId === incoming.accountId &&
     existing.amountMinor === incoming.amountMinor &&
     existing.counterpartyNorm === incoming.counterpartyNorm &&
@@ -96,17 +102,26 @@ function sameFingerprint(existing: StoredTransaction, incoming: ImportedTransact
   );
 }
 
-/** Bästa kandidaten: närmast i datum, sedan samma status, sedan samma id, sedan stabil ordning. */
+/**
+ * Bästa kandidaten: närmast i datum, sedan samma status, samma id och samma bokföringsdag, sedan
+ * stabil ordning. En rad som redan är identisk med den inkommande väljs alltså alltid, så att en
+ * ny import av samma data inte flyttar om matchningarna.
+ */
 function bestCandidate(candidates: StoredTransaction[], incoming: ImportedTransaction): StoredTransaction | undefined {
-  const score = (tx: StoredTransaction): [number, number, number] => [
+  const score = (tx: StoredTransaction): number[] => [
     Math.abs(daysBetween(tx.transactionDate, incoming.transactionDate)),
     tx.status === incoming.status ? 0 : 1,
     tx.providerTxId === incoming.providerTxId ? 0 : 1,
+    tx.bookingDate === incoming.bookingDate ? 0 : 1,
   ];
-  return [...candidates].sort((a, b) => {
+  const byScore = (a: StoredTransaction, b: StoredTransaction): number => {
     const [sa, sb] = [score(a), score(b)];
-    return sa[0] - sb[0] || sa[1] - sb[1] || sa[2] - sb[2] || compareText(a.transactionDate, b.transactionDate) || compareText(a.id, b.id);
-  })[0];
+    const differing = sa.findIndex((value, i) => value !== sb[i]);
+    return differing === -1 ? 0 : (sa[differing] ?? 0) - (sb[differing] ?? 0);
+  };
+  return [...candidates].sort(
+    (a, b) => byScore(a, b) || compareText(a.transactionDate, b.transactionDate) || compareText(a.id, b.id),
+  )[0];
 }
 
 function merge(existing: StoredTransaction, incoming: ImportedTransaction, today: string): StoredTransaction {

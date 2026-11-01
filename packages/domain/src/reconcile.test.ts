@@ -134,6 +134,18 @@ describe("preliminär blir bokförd (KK-9-B)", () => {
     expect(state).toEqual([{ ...booked, lastSeenOn: TODAY }]);
   });
 
+  it("en preliminär matchas inte mot en redan bokförd på fingeravtryck, så omimport ändrar inget", () => {
+    // Motexempel från fast-check: ett bokfört köp och två nya preliminära med samma belopp och motpart
+    const booked = importInto([], [imported({ accountId: "acc_2", counterpartyNorm: "ica", transactionDate: "2026-11-01", bookingDate: "2026-11-01" })]).state;
+    const batch = [
+      imported({ accountId: "acc_2", counterpartyNorm: "ica", status: "pending", transactionDate: "2026-11-03", bookingDate: null }),
+      imported({ accountId: "acc_2", counterpartyNorm: "ica", status: "pending", transactionDate: "2026-11-04", bookingDate: null }),
+    ];
+    const once = importInto(booked, batch);
+    expect(once.state).toHaveLength(3);
+    expect(importInto(once.state, batch).result).toEqual({ inserted: [], updated: [] });
+  });
+
   it("en preliminär som syns igen får nytt senast-sedd-datum", () => {
     const pending = stored({ status: "pending", providerTxId: "p1", lastSeenOn: "2026-11-15" });
     const { result } = importInto([pending], [imported({ status: "pending", providerTxId: "p1" })]);
