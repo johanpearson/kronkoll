@@ -1,0 +1,76 @@
+# Deploy till Cloudflare (KK-1-C, KK-16-B, KK-31).
+# Körs bara när workflowen "ci" har gått helt grön efter en push till main. Då har alla grindar
+# i ci-ok passerat. Cloudflare-hemligheterna finns bara i miljön "production", som är låst till
+# main, så PR-jobb kan aldrig läsa dem.
+name: deploy
+
+on:
+  workflow_run:
+    workflows: [ci]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: deploy
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://kronkoll-25e.pages.dev
+    env:
+      WRANGLER_SEND_METRICS: "false"
+      HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      # Inga install-skript och inga hemligheter i miljön medan beroenden installeras (KK-31, T-I5)
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Deploya API-workern
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler deploy
+
+      - name: Deploya Pages
+        working-directory: apps/web
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler pages deploy --branch main --commit-hash "$HEAD_SHA" --commit-dirty=false
+
+      # Appen och API:t får aldrig gå att nå utan Cloudflare Access (KK-2-A). Utan inloggning ska
+      # Access svara med en omdirigering till inloggningen, eller neka. 200 betyder att skyddet saknas.
+      - name: Rökprov – inget är öppet utan Access
+        run: |
+          fail=0
+          for path in / /api/health; do
+            read -r code location < <(curl -s -o /dev/null --max-time 20 \
+              -w '%{http_code} %{redirect_url}\n' "https://kronkoll-25e.pages.dev$path")
+            echo "$path → $code $location"
+            case "$code" in
+              302|303)
+                case "$location" in
+                  https://*.cloudflareaccess.com/*) ;;
+                  *) echo "::error::$path omdirigerar inte till Cloudflare Access ($location)"; fail=1 ;;
+                esac ;;
+              401|403) ;;
+              *) echo "::error::$path svarade $code utan inloggning. Access skyddar inte appen."; fail=1 ;;
+            esac
+          done
+          exit $fail
