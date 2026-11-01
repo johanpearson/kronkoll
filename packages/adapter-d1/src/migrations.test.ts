@@ -131,7 +131,6 @@ describe("lagringsminimering (KK-11-C, V-i-storage)", () => {
 describe("radering och integritet (KK-11)", () => {
   it("raderas en koppling försvinner dess konton, transaktioner och uppdelningar, men driftloggen blir kvar", async () => {
     await seedConnection("r1");
-    await db.prepare(`INSERT INTO categories (id, name, kind) VALUES ('mat', 'Mat', 'expense')`).run();
     await db.prepare(`INSERT INTO transaction_splits (id, transaction_id, category_id, amount_minor) VALUES ('sp1', 'r1-t1', 'mat', -12500)`).run();
 
     await db.prepare(`DELETE FROM bank_connections WHERE id = 'r1'`).run();

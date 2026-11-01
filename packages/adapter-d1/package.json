@@ -12,6 +12,7 @@
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
+    "@kronkoll/domain": "workspace:*",
     "drizzle-orm": "0.45.4"
   },
   "devDependencies": {
