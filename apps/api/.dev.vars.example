@@ -1,0 +1,13 @@
+# Mall för lokal utveckling. Kopiera till .dev.vars (som är gitignored) och fyll i.
+# Inga riktiga värden här, och bara sandbox-nycklar lokalt (D-secrets).
+# I produktion sätts samma namn som secrets i Cloudflare, aldrig i repot.
+
+# Enable Banking, sandbox-applikationen (#50, KK-5-B)
+EB_APP_ID=
+EB_PRIVATE_KEY=
+
+# Cloudflare Access (#12, KK-2-B). ACCESS_TEAM_DOMAIN och APP_ORIGIN finns i wrangler.jsonc.
+# AUD-taggen för Access-applikationen som skyddar produktionsadressen.
+ACCESS_AUD=
+# Inbjudna e-postadresser, separerade med kommatecken.
+ACCESS_ALLOWED_EMAILS=

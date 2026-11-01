@@ -1,6 +1,7 @@
 # Hemligheter – får aldrig committas (KK-12-A)
 .dev.vars
 .dev.vars.*
+!.dev.vars.example
 .env
 .env.*
 *.pem
