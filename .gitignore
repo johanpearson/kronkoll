@@ -1,0 +1,23 @@
+# Hemligheter – får aldrig committas (KK-12-A)
+.dev.vars
+.dev.vars.*
+.env
+.env.*
+*.pem
+*.key
+*.p8
+*.p12
+
+# Granskningsfiler från reqplan (kan innehålla anteckningar)
+*.review.json
+
+# Beroenden och byggutdata
+node_modules/
+dist/
+.wrangler/
+coverage/
+reports/
+.stryker-tmp/
+playwright-report/
+test-results/
+.DS_Store
