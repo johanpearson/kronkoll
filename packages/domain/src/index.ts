@@ -22,3 +22,16 @@ export {
   type TransferClassification,
   type TransferInput,
 } from "./transfers.ts";
+export { learnPattern, matchesWordPrefix, normalizeCounterparty } from "./normalize.ts";
+export {
+  applyRules,
+  categorize,
+  learnFromManualChoice,
+  type CategorizableTransaction,
+  type Categorization,
+  type CategoryChange,
+  type CategoryRule,
+  type CategorySource,
+  type LearnInput,
+  type LearnResult,
+} from "./categorize.ts";
