@@ -27,7 +27,7 @@ De skrivs för en människa som kommer tillbaka efter några veckor.
 
 ### Små PR:er
 
-- Sikta på **≤ 400 ändrade rader** per PR. Genererade filer (`plans/**/*.html`, lockfiler, snapshots) räknas inte.
+- Sikta på **≤ 400 ändrade rader** per PR. Genererade filer (`plans/**/*.html`, lockfiler, snapshots, även Drizzles `migrations/meta/`) räknas inte.
 - Över 400 rader ger CI en varning. **Över 800 rader** stoppar CI, om inte PR:en har etiketten `large-pr` och
   beskrivningen förklarar varför den inte gick att dela upp.
 - En PR gör **en sak**. Dela hellre upp i en kedja: först port + domänlogik + tester, sedan adapter, sist UI.
