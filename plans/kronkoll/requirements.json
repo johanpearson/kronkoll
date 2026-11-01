@@ -10,7 +10,7 @@
       "verification_note": "Granskning av arkitektur och wrangler-konfiguration mot Cloudflares free-gränser; månatlig manuell kontroll av användning i Cloudflare-dashboarden.",
       "acceptance_criteria": [
         { "id": "KK-1-A", "text": "Ingen komponent, tjänst eller verktyg i arkitekturen kräver betald plan; komponenter som riskerar att bli betalda är flaggade i planen med en gratis reserv." },
-        { "id": "KK-1-B", "text": "Normal användning (en användare, 4 hämtningar/dygn) ligger med god marginal under free-gränserna för Workers-anrop, D1-läsningar/skrivningar och Cron Triggers." },
+        { "id": "KK-1-B", "text": "Normal användning (en användare, 2 schemalagda hämtningar/dygn plus manuella) ligger med god marginal under free-gränserna för Workers-anrop, D1-läsningar/skrivningar och Cron Triggers." },
         { "id": "KK-1-C", "given": "en push till main där alla kvalitetsgrindar är gröna", "when": "GitHub Actions kör deploy-jobbet", "then": "Worker, D1-migreringar och Pages deployas med Wrangler utan manuella steg och utan egen domän" }
       ]
     },
