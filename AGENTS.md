@@ -54,6 +54,12 @@ och kontrolleras i CI (`pr-description`):
 4. **Open questions and decisions**: beslut som tagits i PR:en (med motivering), antaganden och frågor som ägaren
    behöver svara på. Skriv "None" om det inte finns några.
 
+### Issues och krav
+
+- Roadmappen finns som issues: etapperna #3 (M0) till #7 (M4) har arbetspaketen som underissues. Kravspårningen finns i #43.
+- Varje PR länkar sitt issue med `Closes #n` (eller `Part of #n`) under *What and why* och nämner vilka krav (KK-…) den berör.
+- När ett krav blir helt uppfyllt uppdateras statuskolumnen i #43.
+
 Undvik upprepade fillistor och kodutdrag som går att se i diffen. Förklara i stället *varför*.
 
 ## För AI-agenter
