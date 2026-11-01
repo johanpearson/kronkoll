@@ -2,7 +2,9 @@
   "name": "@kronkoll/domain",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
@@ -10,6 +12,7 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "5.0.5",
+    "fast-check": "4.10.2",
     "vitest": "5.0.5"
   }
 }
