@@ -137,11 +137,11 @@ describe("transaktioner (KK-5-C, KK-11-C)", () => {
 
 describe("bara läsande anrop (KK-5-A)", () => {
   it("använder GET med kortlivad JWT och kodar id:n i sökvägen", async () => {
-    const { provider, calls } = fakeApi({ "/accounts/a%2F..%2Fpayments/balances": { balances: [] } });
-    await provider.balance("a/../payments");
+    const { provider, calls } = fakeApi({ "/accounts/a%2F..%2Fsessions/balances": { balances: [] } });
+    await provider.balance("a/../sessions");
     expect(calls).toHaveLength(1);
     expect(calls[0]).toMatchObject({ method: "GET", auth: "Bearer jwt-test" });
-    expect(calls[0]?.url.pathname).toBe("/accounts/a%2F..%2Fpayments/balances");
+    expect(calls[0]?.url.pathname).toBe("/accounts/a%2F..%2Fsessions/balances");
   });
 });
 
