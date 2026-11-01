@@ -2,10 +2,12 @@
 # Branch protection kräver bara statuskontrollen "ci-ok". Den blir grön först när
 # alla jobb i `needs` är gröna. Nya grindar (lint, typecheck, unit, coverage,
 # integration, mutation, e2e) läggs till i `needs` under M0, utan att rulesetet ändras.
+# PR-reglerna (storlek, beskrivning) beskrivs i AGENTS.md.
 name: ci
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
   push:
     branches: [main]
   merge_group:
@@ -56,10 +58,81 @@ jobs:
           done
           exit $fail
 
+  pr-size:
+    name: pr-size
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Små PR:er (≤ 400 mål, > 800 kräver etiketten large-pr)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HAS_BIG_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'large-pr') }}
+        run: |
+          changed=$(git diff --numstat "$BASE_SHA...$HEAD_SHA" -- . \
+            ':(exclude,glob)plans/**/*.html' \
+            ':(exclude,glob)**/pnpm-lock.yaml' ':(exclude,glob)**/package-lock.json' \
+            ':(exclude,glob)**/__snapshots__/**' \
+            | awk '$1 != "-" { n += $1 + $2 } END { print n + 0 }')
+          echo "Ändrade rader (exkl. genererade filer): $changed"
+          echo "### PR-storlek: $changed ändrade rader" >> "$GITHUB_STEP_SUMMARY"
+          if [ "$changed" -gt 800 ]; then
+            if [ "$HAS_BIG_LABEL" = "true" ]; then
+              echo "::warning::$changed rader, tillåtet tack vare etiketten large-pr. Motivera i beskrivningen."
+            else
+              echo "::error::$changed rader är för stort (> 800). Dela upp PR:en, eller sätt etiketten large-pr och motivera."
+              exit 1
+            fi
+          elif [ "$changed" -gt 400 ]; then
+            echo "::warning::$changed rader är över målet på 400. Går den att dela upp?"
+          fi
+
+  pr-description:
+    name: pr-description
+    if: github.event_name == 'pull_request' && github.event.pull_request.user.login != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Titel och beskrivning skrivna för människor (AGENTS.md)
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        shell: python3 {0}
+        run: |
+          import os, re, sys
+          title = os.environ.get("PR_TITLE", "").strip()
+          body = os.environ.get("PR_BODY", "") or ""
+          errors = []
+          if not 10 <= len(title) <= 72:
+              errors.append(f"Titeln ska vara 10–72 tecken (nu {len(title)}).")
+          if re.match(r"(?i)^(wip|update|fix|misc|test)\b[:\s]*\S{0,20}$", title):
+              errors.append("Titeln ska beskriva effekten, inte vara generisk (t.ex. 'Update …', 'WIP').")
+          body = re.sub(r"<!--.*?-->", "", body, flags=re.S)
+          sections = {}
+          for part in re.split(r"(?m)^##\s+", body)[1:]:
+              head, _, text = part.partition("\n")
+              sections[head.strip().lower()] = text.strip()
+          required = ["What and why", "How to test", "How we know it works", "Open questions and decisions"]
+          for h in required:
+              text = sections.get(h.lower())
+              if text is None:
+                  errors.append(f"Rubriken '## {h}' saknas.")
+              elif len(text) < 5:
+                  errors.append(f"Avsnittet '{h}' är tomt (skriv 'None' om det verkligen inte finns något).")
+          for e in errors:
+              print(f"::error::{e}")
+          if errors:
+              print("Se .github/pull_request_template.md och AGENTS.md → Pull requests.")
+              sys.exit(1)
+          print("Titel och beskrivning OK.")
+
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [secret-scan, workflow-lint]
+    needs: [secret-scan, workflow-lint, pr-size, pr-description]
     runs-on: ubuntu-latest
     steps:
       - name: Alla grindar gröna?
@@ -68,5 +141,6 @@ jobs:
         run: |
           echo "Resultat: $RESULTS"
           for r in $RESULTS; do
-            [ "$r" = "success" ] || { echo "::error::Minst en grind är inte grön ($r)"; exit 1; }
+            # "skipped" är ok: PR-kontrollerna körs inte vid push till main och pr-description inte för Dependabot
+            case "$r" in success|skipped) ;; *) echo "::error::Minst en grind är inte grön ($r)"; exit 1 ;; esac
           done

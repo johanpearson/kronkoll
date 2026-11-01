@@ -53,6 +53,11 @@ Settings → Environments → **production**:
 - *Automatically delete head branches*: på
 - *Allow merge commits* och *Allow rebase merging*: av (bara squash)
 
+## 7. Etikett för stora PR:er (large-pr)
+
+Issues → Labels → **New label** `large-pr` ("More than 800 changed lines – justified in the description"). Används av CI-jobbet
+`pr-size` (se AGENTS.md → Små PR:er).
+
 ## Verifiera (V-m-ruleset)
 
 1. `git push origin main` direkt ska nekas.
