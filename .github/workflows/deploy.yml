@@ -40,6 +40,16 @@ jobs:
       # Inga install-skript och inga hemligheter i miljön medan beroenden installeras (KK-31, T-I5)
       - run: pnpm install --frozen-lockfile --ignore-scripts
 
+      # Migreringarna körs före workern, så att ny kod aldrig möter ett gammalt schema. Varje
+      # migrering körs bara en gång (wrangler håller reda på dem i tabellen d1_migrations), och
+      # misslyckas en avbryts deployen innan något annat ändras (KK-16-B).
+      - name: Migrera databasen
+        working-directory: apps/api
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm exec wrangler d1 migrations apply kronkoll --remote
+
       - name: Deploya API-workern
         working-directory: apps/api
         env:

@@ -1,0 +1,6 @@
+// Bara för tester: en lokal D1 utan persistens. Riktiga bindningar finns i apps/api/wrangler.jsonc.
+{
+  "name": "adapter-d1-test",
+  "compatibility_date": "2026-10-01",
+  "d1_databases": [{ "binding": "DB", "database_name": "kronkoll-test", "database_id": "00000000-0000-0000-0000-000000000000" }]
+}
