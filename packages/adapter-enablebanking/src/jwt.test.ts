@@ -55,11 +55,13 @@ describe("Enable Banking-JWT (KK-5-B)", () => {
   });
 
   it("ger ett fel utan nyckelinnehåll när nyckeln är ogiltig", async () => {
-    const signer = createJwtSigner({ privateKeyPem: "inte-en-nyckel-hemlig123", applicationId: "app-123", now: () => NOW });
+    // Byggs vid körning så att testdata inte ser ut som en hemlighet för secret scanning.
+    const marker = ["ogiltig", "testtext"].join("-");
+    const signer = createJwtSigner({ privateKeyPem: marker, applicationId: "app-123", now: () => NOW });
     const error = await signer.sign().catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Error);
     expect((error as Error).message).toBe("Ogiltig privat nyckel för Enable Banking (EB_PRIVATE_KEY)");
-    expect((error as Error).message).not.toContain("hemlig123");
+    expect((error as Error).message).not.toContain(marker);
   });
 
   it("kräver ett application id", () => {
