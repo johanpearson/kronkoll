@@ -103,6 +103,10 @@ importers:
         version: 4.151.1(@cloudflare/workers-types@5.20261016.1)(@types/node@22.20.5)
 
   packages/adapter-enablebanking:
+    dependencies:
+      '@kronkoll/domain':
+        specifier: workspace:*
+        version: link:../domain
     devDependencies:
       '@vitest/coverage-v8':
         specifier: 5.0.5

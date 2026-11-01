@@ -82,3 +82,12 @@ export {
   type OverviewAccount,
   type PeriodTotals,
 } from "./overview.ts";
+export {
+  ProviderError,
+  type BankAccount,
+  type BankAccountType,
+  type BankDataProvider,
+  type ProviderErrorCode,
+  type ProviderTransaction,
+  type TransactionPage,
+} from "./bank.ts";
