@@ -1,0 +1,45 @@
+# Kontraktstest mot Enable Bankings sandbox (V-c-provider, F-contract-nightly).
+# Körs varje natt, när adaptern eller bankporten ändras på main, och för hand. Använder bara
+# sandbox-nyckeln och sandbox-sessionen i miljön "sandbox". Sammanfattningen innehåller bara
+# antal och datum, aldrig belopp, motparter eller id:n (KK-13).
+name: contract-enable-banking
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  push:
+    branches: [main]
+    paths:
+      - packages/adapter-enablebanking/src/**
+      - packages/domain/src/bank.ts
+      - scripts/contract-enable-banking.ts
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contract-enable-banking
+  cancel-in-progress: false
+
+jobs:
+  contract:
+    name: contract
+    runs-on: ubuntu-latest
+    environment: sandbox
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      # Inga install-skript och inga hemligheter i miljön medan beroenden installeras (KK-31)
+      - run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Kör kontraktet mot sandboxen
+        env:
+          EB_APP_ID: ${{ secrets.EB_SANDBOX_APP_ID }}
+          EB_PRIVATE_KEY: ${{ secrets.EB_SANDBOX_KEY }}
+          EB_SESSION_ID: ${{ secrets.EB_SANDBOX_SESSION_ID }}
+        run: node scripts/contract-enable-banking.ts
