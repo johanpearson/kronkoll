@@ -49,3 +49,14 @@ export {
   type MergeResult,
 } from "./categories.ts";
 export { allocateByCategory, validateSplit, type Allocation, type SplitPart, type SplitResult } from "./split.ts";
+export {
+  EXPIRING_WITHIN_DAYS,
+  REMINDER_DAYS,
+  consentReminderText,
+  consentStatus,
+  dueConsentReminder,
+  type ConnectionStatus,
+  type ConsentStatusInput,
+  type DueReminder,
+  type ReminderInput,
+} from "./consent.ts";
