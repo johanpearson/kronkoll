@@ -36,6 +36,11 @@ export function addDays(isoDate: string, days: number): string {
   return toIso(new Date(parseDate(isoDate).getTime() + days * DAY_MS));
 }
 
+/** Antal dagar från a till b (negativt om b ligger före a). */
+export function daysBetween(a: string, b: string): number {
+  return Math.round((parseDate(b).getTime() - parseDate(a).getTime()) / DAY_MS);
+}
+
 /** 0 = söndag … 6 = lördag. */
 export function weekday(isoDate: string): number {
   return parseDate(isoDate).getUTCDay();

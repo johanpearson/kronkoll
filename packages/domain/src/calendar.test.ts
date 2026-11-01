@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, addMonths, parseDate, weekday } from "./calendar.ts";
+import { addDays, addMonths, daysBetween, parseDate, weekday } from "./calendar.ts";
 
 describe("kalenderdagar utan klockslag", () => {
   it.each(["2026-1-01", "26-01-01", "2026/01/01", "", "2026-01-01T00:00"])("avvisar formatet %j", (text) => {
@@ -19,6 +19,11 @@ describe("kalenderdagar utan klockslag", () => {
   it("räknar månader över årsskiften åt båda hållen", () => {
     expect(addMonths({ year: 2026, month: 12 }, 1)).toEqual({ year: 2027, month: 1 });
     expect(addMonths({ year: 2027, month: 1 }, -1)).toEqual({ year: 2026, month: 12 });
+  });
+
+  it("räknar dagar mellan två datum, även över sommartidsbytet", () => {
+    expect(daysBetween("2026-03-28", "2026-03-30")).toBe(2);
+    expect(daysBetween("2026-11-20", "2026-11-09")).toBe(-11);
   });
 
   it("ger veckodag med söndag som 0", () => {
