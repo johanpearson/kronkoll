@@ -48,3 +48,4 @@ export {
   type MergeInput,
   type MergeResult,
 } from "./categories.ts";
+export { allocateByCategory, validateSplit, type Allocation, type SplitPart, type SplitResult } from "./split.ts";
