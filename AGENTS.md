@@ -28,7 +28,7 @@ De skrivs för en människa som kommer tillbaka efter några veckor.
 ### Små PR:er
 
 - Sikta på **≤ 400 ändrade rader** per PR. Genererade filer (`plans/**/*.html`, lockfiler, snapshots) räknas inte.
-- Över 400 rader ger CI en varning. **Över 800 rader** stoppar CI, om inte PR:en har etiketten `stor-pr` och
+- Över 400 rader ger CI en varning. **Över 700 rader** stoppar CI, om inte PR:en har etiketten `large-pr` och
   beskrivningen förklarar varför den inte gick att dela upp.
 - En PR gör **en sak**. Dela hellre upp i en kedja: först port + domänlogik + tester, sedan adapter, sist UI.
   Refaktorering och beteendeändring hamnar i separata PR:er.
@@ -36,29 +36,29 @@ De skrivs för en människa som kommer tillbaka efter några veckor.
 
 ### Titel
 
-- Svenska, imperativ form, ≤ 72 tecken, och den beskriver **effekten för användaren eller systemet**, inte filerna.
-  Bra: `Dedup av preliminära transaktioner när banken byter id`.
-  Dåligt: `Update reconcile.ts`, `WIP`, `Fixar saker`.
+- Engelska, imperativ form, ≤ 72 tecken, och den beskriver **effekten för användaren eller systemet**, inte filerna.
+  Bra: `Deduplicate pending transactions when the bank changes ids`.
+  Dåligt: `Update reconcile.ts`, `WIP`, `Fix stuff`.
 - Lägg gärna till kravid sist: `… (KK-9)`.
 
 ### Beskrivning
 
-Använd mallen i [`.github/pull_request_template.md`](.github/pull_request_template.md). Alla fyra rubrikerna är obligatoriska
+Beskrivningen skrivs på engelska. Använd mallen i [`.github/pull_request_template.md`](.github/pull_request_template.md). Alla fyra rubrikerna är obligatoriska
 och kontrolleras i CI (`pr-description`):
 
-1. **Vad och varför**: vad ändras och vilket problem det löser, i 2–5 meningar i klartext. Ange vilka krav eller
+1. **What and why**: vad ändras och vilket problem det löser, i 2–5 meningar i klartext. Ange vilka krav eller
    acceptanskriterier (KK-…) som berörs.
-2. **Hur man testar**: konkreta steg som en människa kan följa (kommandon, var man klickar, vad som ska synas).
-3. **Hur vi vet att det fungerar**: vilka automatiska tester som täcker ändringen, nya eller ändrade, och vad de visar,
+2. **How to test**: konkreta steg som en människa kan följa (kommandon, var man klickar, vad som ska synas).
+3. **How we know it works**: vilka automatiska tester som täcker ändringen, nya eller ändrade, och vad de visar,
    samt resultat från CI, mutationstest och E2E. Säg ärligt vad som **inte** är testat.
-4. **Öppna frågor och beslut**: beslut som tagits i PR:en (med motivering), antaganden och frågor som ägaren
-   behöver svara på. Skriv "Inga" om det inte finns några.
+4. **Open questions and decisions**: beslut som tagits i PR:en (med motivering), antaganden och frågor som ägaren
+   behöver svara på. Skriv "None" om det inte finns några.
 
 Undvik upprepade fillistor och kodutdrag som går att se i diffen. Förklara i stället *varför*.
 
 ## För AI-agenter
 
-- Följ planen. Om något i planen inte håller, skriv det under *Öppna frågor och beslut* i stället för att tyst avvika.
+- Följ planen. Om något i planen inte håller, skriv det under *Open questions and decisions* i stället för att tyst avvika.
 - Skapa aldrig en PR som ägaren inte bett om. Merga aldrig själv.
 - Kör repots egna kontroller lokalt innan push. Inaktivera aldrig tester eller grindar för att få CI grön.
-- Markera antaganden som **Antagande:** i PR-texten.
+- Markera antaganden som **Assumption:** i PR-texten.

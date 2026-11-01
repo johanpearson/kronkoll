@@ -53,9 +53,9 @@ Settings → Environments → **production**:
 - *Automatically delete head branches*: på
 - *Allow merge commits* och *Allow rebase merging*: av (bara squash)
 
-## 7. Etikett för stora PR:er
+## 7. Etikett för stora PR:er (large-pr)
 
-Issues → Labels → **New label** `stor-pr` ("Över 800 ändrade rader – motiverat i beskrivningen"). Används av CI-jobbet
+Issues → Labels → **New label** `large-pr` ("More than 700 changed lines – justified in the description"). Används av CI-jobbet
 `pr-size` (se AGENTS.md → Små PR:er).
 
 ## Verifiera (V-m-ruleset)

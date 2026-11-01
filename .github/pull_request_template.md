@@ -1,22 +1,22 @@
 <!--
-Skriv för en människa som inte läser koden. Se AGENTS.md → Pull requests.
-Titel: svenska, imperativ form, ≤ 72 tecken, beskriv effekten (t.ex. "Dedup av preliminära transaktioner (KK-9)").
-Mål: ≤ 400 ändrade rader. Över 800 kräver etiketten stor-pr och en motivering nedan.
-Alla fyra rubrikerna kontrolleras i CI och får inte vara tomma.
+Write for a human who will not read the code. See AGENTS.md → Pull requests.
+Title: English, imperative, ≤ 72 characters, describe the effect (e.g. "Deduplicate pending transactions when the bank changes ids (KK-9)").
+Size: aim for ≤ 400 changed lines. More than 700 requires the label large-pr and a justification below.
+All four headings are checked by CI and must not be empty.
 -->
 
-## Vad och varför
+## What and why
 
-<!-- 2–5 meningar: vad ändras och vilket problem löser det? Vilka krav (KK-…) berörs? -->
+<!-- 2–5 sentences: what changes and what problem does it solve? Which requirements (KK-…) are affected? -->
 
-## Hur man testar
+## How to test
 
-<!-- Konkreta steg: kommandon, var man klickar, vad som ska synas. -->
+<!-- Concrete steps: commands, where to click, what you should see. -->
 
-## Hur vi vet att det fungerar
+## How we know it works
 
-<!-- Vilka tester täcker ändringen och vad visar de? CI-resultat. Vad är INTE testat? -->
+<!-- Which tests cover the change and what do they show? CI results. What is NOT tested? -->
 
-## Öppna frågor och beslut
+## Open questions and decisions
 
-<!-- Beslut med motivering, antaganden (markera "Antagande:") och frågor till ägaren. Skriv "Inga" om inget finns. -->
+<!-- Decisions with rationale, assumptions (mark "Assumption:") and questions for the owner. Write "None" if there are none. -->

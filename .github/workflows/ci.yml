@@ -67,11 +67,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Små PR:er (≤ 400 mål, > 800 kräver etiketten stor-pr)
+      - name: Små PR:er (≤ 400 mål, > 700 kräver etiketten large-pr)
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          HAS_BIG_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'stor-pr') }}
+          HAS_BIG_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'large-pr') }}
         run: |
           changed=$(git diff --numstat "$BASE_SHA...$HEAD_SHA" -- . \
             ':(exclude,glob)plans/**/*.html' \
@@ -80,11 +80,11 @@ jobs:
             | awk '$1 != "-" { n += $1 + $2 } END { print n + 0 }')
           echo "Ändrade rader (exkl. genererade filer): $changed"
           echo "### PR-storlek: $changed ändrade rader" >> "$GITHUB_STEP_SUMMARY"
-          if [ "$changed" -gt 800 ]; then
+          if [ "$changed" -gt 700 ]; then
             if [ "$HAS_BIG_LABEL" = "true" ]; then
-              echo "::warning::$changed rader, tillåtet tack vare etiketten stor-pr. Motivera i beskrivningen."
+              echo "::warning::$changed rader, tillåtet tack vare etiketten large-pr. Motivera i beskrivningen."
             else
-              echo "::error::$changed rader är för stort (> 800). Dela upp PR:en, eller sätt etiketten stor-pr och motivera."
+              echo "::error::$changed rader är för stort (> 700). Dela upp PR:en, eller sätt etiketten large-pr och motivera."
               exit 1
             fi
           elif [ "$changed" -gt 400 ]; then
@@ -115,13 +115,13 @@ jobs:
           for part in re.split(r"(?m)^##\s+", body)[1:]:
               head, _, text = part.partition("\n")
               sections[head.strip().lower()] = text.strip()
-          required = ["Vad och varför", "Hur man testar", "Hur vi vet att det fungerar", "Öppna frågor och beslut"]
+          required = ["What and why", "How to test", "How we know it works", "Open questions and decisions"]
           for h in required:
               text = sections.get(h.lower())
               if text is None:
                   errors.append(f"Rubriken '## {h}' saknas.")
               elif len(text) < 5:
-                  errors.append(f"Avsnittet '{h}' är tomt (skriv 'Inga' om det verkligen inte finns något).")
+                  errors.append(f"Avsnittet '{h}' är tomt (skriv 'None' om det verkligen inte finns något).")
           for e in errors:
               print(f"::error::{e}")
           if errors:
