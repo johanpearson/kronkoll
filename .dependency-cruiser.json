@@ -1,0 +1,77 @@
+{
+  "$schema": "https://raw.githubusercontent.com/sverweij/dependency-cruiser/main/src/schema/configuration.schema.json",
+  "forbidden": [
+    {
+      "name": "domain-ar-ren",
+      "comment": "KK-14-A: domänlagret får bara bero på sig självt – inga adaptrar, appar eller andra paket.",
+      "severity": "error",
+      "from": {
+        "path": "^packages/domain/src"
+      },
+      "to": {
+        "pathNot": "^packages/domain/src",
+        "dependencyTypes": [
+          "local"
+        ]
+      }
+    },
+    {
+      "name": "domain-inga-npm-paket",
+      "comment": "KK-14-A: domänkoden (utom tester) får inte använda npm-paket eller Node-moduler.",
+      "severity": "error",
+      "from": {
+        "path": "^packages/domain/src",
+        "pathNot": "\\.test\\.ts$"
+      },
+      "to": {
+        "dependencyTypesNot": [
+          "local"
+        ]
+      }
+    },
+    {
+      "name": "inga-cirkulara-beroenden",
+      "severity": "error",
+      "from": {},
+      "to": {
+        "circular": true
+      }
+    },
+    {
+      "name": "inga-okanda-moduler",
+      "comment": "Importer som inte går att lösa upp är nästan alltid fel.",
+      "severity": "error",
+      "from": {},
+      "to": {
+        "couldNotResolve": true
+      }
+    }
+  ],
+  "options": {
+    "doNotFollow": {
+      "path": "node_modules"
+    },
+    "exclude": {
+      "path": "^(packages|apps)/[^/]+/(dist|coverage)/"
+    },
+    "tsPreCompilationDeps": true,
+    "tsConfig": {
+      "fileName": "tsconfig.base.json"
+    },
+    "enhancedResolveOptions": {
+      "extensions": [
+        ".ts",
+        ".js"
+      ],
+      "exportsFields": [
+        "exports"
+      ],
+      "conditionNames": [
+        "import",
+        "types",
+        "node",
+        "default"
+      ]
+    }
+  }
+}
