@@ -1,0 +1,9 @@
+# Säkerhetsheaders för statiska filer (KK-30-B). Samma värden som server/security-headers.ts,
+# vilket ett test kontrollerar. API-svar får sina headers i Pages Function.
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), microphone=(), geolocation=()
+  X-Robots-Tag: noindex

@@ -1,0 +1,4 @@
+# Falsklarm som granskats manuellt. Ange alltid varför – lägg aldrig till riktiga hemligheter här.
+# Påhittad, ogiltig teststräng i ett test som visar att felmeddelanden inte läcker nyckeln (PR #50).
+# Strängen är borttagen i senare commit; raden behövs bara för att PR:ens commit-historik skannas.
+f396c91169d92535ede57db14b7ec087ad9928dd:packages/adapter-enablebanking/src/jwt.test.ts:generic-api-key:58
