@@ -60,3 +60,14 @@ export {
   type DueReminder,
   type ReminderInput,
 } from "./consent.ts";
+export {
+  budgetOutcome,
+  spendingByCategory,
+  suggestFromAverage,
+  suggestFromPrevious,
+  type BudgetLineInput,
+  type BudgetLineOutcome,
+  type BudgetOutcome,
+  type BudgetTransaction,
+  type SpendingInput,
+} from "./budget.ts";
