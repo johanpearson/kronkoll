@@ -99,6 +99,15 @@ export {
   type SyncRunSummary,
 } from "./sync.ts";
 export {
+  syncConnection,
+  type BalanceStore,
+  type ConnectionSyncState,
+  type SyncConnectionInput,
+  type SyncConnectionOutcome,
+  type SyncKind,
+  type SyncRunLog,
+} from "./sync-connection.ts";
+export {
   DEFAULT_MAX_PAGES,
   FIRST_SYNC_DAYS,
   syncAccount,
