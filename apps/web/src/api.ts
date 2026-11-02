@@ -19,7 +19,12 @@ export function patchJson(path: string, body: unknown, timeoutMs = TIMEOUT_MS): 
   return sendJson("PATCH", path, body, timeoutMs);
 }
 
-async function sendJson(method: "POST" | "PATCH", path: string, body: unknown, timeoutMs: number): Promise<ApiResult> {
+/** PUT med JSON, likadant som postJson. */
+export function putJson(path: string, body: unknown, timeoutMs = TIMEOUT_MS): Promise<ApiResult> {
+  return sendJson("PUT", path, body, timeoutMs);
+}
+
+async function sendJson(method: "POST" | "PATCH" | "PUT", path: string, body: unknown, timeoutMs: number): Promise<ApiResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
