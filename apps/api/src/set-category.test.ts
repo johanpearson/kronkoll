@@ -125,9 +125,9 @@ describe("PATCH /api/transactions/{id} (KK-18-B, KK-18-C)", () => {
   });
 
   it("andra metoder ger 405", async () => {
-    const res = await call("GET", "/api/transactions/t1");
+    const res = await call("DELETE", "/api/transactions/t1");
     expect(res.status).toBe(405);
-    expect(res.headers.get("allow")).toBe("PATCH");
+    expect(res.headers.get("allow")).toBe("GET, PATCH");
   });
 });
 

@@ -12,7 +12,7 @@ import { getSplits, putSplits } from "./splits.ts";
 import { putTransfer } from "./transfers.ts";
 import { completeConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
-import { listTransactions } from "./transactions.ts";
+import { getTransaction, listTransactions } from "./transactions.ts";
 
 export interface Env extends AccessEnv, SyncEnv, ConnectEnv {
   /** Secret: Enable Bankings application id. */
@@ -87,8 +87,9 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
 
   const txMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
   if (txMatch?.[1]) {
-    if (request.method !== "PATCH") return json({ error: "method_not_allowed" }, 405, { allow: "PATCH" });
-    return setCategory(request, env, context.sync, txMatch[1]);
+    if (request.method === "GET") return getTransaction(env, txMatch[1]);
+    if (request.method === "PATCH") return setCategory(request, env, context.sync, txMatch[1]);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, PATCH" });
   }
 
   const ruleMatch = /^\/api\/rules\/([A-Za-z0-9_-]{1,64})\/apply$/u.exec(pathname);

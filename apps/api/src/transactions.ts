@@ -1,7 +1,7 @@
 // GET /api/transactions (#32, KK-9, KK-18, KK-34): transaktionerna i en budgetperiod för listvyn.
 // Perioden följer startdagen i inställningarna (t.ex. lönedagen) och svensk tid. Bankens text
 // skickas som den kom och renderas alltid som text i appen (KK-30).
-import { settingsRepository, transactionRepository, type TransactionListItem } from "@kronkoll/adapter-d1";
+import { settingsRepository, splitRepository, transactionRepository, type TransactionListItem } from "@kronkoll/adapter-d1";
 import { budgetPeriodForKey, currentBudgetPeriod, type BudgetPeriod } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
 
@@ -85,5 +85,41 @@ export async function listTransactions(request: Request, env: { DB: D1Database }
     return json({ period, items: items.map(toJson), next_cursor: nextCursor }, 200);
   } catch (error) {
     return error instanceof RangeError ? invalid() : json({ error: "unavailable" }, 503);
+  }
+}
+
+/** GET /api/transactions/{id}: allt om en transaktion för detaljsidan (#32). */
+export async function getTransaction(env: { DB: D1Database }, id: string): Promise<Response> {
+  try {
+    const detail = await transactionRepository(env.DB).detail(id);
+    if (!detail) return json({ error: "not_found" }, 404);
+    const splits = await splitRepository(env.DB).get(id);
+    return json(
+      {
+        id: detail.id,
+        account: { id: detail.accountId, name: detail.accountName, type: detail.accountType },
+        status: detail.status,
+        transaction_date: detail.transactionDate,
+        booking_date: detail.bookingDate,
+        amount_minor: detail.amountMinor,
+        counterparty: detail.counterparty,
+        counterparty_norm: detail.counterpartyNorm,
+        description: detail.description,
+        category_id: detail.categoryId,
+        category_source: detail.categorySource,
+        is_internal_transfer: detail.isInternalTransfer,
+        manual_transfer: detail.manualTransfer,
+        transfer_pair: detail.transferPair && {
+          id: detail.transferPair.id,
+          account_name: detail.transferPair.accountName,
+          amount_minor: detail.transferPair.amountMinor,
+          transaction_date: detail.transferPair.transactionDate,
+        },
+        splits: splits.map((p) => ({ category_id: p.categoryId, amount_minor: p.amountMinor })),
+      },
+      200,
+    );
+  } catch {
+    return json({ error: "unavailable" }, 503);
   }
 }
