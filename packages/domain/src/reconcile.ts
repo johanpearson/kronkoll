@@ -3,7 +3,8 @@
  *
  * 1. Bankens id först: samma konto och samma provider-id.
  * 2. Annars fingeravtryck: samma konto, belopp och normaliserade motpart, och datum inom ±3 dagar.
- *    Varje befintlig rad kan bara matchas en gång, så två identiska köp samma dag blir två rader
+ *    När en preliminär blir bokförd får beloppet skilja högst 20 % (samma riktning); finns flera
+ *    kandidater väljs den med minst beloppsskillnad. Varje befintlig rad kan bara matchas en gång, så två identiska köp samma dag blir två rader
  *    (löpnummer i praktiken). Två transaktioner med olika bank-id matchas aldrig, utom när en
  *    preliminär blir bokförd, eftersom banker ofta byter id just då.
  * 3. En matchad rad behåller sitt id, så kategori och uppdelning följer med. En bokförd blir
@@ -55,6 +56,8 @@ export interface ReconcileResult {
 
 export const MATCH_WINDOW_DAYS = 3;
 export const PENDING_GRACE_DAYS = 10;
+/** Största tillåtna beloppsskillnad i procent när en preliminär blir bokförd. */
+export const AMOUNT_TOLERANCE_PERCENT = 20;
 
 function validate(tx: ImportedTransaction): void {
   assertMinor(tx.amountMinor);
@@ -87,15 +90,27 @@ function idsCompatible(existing: StoredTransaction, incoming: ImportedTransactio
 }
 
 /**
- * Fingeravtryck: samma konto, belopp och motpart inom ±3 dagar. En preliminär från banken
- * matchas aldrig mot en redan bokförd här, eftersom det i praktiken är ett nytt köp. Bara
+ * Kan beloppen höra ihop? Normalt krävs exakt samma belopp. När en preliminär blir bokförd får
+ * beloppet skilja högst 20 % (dricks, förhandsreservation, valutakurs), förutsatt samma riktning.
+ * Procenten räknas av den preliminära summan, i heltalsaritmetik.
+ */
+function amountsCompatible(existing: StoredTransaction, incoming: ImportedTransaction): boolean {
+  if (existing.amountMinor === incoming.amountMinor) return true;
+  if (!(existing.status === "pending" && incoming.status === "booked")) return false;
+  if (Math.sign(existing.amountMinor) !== Math.sign(incoming.amountMinor)) return false;
+  return Math.abs(existing.amountMinor - incoming.amountMinor) * 100 <= Math.abs(existing.amountMinor) * AMOUNT_TOLERANCE_PERCENT;
+}
+
+/**
+ * Fingeravtryck: samma konto och motpart, kompatibelt belopp och ±3 dagar. En preliminär från
+ * banken matchas aldrig mot en redan bokförd här, eftersom det i praktiken är ett nytt köp. Bara
  * samma bank-id får knyta ihop dem.
  */
 function sameFingerprint(existing: StoredTransaction, incoming: ImportedTransaction): boolean {
   return (
     !(existing.status === "booked" && incoming.status === "pending") &&
     existing.accountId === incoming.accountId &&
-    existing.amountMinor === incoming.amountMinor &&
+    amountsCompatible(existing, incoming) &&
     existing.counterpartyNorm === incoming.counterpartyNorm &&
     Math.abs(daysBetween(existing.transactionDate, incoming.transactionDate)) <= MATCH_WINDOW_DAYS &&
     idsCompatible(existing, incoming)
@@ -103,12 +118,13 @@ function sameFingerprint(existing: StoredTransaction, incoming: ImportedTransact
 }
 
 /**
- * Bästa kandidaten: närmast i datum, sedan samma status, samma id och samma bokföringsdag, sedan
- * stabil ordning. En rad som redan är identisk med den inkommande väljs alltså alltid, så att en
- * ny import av samma data inte flyttar om matchningarna.
+ * Bästa kandidaten: minst beloppsskillnad, sedan närmast i datum, samma status, samma id och samma
+ * bokföringsdag, sedan stabil ordning. En rad som redan är identisk med den inkommande väljs alltså
+ * alltid, så att en ny import av samma data inte flyttar om matchningarna.
  */
 function bestCandidate(candidates: StoredTransaction[], incoming: ImportedTransaction): StoredTransaction | undefined {
   const score = (tx: StoredTransaction): number[] => [
+    Math.abs(tx.amountMinor - incoming.amountMinor),
     Math.abs(daysBetween(tx.transactionDate, incoming.transactionDate)),
     tx.status === incoming.status ? 0 : 1,
     tx.providerTxId === incoming.providerTxId ? 0 : 1,
