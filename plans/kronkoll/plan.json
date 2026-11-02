@@ -122,7 +122,7 @@
     },
     {
       "id": "transaktion", "title": "Transaktion", "group": "Huvudvyer", "nav_parent": "transaktioner",
-      "description": "Detaljvy. När användaren byter kategori föreslås en regel på den normaliserade motparten (\"ICA NARA SOFO\" → \"ICA\"). En manuellt satt kategori markeras och skrivs aldrig över av regler (KK-18-C).",
+      "description": "Detaljvy (målbild). När användaren byter kategori kan en regel läras in på hela den normaliserade motparten (\"ICA NARA SOFO\", beslut 2026-11-02 i #25/#85; första ordet var för brett). En manuellt satt kategori markeras och skrivs aldrig över av regler (KK-18-C). Första versionen (#112, #114) har ingen egen sida: Ändra och Dela upp öppnas direkt i raden i Transaktioner.",
       "satisfies": ["KK-18", "KK-19", "KK-9"],
       "elements": [
         { "type": "stat", "label": "ICA Nära Sofo · Skandia Visa ••1190", "value": "−412,50 kr", "satisfies": ["KK-4-A"] },
@@ -131,7 +131,7 @@
           { "type": "text", "text": "1 nov. 2026" }
         ] },
         { "id": "category", "type": "select", "label": "Kategori", "options": ["Mat › Livsmedel", "Mat › Restaurang & café", "Hushåll › Förbrukning", "Barn › Mat & blöjor"], "value": "Mat › Livsmedel", "satisfies": ["KK-18-B"] },
-        { "id": "learn", "type": "checkbox", "label": "Gör alltid så för \"ICA\" (skapar regel)", "checked": true, "satisfies": ["KK-18-B"] },
+        { "id": "learn", "type": "checkbox", "label": "Gör alltid så för \"ICA Nära Sofo\" (skapar regel)", "checked": true, "satisfies": ["KK-18-B"] },
         { "id": "manual-note", "type": "alert", "tone": "info", "text": "Manuellt vald kategori – regler ändrar inte den här transaktionen.", "satisfies": ["KK-18-C"] },
         { "id": "split", "type": "button", "label": "Dela upp transaktion", "variant": "secondary", "opens": "dela-upp", "satisfies": ["KK-19"] },
         { "id": "save", "type": "button", "label": "Spara", "variant": "primary", "opens": "regel-historik", "satisfies": ["KK-18-B"] },
@@ -140,7 +140,7 @@
     },
     {
       "id": "regel-historik", "title": "Regel skapad", "modal": true, "group": "Huvudvyer",
-      "description": "Efter att en regel skapats kan den, om användaren vill, appliceras bakåt. Den rör aldrig manuellt kategoriserade transaktioner.",
+      "description": "Efter att en regel skapats kan den, om användaren vill, appliceras bakåt. Den rör aldrig manuellt kategoriserade transaktioner. Byggt i #112 som en fråga i raden (\"Regeln matchar 23 tidigare transaktioner. 2 manuellt valda ändras inte.\" – Applicera på dem / Inte nu), som bara visas när regeln matchar något tidigare.",
       "satisfies": ["KK-18-B", "KK-18-C"],
       "elements": [
         { "type": "heading", "text": "Regel: ICA → Mat › Livsmedel", "level": 3 },
@@ -151,6 +151,7 @@
     },
     {
       "id": "dela-upp", "title": "Dela upp transaktion", "modal": true, "group": "Huvudvyer",
+      "description": "Byggt i #114 som en redigerare i raden. Belopp skrivs i kronor utan tecken (\"340,50\", \"1 240,00\") och får transaktionens tecken. Spara går bara när Kvar att fördela är exakt 0,00 kr; servern kontrollerar samma sak. En befintlig uppdelning kan tas bort.",
       "satisfies": ["KK-19"],
       "elements": [
         { "type": "text", "text": "Clas Ohlson · 31 okt. · **1 240,00 kr**" },
@@ -568,10 +569,12 @@
       "id": "api-transactions", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/transactions",
       "summary": "Lista transaktioner (paginering med cursor)",
       "params": [
-        { "name": "period", "in": "query", "type": "YYYY-MM" }, { "name": "category_id", "in": "query", "type": "string" },
-        { "name": "q", "in": "query", "type": "string" }, { "name": "uncategorized", "in": "query", "type": "bool" }, { "name": "cursor", "in": "query", "type": "string" }
+        { "name": "period", "in": "query", "type": "YYYY-MM", "description": "Budgetperiodens nyckel enligt startdagen (KK-34). Utan period: pågående period." }, { "name": "category_id", "in": "query", "type": "string" },
+        { "name": "q", "in": "query", "type": "string" }, { "name": "uncategorized", "in": "query", "type": "bool" }, { "name": "cursor", "in": "query", "type": "string" },
+        { "name": "limit", "in": "query", "type": "int", "description": "1–200, standard 50" }
       ],
-      "responses": { "200": { "body": { "items": [{ "id": "tx_01J…", "account_id": "acc_visa", "status": "pending", "booking_date": null, "transaction_date": "2026-11-01", "amount_minor": -41250, "currency": "SEK", "counterparty": "ICA Nära Sofo", "category_id": "cat_mat_livs", "category_source": "rule", "is_internal_transfer": false, "split": false }], "next_cursor": "eyJ…" } } },
+      "responses": { "200": { "body": { "period": { "key": "2026-11", "start": "2026-11-01", "end": "2026-11-30" }, "items": [{ "id": "tx_01J…", "account_id": "acc_visa", "status": "pending", "booking_date": null, "transaction_date": "2026-11-01", "amount_minor": -41250, "counterparty": "ICA Nära Sofo", "description": "Kortköp", "category_id": "mat-livsmedel", "category_source": "template", "is_internal_transfer": false, "split": false }], "next_cursor": "eyJ…" } }, "400": { "body": { "error": "invalid_request" } } },
+      "description": "Byggt i #106. Borttagna preliminära visas inte. Inget currency-fält: alla belopp är öre i SEK (D-money).",
       "satisfies": ["KK-9", "KK-18", "KK-20-C"]
     },
     {
@@ -579,9 +582,12 @@
       "summary": "Sätt kategori manuellt, eventuellt med inlärning av regel",
       "request": { "category_id": "cat_mat_livs", "learn_rule": true },
       "responses": {
-        "200": { "body": { "transaction": { "id": "tx_01J…", "category_source": "manual" }, "rule": { "id": "rule_ica", "pattern": "ICA", "match": "counterparty_prefix", "category_id": "cat_mat_livs" }, "retroactive_candidates": 23, "protected_manual": 2 } },
-        "403": { "description": "CSRF-skydd: fel Origin eller saknad X-Kronkoll-header", "body": { "error": "forbidden" } }
+        "200": { "body": { "transaction": { "id": "tx_01J…", "category_id": "mat-livsmedel", "category_source": "manual" }, "rule": { "id": "rule_ica", "pattern": "ICA NARA SOFO", "match": "counterparty_prefix", "category_id": "mat-livsmedel" }, "retroactive_candidates": 23, "protected_manual": 2 } },
+        "400": { "body": { "error": "unknown_category | invalid_request" } },
+        "403": { "description": "CSRF-skydd: fel Origin eller saknad X-Kronkoll-header", "body": { "error": "forbidden" } },
+        "404": { "body": { "error": "not_found" } }
       },
+      "description": "Byggt i #111. Ändrar ingen historik: svaret säger bara vad regeln skulle ändra bakåt. Själva transaktionen räknas inte med i retroactive_candidates eller protected_manual.",
       "satisfies": ["KK-18-B", "KK-18-C", "KK-29-B"]
     },
     {
@@ -596,9 +602,18 @@
       "request": { "parts": [{ "category_id": "cat_hushall", "amount_minor": -90000 }, { "category_id": "cat_hobby", "amount_minor": -34000 }] },
       "responses": {
         "200": { "body": { "transaction_id": "tx_…", "parts": 2 } },
+        "400": { "body": { "error": "too_few_parts | invalid_part | unknown_category | invalid_request" } },
         "422": { "description": "Delarna summerar inte till originalbeloppet", "body": { "error": "split_sum_mismatch", "expected_minor": -124000, "actual_minor": -120000, "remaining_minor": -4000 } }
       },
+      "description": "Byggt i #113. En tom lista tar bort uppdelningen. Högst 10 delar. GET samma sökväg ger beloppet och de sparade delarna.",
       "satisfies": ["KK-19-A", "KK-19-B"]
+    },
+    {
+      "id": "api-categories", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/categories",
+      "summary": "Kategorierna med förälder, för namn som \"Mat › Livsmedel\" och för kategorival",
+      "responses": { "200": { "body": { "items": [{ "id": "mat-livsmedel", "parent_id": "mat", "name": "Livsmedel", "kind": "expense", "archived": false }] } } },
+      "description": "Byggt i #109. Arkiverade tas med så att äldre transaktioner har ett namn; appen visar dem inte i kategorivalet.",
+      "satisfies": ["KK-18-A"]
     },
     {
       "id": "api-budget", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PUT", "path": "/api/budgets/{period}",
