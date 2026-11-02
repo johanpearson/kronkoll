@@ -10,6 +10,9 @@
   },
   "dependencies": {
     "@kronkoll/adapter-access": "workspace:*",
+    "@kronkoll/adapter-d1": "workspace:*",
+    "@kronkoll/adapter-enablebanking": "workspace:*",
+    "@kronkoll/domain": "workspace:*",
     "@kronkoll/logging": "workspace:*"
   },
   "devDependencies": {
