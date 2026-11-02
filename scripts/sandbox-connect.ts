@@ -41,6 +41,27 @@ async function call(method: "GET" | "POST", path: string, body?: object): Promis
   return json;
 }
 
+/**
+ * Följer en inloggningslänk upp till tio omdirigeringar. Ger felkoden om testbanken skickar
+ * tillbaka till REDIRECT_URL med ?error=, annars null (den visar en sida för inloggning).
+ */
+async function probe(link: string): Promise<string | null> {
+  let url = link;
+  for (let hop = 0; hop < 10; hop++) {
+    const res = await fetch(url, { redirect: "manual" });
+    const location = res.headers.get("location");
+    if (res.status < 300 || res.status >= 400 || location === null) {
+      const html = res.status === 200 ? await res.text() : "";
+      const inPage = /[?&]error=([a-z_]+)/u.exec(html.includes(REDIRECT_URL) ? html : "");
+      return res.status >= 400 ? `HTTP ${String(res.status)}` : (inPage?.[1] ?? null);
+    }
+    const next = new URL(location, url);
+    if (next.href.startsWith(REDIRECT_URL)) return next.searchParams.get("error") ?? "kom tillbaka utan fel";
+    url = next.href;
+  }
+  return "för många omdirigeringar";
+}
+
 if (step === "start") {
   const name = process.env.EB_ASPSP ?? "Mock ASPSP";
   const country = process.env.EB_COUNTRY ?? "FI";
@@ -54,18 +75,40 @@ if (step === "start") {
     process.exit(1);
   }
   const psuTypes = Array.isArray(aspsp.psu_types) ? aspsp.psu_types.map(String) : [];
-  const psuType = psuTypes.includes("personal") ? "personal" : (psuTypes[0] ?? "personal");
   const maxSeconds = typeof aspsp.maximum_consent_validity === "number" ? aspsp.maximum_consent_validity : CONSENT_DAYS * 86_400;
   // En timmes marginal mot bankens gräns, och aldrig längre än CONSENT_DAYS.
-  const consentSeconds = Math.max(3600, Math.min(CONSENT_DAYS * 86_400, maxSeconds - 3600));
-  const validUntil = new Date(Date.now() + consentSeconds * 1000).toISOString();
-  const auth = await call("POST", "/auth", {
-    access: { valid_until: validUntil },
-    aspsp: { name, country },
-    state: crypto.randomUUID(),
-    redirect_url: REDIRECT_URL,
-    psu_type: psuType,
-  });
+  const longest = Math.max(3600, Math.min(CONSENT_DAYS * 86_400, maxSeconds - 3600));
+  const variants = [...new Set([...(psuTypes.includes("personal") ? ["personal"] : []), ...psuTypes, "personal"])].flatMap((psuType) =>
+    [...new Set([longest, Math.min(longest, 30 * 86_400), 86_400])].map((seconds) => ({ psuType, seconds })),
+  );
+
+  // Testa varje variant: följ länken utan webbläsare och se om testbanken genast skickar
+  // tillbaka till redirect-adressen med ett fel. Bara felkoden skrivs ut.
+  const tried: string[] = [];
+  let found: { url: string; psuType: string; validUntil: string } | null = null;
+  for (const { psuType, seconds } of variants) {
+    const validUntil = new Date(Date.now() + seconds * 1000).toISOString();
+    const auth = await call("POST", "/auth", {
+      access: { valid_until: validUntil },
+      aspsp: { name, country },
+      state: crypto.randomUUID(),
+      redirect_url: REDIRECT_URL,
+      psu_type: psuType,
+    });
+    if (typeof auth.url !== "string" || !auth.url.startsWith("https://")) throw new Error("Svaret saknade en inloggningslänk");
+    const bounce = await probe(auth.url);
+    tried.push(`- ${psuType}, ${String(Math.round(seconds / 86_400))} dagar: ${bounce ?? "visar en sida"}`);
+    if (bounce === null) {
+      found = { url: auth.url, psuType, validUntil };
+      break;
+    }
+  }
+  if (found === null) {
+    summary([`## Testbanken ${name} (${country}) avbröt alla varianter`, "", ...tried]);
+    process.exit(1);
+  }
+  const { psuType, validUntil } = found;
+  const auth = { url: found.url };
   if (typeof auth.url !== "string" || !auth.url.startsWith("https://")) throw new Error("Svaret saknade en inloggningslänk");
   summary([
     "## Koppla sandboxen, steg 1 av 2",
@@ -79,6 +122,9 @@ if (step === "start") {
     `Länk: ${auth.url}`,
     "",
     `Samtycket gäller till ${validUntil.slice(0, 10)}. Kundtyp: ${psuType} (testbanken stöder ${psuTypes.join(", ") || "okänt"}).`,
+    "",
+    "Provade varianter:",
+    ...tried,
   ]);
 } else if (step === "finish") {
   const redirect = process.env.REDIRECTED_TO ?? "";
