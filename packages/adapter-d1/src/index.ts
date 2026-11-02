@@ -1,6 +1,7 @@
 export * as schema from "./schema.ts";
 export { deriveKeys, type Keys } from "./crypto.ts";
 export {
+  accountNameRepository,
   accountRepository,
   connectionRepository,
   settingsRepository,
@@ -8,6 +9,7 @@ export {
   type BankAccountInput,
   type Connection,
   type ConnectionStatus,
+  type NamedAccount,
   type Settings,
   type SyncRun,
 } from "./repositories.ts";

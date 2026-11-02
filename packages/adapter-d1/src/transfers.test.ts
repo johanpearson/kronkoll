@@ -118,6 +118,18 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
     });
   });
 
+  it("detaljen visar kontots egna namn när det finns, även för motposten (KK-37)", async () => {
+    const repo = transactionRepository(db);
+    await repo.setTransfers([
+      { id: "ut", internal: true, pairId: "in" },
+      { id: "in", internal: true, pairId: "ut" },
+    ]);
+    await db.prepare(`UPDATE accounts SET nickname = 'Buffert' WHERE id = 'acc_spar'`).run();
+    expect((await repo.detail("in"))?.accountName).toBe("Buffert");
+    expect((await repo.detail("ut"))?.transferPair?.accountName).toBe("Buffert");
+    await db.prepare(`UPDATE accounts SET nickname = NULL WHERE id = 'acc_spar'`).run();
+  });
+
   it("detaljen för en preliminär utan motpost, och null för en borttagen eller okänd", async () => {
     const repo = transactionRepository(db);
     await db.prepare(`UPDATE transactions SET status = 'pending' WHERE id = 'kop'`).run();

@@ -207,6 +207,15 @@
       ]
     },
     {
+      "id": "konto-namn", "title": "Namn på kontot", "modal": true, "group": "Inställningar",
+      "description": "Eget namn på ett konto (KK-37). Bankens maskerade namn står kvar under, så att kontot går att känna igen.",
+      "satisfies": ["KK-37"],
+      "elements": [
+        { "id": "nickname", "type": "input", "label": "Namn", "value": "Privat kort", "hint": "Privatkonto ••4821 hos Skandia. Lämna tomt för bankens namn.", "satisfies": ["KK-37-A", "KK-37-C"] },
+        { "type": "button", "label": "Spara", "variant": "primary", "close": true, "toast": "Kontot heter nu Privat kort", "satisfies": ["KK-37-A"] }
+      ]
+    },
+    {
       "id": "budget-redigera", "title": "Budget: Mat", "modal": true, "group": "Huvudvyer",
       "satisfies": ["KK-20-A"],
       "elements": [
@@ -395,6 +404,11 @@
           { "title": "CSV: American Express", "subtitle": "Manuell import · senast 2 okt.", "badge": "CSV", "tone": "info", "goto": "csv-import", "satisfies": ["KK-6-B"] }
         ] },
         { "type": "button", "label": "Koppla ny bank", "variant": "secondary", "goto": "koppla-bank" },
+        { "id": "accounts-named", "type": "list", "title": "Konton", "satisfies": ["KK-37-A", "KK-37-B"], "items": [
+          { "title": "Privat kort", "subtitle": "Privatkonto ••4821 · Skandia", "goto": "konto-namn" },
+          { "title": "Gemensamt kort", "subtitle": "Privatkonto ••5310 · Skandia", "goto": "konto-namn" },
+          { "title": "Sparkonto ••7712", "subtitle": "Skandia · inget eget namn", "goto": "konto-namn" }
+        ] },
         { "id": "notifications", "type": "section", "title": "Notiser (Web Push)", "satisfies": ["KK-27"], "elements": [
           { "type": "toggle", "label": "Samtycke går snart ut (14, 3, 0 dagar)", "checked": true, "satisfies": ["KK-27-B"] },
           { "type": "toggle", "label": "Budget överskriden", "checked": true, "satisfies": ["KK-27-A"] },
@@ -614,6 +628,21 @@
       "responses": { "200": { "body": { "items": [{ "id": "mat-livsmedel", "parent_id": "mat", "name": "Livsmedel", "kind": "expense", "archived": false }] } } },
       "description": "Byggt i #109. Arkiverade tas med så att äldre transaktioner har ett namn; appen visar dem inte i kategorivalet.",
       "satisfies": ["KK-18-A"]
+    },
+    {
+      "id": "api-accounts", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/accounts",
+      "summary": "Kontona med eget namn, bankens maskerade namn och bank, för Inställningar",
+      "responses": { "200": { "body": { "items": [{ "id": "acc_1", "name": "Privat kort", "nickname": "Privat kort", "bank_name": "Privatkonto ••4821", "bank": "Skandia", "type": "checking" }] } } },
+      "description": "`name` är det egna namnet om det finns, annars bankens maskerade namn. Samma regel gäller överallt där ett konto visas.",
+      "satisfies": ["KK-37"]
+    },
+    {
+      "id": "api-account-patch", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PATCH", "path": "/api/accounts/{id}",
+      "summary": "Sätt eller ta bort kontots egna namn",
+      "request": { "nickname": "Privat kort | null" },
+      "responses": { "200": { "body": { "id": "acc_1", "name": "Privat kort", "nickname": "Privat kort" } }, "400": { "body": { "error": "invalid_request" } }, "404": { "body": { "error": "not_found" } } },
+      "description": "Namnet trimmas och får vara högst 40 tecken utan styrtecken. Tomt eller null tar bort det. Kräver CSRF-skydd som andra ändringar.",
+      "satisfies": ["KK-37-A", "KK-37-C"]
     },
     {
       "id": "api-budget", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PUT", "path": "/api/budgets/{period}",
@@ -994,6 +1023,7 @@
         { "name": "provider_uid", "type": "text", "description": "Enable Banking account uid" },
         { "name": "iban_hash", "type": "text (HMAC)", "description": "För att matcha konton vid koppla om utan att spara IBAN", "satisfies": ["KK-8-B"] },
         { "name": "display_name", "type": "text", "description": "\"Privatkonto ••4821\" (maskerat)", "pii": true, "satisfies": ["KK-11-C"] },
+        { "name": "nickname", "type": "text", "description": "Användarens eget namn, t.ex. \"Privat kort\". Skrivs aldrig över av synken.", "satisfies": ["KK-37-A", "KK-37-B"] },
         { "name": "type", "type": "checking|credit_card|savings|manual", "satisfies": ["KK-6-A"] },
         { "name": "balance_minor", "type": "int", "satisfies": ["KK-17-A"] },
         { "name": "sync_cursor", "type": "text", "description": "date_from/continuation för uppdelad hämtning (CPU-gräns)" }

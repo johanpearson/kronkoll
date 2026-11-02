@@ -114,6 +114,8 @@ export const accounts = sqliteTable(
     ibanHash: text("iban_hash"),
     /** Maskerat, t.ex. "Privatkonto ••4821". */
     displayName: text("display_name").notNull(),
+    /** Användarens eget namn, t.ex. "Privat kort" (KK-37). Synken skriver aldrig över det. */
+    nickname: text("nickname"),
     type: text("type", { enum: ACCOUNT_TYPES }).notNull(),
     balanceMinor: integer("balance_minor"),
     /** Kontot räknas in i översiktens totala saldo (KK-17-A). */

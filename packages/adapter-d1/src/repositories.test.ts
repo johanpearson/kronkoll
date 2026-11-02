@@ -2,7 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { BalanceStore, ConnectionSyncState, SyncRunLog, SyncRunSummary, TransactionStore } from "@kronkoll/domain";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { deriveKeys, type Keys } from "./crypto.ts";
-import { accountRepository, connectionRepository, settingsRepository, syncRunRepository } from "./repositories.ts";
+import { accountNameRepository, accountRepository, connectionRepository, settingsRepository, syncRunRepository } from "./repositories.ts";
 import { migratedDb, randomSecret } from "./test-support.ts";
 import { transactionRepository } from "./transactions.ts";
 
@@ -86,6 +86,32 @@ describe("konton", () => {
     const repo = accountRepository(db, keys);
     const id = await repo.upsertFromBank({ connectionId: "c3", providerUid: "card-1", iban: null, name: "Visa", type: "credit_card", balanceMinor: -320000 }, newId);
     expect((await repo.list()).find((a) => a.id === id)).toMatchObject({ displayName: "Visa", ibanHash: null });
+  });
+});
+
+describe("egna kontonamn (KK-37)", () => {
+  it("sätter och tar bort ett eget namn, och listar kontona med bank och namn", async () => {
+    const repo = accountRepository(db, keys);
+    const names = accountNameRepository(db);
+    const id = await repo.upsertFromBank({ connectionId: "c1", providerUid: "named-1", iban: null, name: "Privatkonto", type: "checking", balanceMinor: 0 }, newId);
+    expect(await names.set(id, "Privat kort")).toBe(true);
+    expect((await names.list()).find((a) => a.id === id)).toEqual({ id, nickname: "Privat kort", bankName: "Privatkonto", bank: "Skandia", type: "checking" });
+    expect(await names.set(id, null)).toBe(true);
+    expect((await names.list()).find((a) => a.id === id)?.nickname).toBeNull();
+  });
+
+  it("synken och koppla om behåller det egna namnet men uppdaterar bankens (KK-37-B)", async () => {
+    const repo = accountRepository(db, keys);
+    const names = accountNameRepository(db);
+    const input = { connectionId: "c1", providerUid: "named-2", iban: null, name: "Privatkonto", type: "checking" as const, balanceMinor: 0 };
+    const id = await repo.upsertFromBank(input, newId);
+    await names.set(id, "Gemensamt kort");
+    await repo.upsertFromBank({ ...input, name: "Lönekonto", balanceMinor: 100 }, newId);
+    expect((await names.list()).find((a) => a.id === id)).toMatchObject({ nickname: "Gemensamt kort", bankName: "Lönekonto" });
+  });
+
+  it("säger till när kontot inte finns", async () => {
+    expect(await accountNameRepository(db).set("finns-inte", "Buffert")).toBe(false);
   });
 });
 
