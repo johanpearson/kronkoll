@@ -47,7 +47,7 @@ export function App() {
   return (
     <>
       <Page />
-      <nav aria-label="Huvudmeny">
+      <nav className="tabbar" aria-label="Huvudmeny">
         <ul>
           {TABS.map((tab) => (
             <li key={tab.to}>

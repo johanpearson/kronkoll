@@ -1,0 +1,83 @@
+/*
+ * Designtokens (D-design, KK-26). Lugn neutral bas, djupt petrolgrön accent och generösa rundningar.
+ * Ljust läge är standard. Mörkt läge följer systemet, eller användarens val via data-theme på <html>.
+ * Färgparen kontrolleras mot WCAG AA i contrast.test.ts, så ändra här och kör testerna.
+ * Det mörka läget står två gånger med samma värden: för den som valt mörkt och för systemets mörka
+ * läge när inget val är gjort. Testet kontrollerar att de är lika.
+ */
+:root {
+  color-scheme: light;
+  --background: #f5f6f8;
+  --surface: #ffffff;
+  --input: #ffffff;
+  --text: #1a2230;
+  --heading: #0b1220;
+  --muted: #566070;
+  --border: #e3e6eb;
+  --border-strong: #7b8494;
+  --primary: #0f6b63;
+  --on-primary: #ffffff;
+  --primary-soft: #e3f1ef;
+  --success: #157f3d;
+  --warning: #a15c07;
+  --danger: #b42323;
+  --info: #1f4fbf;
+  --focus: #1f4fbf;
+
+  --font: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --radius: 16px;
+  --radius-small: 10px;
+  --radius-pill: 999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --tabbar-height: 64px;
+  --duration: 200ms;
+  --easing: cubic-bezier(0.2, 0, 0, 1);
+  --shadow: 0 1px 2px rgb(11 18 32 / 6%), 0 4px 16px rgb(11 18 32 / 6%);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0e1116;
+  --surface: #161a21;
+  --input: #1c2129;
+  --text: #e6e9ef;
+  --heading: #f5f7fa;
+  --muted: #a1aab8;
+  --border: #262c36;
+  --border-strong: #6b7483;
+  --primary: #5cc8ba;
+  --on-primary: #062a26;
+  --primary-soft: #12302c;
+  --success: #4cc77a;
+  --warning: #e7a63e;
+  --danger: #f07a7a;
+  --info: #84a9ff;
+  --focus: #84a9ff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: #0e1116;
+    --surface: #161a21;
+    --input: #1c2129;
+    --text: #e6e9ef;
+    --heading: #f5f7fa;
+    --muted: #a1aab8;
+    --border: #262c36;
+    --border-strong: #6b7483;
+    --primary: #5cc8ba;
+    --on-primary: #062a26;
+    --primary-soft: #12302c;
+    --success: #4cc77a;
+    --warning: #e7a63e;
+    --danger: #f07a7a;
+    --info: #84a9ff;
+    --focus: #84a9ff;
+  }
+}

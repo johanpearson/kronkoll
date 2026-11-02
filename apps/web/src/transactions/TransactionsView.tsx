@@ -151,7 +151,7 @@ function Row(props: {
   ].filter((n): n is string => n !== null);
   return (
     <li className={t.isInternalTransfer ? "internal" : undefined}>
-      <span>{name}</span> <span>{formatSek(t.amountMinor)}</span>
+      <span>{name}</span> <span className="amount">{formatSek(t.amountMinor)}</span>
       {notes.length > 0 && <small> · {notes.join(" · ")}</small>}{" "}
       {props.mode === null && (
         <>

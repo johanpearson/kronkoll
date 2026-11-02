@@ -1,0 +1,230 @@
+/*
+ * Grundstil (D-design, KK-25, KK-26): mobil först, typografi med Inter, flikraden längst ner och
+ * vanliga HTML-element som ser bra ut utan egna klasser. Komponenter och val av tema kommer i nästa PR.
+ */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--background);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 16px;
+  line-height: 1.5;
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Sidans innehåll: smal kolumn, luft runt om och plats för flikraden under. */
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) calc(var(--tabbar-height) + var(--space-6) + env(safe-area-inset-bottom));
+}
+
+h1,
+h2,
+h3 {
+  color: var(--heading);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  margin: 0 0 var(--space-5);
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+h2 {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+p {
+  margin: 0 0 var(--space-3);
+}
+
+small {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+a {
+  color: var(--primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+/* Belopp och datum med siffror som står rakt under varandra. */
+.amount,
+time {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Listor ser ut som kort med rader, vilket passar transaktioner och inställningar. */
+main ul {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+main ul > li {
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+main ul > li:first-child {
+  border-top: 0;
+}
+
+/* En lista med grupper (till exempel transaktioner per dag) är luftig utanpå, kort inuti. */
+main ul:has(> li > ul) {
+  background: none;
+  border: 0;
+  box-shadow: none;
+}
+
+main ul:has(> li > ul) > li {
+  padding: 0;
+  border: 0;
+}
+
+main ul:has(> li > ul) > li > h2 {
+  margin-top: var(--space-4);
+}
+
+/* Interna överföringar räknas inte och tonas ner. */
+li.internal {
+  color: var(--muted);
+}
+
+button {
+  font: inherit;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color var(--duration) var(--easing), border-color var(--duration) var(--easing);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--primary);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input,
+select {
+  font: inherit;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-small);
+  background: var(--input);
+  color: var(--text);
+}
+
+input[type="checkbox"] {
+  min-height: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--primary);
+}
+
+[role="alert"] {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-small);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  background: var(--surface);
+}
+
+[role="status"] {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-small);
+  border: 1px solid var(--success);
+  color: var(--success);
+  background: var(--surface);
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Flikraden längst ner, med plats för hemknappen på mobiler. */
+.tabbar {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 10;
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+}
+
+.tabbar ul {
+  display: flex;
+  max-width: 640px;
+  height: var(--tabbar-height);
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.tabbar li {
+  flex: 1;
+}
+
+.tabbar a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.tabbar a[aria-current="page"] {
+  color: var(--primary);
+  font-weight: 600;
+  box-shadow: inset 0 2px 0 var(--primary);
+}
+
+/* KK-26-B: korta animationer, och inga alls för den som valt minskad rörelse. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
