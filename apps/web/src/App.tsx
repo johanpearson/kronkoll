@@ -1,5 +1,6 @@
-// Appens skal (#30). Bara sidorna som behövs nu: start och "sidan finns inte". Vyerna för att
-// koppla bank (#26) och resten av webbskalet (tema, navigering, PWA, utloggning) kommer i egna PR:er.
+// Appens skal (#30). Sidorna som finns nu: start, koppla bank (#26) och "sidan finns inte".
+// Resten av webbskalet (tema, navigering, PWA, utloggning) kommer i egna PR:er.
+import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { Link, usePath } from "./router.tsx";
 
 function Start() {
@@ -7,6 +8,9 @@ function Start() {
     <main>
       <h1>Kronkoll</h1>
       <p>Kommer snart.</p>
+      <p>
+        <Link to="/koppla">Koppla bank</Link>
+      </p>
     </main>
   );
 }
@@ -22,7 +26,14 @@ function NotFound() {
   );
 }
 
+const ROUTES: Record<string, () => React.JSX.Element> = {
+  "/": Start,
+  "/koppla": ConnectBank,
+  "/koppla/samtycke": Consent,
+  "/koppla/klar": ConnectDone,
+};
+
 export function App() {
-  const path = usePath();
-  return path === "/" ? <Start /> : <NotFound />;
+  const Page = ROUTES[usePath()] ?? NotFound;
+  return <Page />;
 }
