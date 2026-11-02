@@ -3,14 +3,26 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "wrangler pages dev --port 8788 --inspector-port 9231",
-    "typecheck": "tsc -p tsconfig.json",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "pnpm build && wrangler pages dev --port 8788 --inspector-port 9231",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/tsconfig.json",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20261016.1",
+    "@testing-library/react": "16.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
     "@vitest/coverage-v8": "5.0.5",
+    "jsdom": "29.1.1",
+    "vite": "8.3.5",
     "vitest": "5.0.5"
+  },
+  "dependencies": {
+    "react": "19.3.1",
+    "react-dom": "19.3.1"
   }
 }

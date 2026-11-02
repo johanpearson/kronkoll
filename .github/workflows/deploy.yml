@@ -57,6 +57,11 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: pnpm exec wrangler deploy
 
+      # Webbappen byggs här, efter att alla grindar gått gröna, med samma låsta beroenden.
+      - name: Bygg webbappen
+        working-directory: apps/web
+        run: pnpm build
+
       - name: Deploya Pages
         working-directory: apps/web
         env:
