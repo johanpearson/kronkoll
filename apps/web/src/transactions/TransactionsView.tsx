@@ -4,6 +4,7 @@
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson } from "../api.ts";
+import { Link } from "../router.tsx";
 import { CategoryEditor, type CategoryOption } from "./CategoryEditor.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
 
@@ -94,7 +95,7 @@ function groupByDay(items: readonly Transaction[]): [string, Transaction[]][] {
   return [...days];
 }
 
-interface Categories {
+export interface Categories {
   /** Namn per id, t.ex. "Mat › Livsmedel", även för arkiverade. */
   readonly names: ReadonlyMap<string, string>;
   /** Det som går att välja: inte arkiverade, sorterade efter namn. */
@@ -102,7 +103,7 @@ interface Categories {
 }
 
 /** Kategorierna, eller inga om de inte går att hämta. Listan fungerar ändå. */
-async function fetchCategories(): Promise<Categories> {
+export async function fetchCategories(): Promise<Categories> {
   const { status, body } = await getJson("/api/categories");
   const items = field(body, "items");
   if (status !== 200 || !Array.isArray(items)) return { names: new Map(), options: [] };
@@ -152,7 +153,9 @@ function Row(props: {
   return (
     <li className={t.isInternalTransfer ? "tx internal" : "tx"}>
       <div className="tx-main">
-        <span className="tx-name">{name}</span>
+        <span className="tx-name">
+          <Link to={`/transaktioner/${encodeURIComponent(t.id)}`}>{name}</Link>
+        </span>
         <span className={t.amountMinor > 0 ? "amount income" : "amount"}>{formatSek(t.amountMinor)}</span>
       </div>
       {notes.length > 0 && <small className="tx-notes">{notes.join(" · ")}</small>}

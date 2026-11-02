@@ -4,6 +4,7 @@ import { House, ReceiptText, Settings } from "lucide-react";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { Link, usePath } from "./router.tsx";
 import { SettingsView } from "./settings/SettingsView.tsx";
+import { TransactionDetail } from "./transactions/TransactionDetail.tsx";
 import { TransactionsView } from "./transactions/TransactionsView.tsx";
 
 function Overview() {
@@ -38,16 +39,20 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
 /** Menyn i den ordning planen har den. Koppla bank hör till Inställningar. */
 const TABS = [
   { to: "/", label: "Översikt", Icon: House, owns: (path: string) => path === "/" },
-  { to: "/transaktioner", label: "Transaktioner", Icon: ReceiptText, owns: (path: string) => path === "/transaktioner" },
+  { to: "/transaktioner", label: "Transaktioner", Icon: ReceiptText, owns: (path: string) => path === "/transaktioner" || path.startsWith("/transaktioner/") },
   { to: "/installningar", label: "Inställningar", Icon: Settings, owns: (path: string) => path === "/installningar" || path.startsWith("/koppla") },
 ];
 
+/** /transaktioner/{id}: detaljsidan för en transaktion. */
+const DETAIL = /^\/transaktioner\/([^/]+)$/u;
+
 export function App() {
   const path = usePath();
+  const detailId = DETAIL.exec(path)?.[1];
   const Page = ROUTES[path] ?? NotFound;
   return (
     <>
-      <Page />
+      {detailId === undefined ? <Page /> : <TransactionDetail key={detailId} id={decodeURIComponent(detailId)} />}
       <nav className="tabbar" aria-label="Huvudmeny">
         <ul>
           {TABS.map((tab) => (
