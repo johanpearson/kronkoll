@@ -100,22 +100,24 @@ export interface Categories {
   readonly names: ReadonlyMap<string, string>;
   /** Det som går att välja: inte arkiverade, sorterade efter namn. */
   readonly options: readonly CategoryOption[];
+  /** Det som går att budgetera: valbara utgiftskategorier, i samma ordning (KK-20-A). */
+  readonly budgetable: readonly CategoryOption[];
 }
 
-export const NO_CATEGORIES: Categories = { names: new Map(), options: [] };
+export const NO_CATEGORIES: Categories = { names: new Map(), options: [], budgetable: [] };
 
 /** Kategorierna, eller inga om de inte går att hämta. Listan fungerar ändå. */
 export async function fetchCategories(): Promise<Categories> {
   const { status, body } = await getJson("/api/categories");
   const items = field(body, "items");
   if (status !== 200 || !Array.isArray(items)) return NO_CATEGORIES;
-  const raw = new Map<string, { name: string; parent: string | null; archived: boolean }>();
+  const raw = new Map<string, { name: string; parent: string | null; archived: boolean; expense: boolean }>();
   for (const item of items) {
     const id = field(item, "id");
     const name = field(item, "name");
     const parent = field(item, "parent_id");
     if (typeof id === "string" && typeof name === "string") {
-      raw.set(id, { name, parent: typeof parent === "string" ? parent : null, archived: field(item, "archived") === true });
+      raw.set(id, { name, parent: typeof parent === "string" ? parent : null, archived: field(item, "archived") === true, expense: field(item, "kind") === "expense" });
     }
   }
   const names = new Map(
@@ -128,7 +130,7 @@ export async function fetchCategories(): Promise<Categories> {
     .filter(([, c]) => !c.archived)
     .map(([id]) => ({ id, label: names.get(id) ?? id }))
     .sort((a, b) => a.label.localeCompare(b.label, "sv"));
-  return { names, options };
+  return { names, options, budgetable: options.filter((o) => raw.get(o.id)?.expense === true) };
 }
 
 function Row(props: {
