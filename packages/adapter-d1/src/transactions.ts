@@ -210,6 +210,42 @@ export function transactionRepository(d1: D1Database) {
         .all();
     },
 
+    /** En transaktion i domänens form för kategorisering, eller null om den inte finns eller är borttagen. */
+    async get(id: string): Promise<CategorizableTransaction | null> {
+      const [row] = await db
+        .select({
+          id: transactions.id,
+          counterpartyNorm: transactions.counterpartyNorm,
+          description: transactions.description,
+          categoryId: transactions.categoryId,
+          categorySource: transactions.categorySource,
+        })
+        .from(transactions)
+        .where(and(eq(transactions.id, id), ne(transactions.status, "removed")))
+        .all();
+      return row ?? null;
+    },
+
+    /** Alla transaktioner som en regel kan gälla, manuella inräknade, för att räkna en regels effekt bakåt. */
+    async categorizable(): Promise<CategorizableTransaction[]> {
+      return db
+        .select({
+          id: transactions.id,
+          counterpartyNorm: transactions.counterpartyNorm,
+          description: transactions.description,
+          categoryId: transactions.categoryId,
+          categorySource: transactions.categorySource,
+        })
+        .from(transactions)
+        .where(ne(transactions.status, "removed"))
+        .all();
+    },
+
+    /** Användaren väljer kategori. Den markeras som manuell och rörs sedan aldrig av regler (KK-18-C). */
+    async setManualCategory(id: string, categoryId: string): Promise<void> {
+      await db.update(transactions).set({ categoryId, categorySource: "manual" }).where(eq(transactions.id, id));
+    },
+
     /** Sparar kategorier i en batch. En manuellt satt kategori skrivs aldrig över (KK-18-C). */
     async setCategories(changes: readonly CategoryChange[]): Promise<void> {
       const statements = changes.map((change) =>
