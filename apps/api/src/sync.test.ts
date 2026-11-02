@@ -159,6 +159,59 @@ describe("kategorisering efter synken (KK-18, F-dataflode)", () => {
   });
 });
 
+describe("interna överföringar efter synken (KK-20-C, F-dataflode)", () => {
+  /** Påhittade transaktioner (KK-13) direkt i databasen, en per konto och dag. */
+  async function insert(id: string, accountId: string, amount: number, date = "2026-11-02") {
+    await db
+      .prepare(
+        `INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor, counterparty, counterparty_norm)
+         VALUES (?, ?, 'fp', 'booked', ?, ?, ?, 'X', 'X')`,
+      )
+      .bind(id, accountId, date, date, amount)
+      .run();
+  }
+  const flags = async () =>
+    (await db.prepare(`SELECT id, is_internal_transfer AS i, transfer_pair_id AS p FROM transactions ORDER BY id`).all()).results;
+
+  it("markerar en överföring mellan två egna konton som intern, åt båda hållen, och rör inte ett vanligt köp", async () => {
+    const budget = await seedConnection("c1");
+    const spar = await seedConnection("c2");
+    await insert("ut", budget, -500000);
+    await insert("in", spar, 500000, "2026-11-03");
+    await insert("kop", budget, -4500);
+    const { deps, logs } = setup(fakeBank({ transactions: [] }));
+    await runSync(env(), "cron", deps);
+    expect(await flags()).toEqual([
+      { id: "in", i: 1, p: "ut" },
+      { id: "kop", i: 0, p: null },
+      { id: "ut", i: 1, p: "in" },
+    ]);
+    expect(logs.lines.at(-1)).toEqual({ level: "info", event: "sync.transfers", fields: { count: 2 } });
+  });
+
+  it("en ny synk utan ändringar skriver och loggar ingenting om överföringar", async () => {
+    const budget = await seedConnection("c1");
+    const spar = await seedConnection("c2");
+    await insert("ut", budget, -500000);
+    await insert("in", spar, 500000);
+    const { deps, logs } = setup(fakeBank({ transactions: [] }));
+    await runSync(env(), "cron", deps);
+    const before = logs.lines.length;
+    await runSync(env(), "cron", deps);
+    expect(logs.lines.slice(before).map((l) => l.event)).not.toContain("sync.transfers");
+  });
+
+  it("belopp som inte möts inom tre dagar räknas inte som överföring", async () => {
+    const budget = await seedConnection("c1");
+    const spar = await seedConnection("c2");
+    await insert("ut", budget, -500000, "2026-11-01");
+    await insert("in", spar, 500000, "2026-11-05");
+    const { deps } = setup(fakeBank({ transactions: [] }));
+    await runSync(env(), "cron", deps);
+    expect((await flags()).map((r) => r.i)).toEqual([0, 0]);
+  });
+});
+
 describe("fel isoleras (KK-7-B)", () => {
   it("401 från banken sätter kopplingen till utgången och loggar felkoden", async () => {
     await seedConnection("c1");

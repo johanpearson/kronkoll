@@ -16,6 +16,7 @@ import {
   type CategoryChange,
   type ReconcileResult,
   type StoredTransaction,
+  type TransferInput,
 } from "@kronkoll/domain";
 import { and, desc, eq, gte, inArray, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
@@ -244,6 +245,37 @@ export function transactionRepository(d1: D1Database) {
     /** Användaren väljer kategori. Den markeras som manuell och rörs sedan aldrig av regler (KK-18-C). */
     async setManualCategory(id: string, categoryId: string): Promise<void> {
       await db.update(transactions).set({ categoryId, categorySource: "manual" }).where(eq(transactions.id, id));
+    },
+
+    /**
+     * Transaktioner i domänens form för att hitta interna överföringar (KK-20-C), med hur de är
+     * markerade nu. Manuell markering finns inte i databasen än och är därför alltid null.
+     */
+    async forTransfers(): Promise<(TransferInput & { internal: boolean; pairId: string | null })[]> {
+      const rows = await db
+        .select({
+          id: transactions.id,
+          accountId: transactions.accountId,
+          transactionDate: transactions.transactionDate,
+          amountMinor: transactions.amountMinor,
+          counterpartyNorm: transactions.counterpartyNorm,
+          status: transactions.status,
+          internal: transactions.isInternalTransfer,
+          pairId: transactions.transferPairId,
+        })
+        .from(transactions)
+        .where(ne(transactions.status, "removed"))
+        .all();
+      return rows.map((row) => ({ ...row, manualTransfer: null }));
+    },
+
+    /** Sparar vilka som är interna överföringar och deras motpost, i en batch. */
+    async setTransfers(changes: readonly { id: string; internal: boolean; pairId: string | null }[]): Promise<void> {
+      const statements = changes.map((change) =>
+        db.update(transactions).set({ isInternalTransfer: change.internal, transferPairId: change.pairId }).where(eq(transactions.id, change.id)),
+      );
+      const [first, ...rest] = statements;
+      if (first) await db.batch([first, ...rest]);
     },
 
     /** Sparar kategorier i en batch. En manuellt satt kategori skrivs aldrig över (KK-18-C). */
