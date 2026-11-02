@@ -26,6 +26,7 @@ export {
 export { learnPattern, matchesWordPrefix, normalizeCounterparty } from "./normalize.ts";
 export {
   applyRules,
+  ruleReach,
   categorize,
   learnFromManualChoice,
   type CategorizableTransaction,
@@ -33,6 +34,7 @@ export {
   type CategoryChange,
   type CategoryRule,
   type CategorySource,
+  type RuleReach,
   type LearnInput,
   type LearnResult,
 } from "./categorize.ts";

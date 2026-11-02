@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   applyRules,
+  ruleReach,
   categorize,
   learnFromManualChoice,
   type CategorizableTransaction,
@@ -171,5 +172,38 @@ describe("applicera regler bakåt (KK-18-C)", () => {
     const changes = applyRules(transactions, [learned]);
     const updated = transactions.map((t) => ({ ...t, ...changes.find((c) => c.id === t.id) }));
     expect(applyRules(updated, [learned])).toEqual([]);
+  });
+});
+
+describe("en regels effekt bakåt (KK-18-B, KK-18-C)", () => {
+  const learned: CategoryRule = { id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA SOFO", categoryId: "mat", source: "learned" };
+  const history = [
+    tx({ id: "a" }),
+    tx({ id: "b", categoryId: "gammal", categorySource: "template" }),
+    tx({ id: "c", categoryId: "hushall", categorySource: "manual" }),
+    tx({ id: "d", counterpartyNorm: "ICA NARA SOFO STHLM" }),
+    tx({ id: "e", counterpartyNorm: "SL" }),
+    tx({ id: "f", categoryId: "mat", categorySource: "learned" }),
+  ];
+
+  it("ger de transaktioner regeln skulle ändra, och räknar manuella som skyddas", () => {
+    expect(ruleReach(history, [templateIca, learned], "r-ica")).toEqual({
+      changes: [
+        { id: "a", categoryId: "mat", categorySource: "learned" },
+        { id: "b", categoryId: "mat", categorySource: "learned" },
+        { id: "d", categoryId: "mat", categorySource: "learned" },
+      ],
+      protectedManual: 1,
+    });
+  });
+
+  it("rör inte transaktioner där en annan regel vinner", () => {
+    const longer: CategoryRule = { ...learned, id: "r-lang", pattern: "ICA NARA SOFO STHLM", categoryId: "annat" };
+    const { changes } = ruleReach(history, [learned, longer], "r-ica");
+    expect(changes.map((c) => c.id)).toEqual(["a", "b"]);
+  });
+
+  it("en regel som inte finns ger ingen effekt", () => {
+    expect(ruleReach(history, [learned], "saknas")).toEqual({ changes: [], protectedManual: 0 });
   });
 });

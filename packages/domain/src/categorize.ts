@@ -123,3 +123,31 @@ export function learnFromManualChoice(input: LearnInput): LearnResult {
     : { id: input.newId(), match: "counterparty_prefix", pattern, categoryId: input.categoryId, source: "learned" };
   return { transaction, rule };
 }
+
+export interface RuleReach {
+  /** Transaktioner som får en ny kategori om regeln appliceras bakåt. */
+  readonly changes: readonly CategoryChange[];
+  /** Manuellt kategoriserade transaktioner som regeln matchar men aldrig ändrar (KK-18-C). */
+  readonly protectedManual: number;
+}
+
+/**
+ * Vad en regel skulle göra med historiken om den appliceras bakåt, till exempel efter "Gör alltid
+ * så" (KK-18-B). Bara transaktioner där just den här regeln vinner räknas, så att en annan regel
+ * med högre prioritet aldrig skrivs över. Manuella transaktioner ändras aldrig, men räknas.
+ */
+export function ruleReach(transactions: readonly CategorizableTransaction[], rules: readonly CategoryRule[], ruleId: string): RuleReach {
+  const changes: CategoryChange[] = [];
+  let protectedManual = 0;
+  for (const tx of transactions) {
+    if (tx.categorySource === "manual") {
+      if (categorize({ ...tx, categorySource: "none" }, rules)?.ruleId === ruleId) protectedManual += 1;
+      continue;
+    }
+    const result = categorize(tx, rules);
+    if (result?.ruleId === ruleId && (result.categoryId !== tx.categoryId || result.source !== tx.categorySource)) {
+      changes.push({ id: tx.id, categoryId: result.categoryId, categorySource: result.source });
+    }
+  }
+  return { changes, protectedManual };
+}
