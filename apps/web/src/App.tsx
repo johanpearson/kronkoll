@@ -1,6 +1,7 @@
-// Appens skal (#30): sidorna och huvudmenyn. Menyn har de vyer som finns; Budget, Sparmål och Inkomst
-// läggs till när de byggs. Tema, PWA och offline-cache kommer i egna PR:er.
-import { House, ReceiptText, Settings } from "lucide-react";
+// Appens skal (#30): sidorna och huvudmenyn. Menyn har de vyer som finns; Sparmål och Inkomst
+// läggs till när de byggs. PWA och offline-cache kommer i egna PR:er.
+import { House, PiggyBank, ReceiptText, Settings } from "lucide-react";
+import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { Link, usePath } from "./router.tsx";
 import { SettingsView } from "./settings/SettingsView.tsx";
@@ -30,6 +31,7 @@ function NotFound() {
 const ROUTES: Record<string, () => React.JSX.Element> = {
   "/": Overview,
   "/transaktioner": TransactionsView,
+  "/budget": BudgetView,
   "/installningar": SettingsView,
   "/koppla": ConnectBank,
   "/koppla/samtycke": Consent,
@@ -40,6 +42,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
 const TABS = [
   { to: "/", label: "Översikt", Icon: House, owns: (path: string) => path === "/" },
   { to: "/transaktioner", label: "Transaktioner", Icon: ReceiptText, owns: (path: string) => path === "/transaktioner" || path.startsWith("/transaktioner/") },
+  { to: "/budget", label: "Budget", Icon: PiggyBank, owns: (path: string) => path === "/budget" },
   { to: "/installningar", label: "Inställningar", Icon: Settings, owns: (path: string) => path === "/installningar" || path.startsWith("/koppla") },
 ];
 

@@ -7,7 +7,7 @@ import { field, getJson, putJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { CategoryEditor } from "./CategoryEditor.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
-import { fetchCategories, type Categories } from "./TransactionsView.tsx";
+import { fetchCategories, NO_CATEGORIES, type Categories } from "./TransactionsView.tsx";
 
 interface Detail {
   readonly id: string;
@@ -77,7 +77,7 @@ type State = { kind: "loading" } | { kind: "missing" } | { kind: "error" } | { k
 
 export function TransactionDetail({ id }: { id: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
-  const [categories, setCategories] = useState<Categories>({ names: new Map(), options: [] });
+  const [categories, setCategories] = useState<Categories>(NO_CATEGORIES);
   const [mode, setMode] = useState<"category" | "split" | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
