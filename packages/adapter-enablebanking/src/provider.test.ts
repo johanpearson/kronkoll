@@ -111,6 +111,23 @@ describe("transaktioner (KK-5-C, KK-11-C)", () => {
     expect(page.transactions[0]?.description).toHaveLength(140);
   });
 
+  it("hoppar över id med bara nollor och litar inte på id som återkommer på sidan, så att olika köp inte slås ihop", async () => {
+    const { provider } = fakeApi({
+      "/accounts/a/transactions": {
+        transactions: [
+          tx({ entry_reference: "0000000000", transaction_id: "tid-1" }),
+          tx({ entry_reference: "dup" }),
+          tx({ entry_reference: "dup", transaction_amount: { currency: "SEK", amount: "40.00" } }),
+          tx({ entry_reference: "unik" }),
+          tx({ entry_reference: "000", transaction_id: "0" }),
+        ],
+      },
+    });
+    const page = await provider.transactions("a", { dateFrom: "2026-08-01", continuationKey: null });
+    expect(page.transactions.map((t) => t.providerTxId)).toEqual(["tid-1", null, null, "unik", null]);
+    expect(page.transactions.map((t) => t.amountMinor)).toEqual([-12550, -12550, -4000, -12550, -12550]);
+  });
+
   it("hämtar sida för sida med continuation key", async () => {
     const { provider, calls } = fakeApi({
       "/accounts/a/transactions": { transactions: [tx({})], continuation_key: "nästa" },
