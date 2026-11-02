@@ -24,6 +24,8 @@ function imported(overrides: Partial<ImportedTransaction> = {}): ImportedTransac
     bookingDate: "2026-11-10",
     amountMinor: -4500,
     counterpartyNorm: "espresso house",
+    counterparty: "ESPRESSO HOUSE STHLM",
+    description: "Kaffe",
     ...overrides,
   };
 }
@@ -238,6 +240,32 @@ describe("försvunnen preliminär (KK-9-C)", () => {
   });
 });
 
+describe("bankens visningstext följer med (KK-9, KK-30)", () => {
+  it("en ny rad sparar motpartens och beskrivningens text som banken skickade den", () => {
+    const { state } = importInto([], [imported({ counterparty: "K*ICA KVANTUM 12 STHLM", description: "Köp 2026-11-10" })]);
+    expect(state).toHaveLength(1);
+    expect(state[0]).toMatchObject({ counterparty: "K*ICA KVANTUM 12 STHLM", description: "Köp 2026-11-10" });
+  });
+
+  it("när en preliminär bokförs tas bankens nya text, och en ändrad text räknas som en ändring", () => {
+    const pending = stored({ id: "tx_kept", status: "pending", bookingDate: null, counterparty: "ESPRESSO HOUSE", description: "" });
+    const { result, state } = importInto([pending], [imported({ counterparty: "ESPRESSO HOUSE STHLM", description: "Kaffe" })]);
+    expect(result.updated).toHaveLength(1);
+    expect(state[0]).toMatchObject({ id: "tx_kept", counterparty: "ESPRESSO HOUSE STHLM", description: "Kaffe" });
+  });
+
+  it("en bokförd rad behåller sin text när banken skickar en preliminär med samma id", () => {
+    const booked = stored({ providerTxId: "b1", counterparty: "ESPRESSO HOUSE STHLM", description: "Kaffe" });
+    const { state } = importInto([booked], [imported({ status: "pending", providerTxId: "b1", counterparty: "ANNAT", description: "ANNAT" })]);
+    expect(state[0]).toMatchObject({ counterparty: "ESPRESSO HOUSE STHLM", description: "Kaffe" });
+  });
+
+  it("samma text en gång till ändrar ingenting", () => {
+    const first = importInto([], [imported({ providerTxId: "b1" })]);
+    expect(importInto(first.state, [imported({ providerTxId: "b1" })]).result).toEqual({ inserted: [], updated: [] });
+  });
+});
+
 describe("indata kontrolleras", () => {
   it("avvisar belopp som inte är heltal öre", () => {
     expect(() => importInto([], [imported({ amountMinor: 1.5 })])).toThrow(RangeError);
@@ -261,6 +289,8 @@ const arbImported = fc
   })
   .map(({ hasId, ...tx }): ImportedTransaction => ({
     ...tx,
+    counterparty: tx.counterpartyNorm.toUpperCase(),
+    description: "",
     providerTxId: hasId ? [tx.accountId, tx.status, tx.transactionDate, tx.amountMinor, tx.counterpartyNorm].join("/") : null,
     bookingDate: tx.status === "booked" ? tx.transactionDate : null,
   }));

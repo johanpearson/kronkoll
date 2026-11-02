@@ -28,6 +28,10 @@ export interface ImportedTransaction {
   readonly bookingDate: string | null;
   readonly amountMinor: number;
   readonly counterpartyNorm: string;
+  /** Bankens motpartstext som den kom. Opålitlig indata som alltid visas som text (KK-30). */
+  readonly counterparty: string;
+  /** Bankens meddelande, högst 140 tecken. Samma varning som för motparten. */
+  readonly description: string;
 }
 
 export interface StoredTransaction extends Omit<ImportedTransaction, "status"> {
@@ -153,6 +157,8 @@ function merge(existing: StoredTransaction, incoming: ImportedTransaction, today
     bookingDate: incoming.bookingDate,
     amountMinor: incoming.amountMinor,
     counterpartyNorm: incoming.counterpartyNorm,
+    counterparty: incoming.counterparty,
+    description: incoming.description,
     lastSeenOn: today,
   };
 }
