@@ -115,6 +115,9 @@ export {
   type TransactionStore,
 } from "./sync-account.ts";
 export {
+  type AuthorizationRequest,
+  type BankConnector,
+  type BankSession,
   ProviderError,
   type BankAccount,
   type BankAccountType,

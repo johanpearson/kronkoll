@@ -49,6 +49,32 @@ export class ProviderError extends Error {
   }
 }
 
+export interface AuthorizationRequest {
+  readonly aspspName: string;
+  readonly country: string;
+  /** Det signerade engångs-state som banken skickar tillbaka (KK-29-A). */
+  readonly state: string;
+  readonly redirectUrl: string;
+}
+
+export interface BankSession {
+  /** Bankens session-id. Krypteras innan det sparas (KK-11-C). */
+  readonly sessionId: string;
+  /** Sista dagen samtycket gäller, som svensk kalenderdag, eller null om banken inte säger det. */
+  readonly consentExpiresOn: string | null;
+}
+
+/**
+ * Porten för att koppla en bank (KK-5, KK-8, flödet F-koppla): starta samtycket och skapa
+ * sessionen när användaren har godkänt med BankID. Bara kontoinformation begärs (KK-5-A).
+ */
+export interface BankConnector {
+  /** Startar samtycket med bankens längsta giltighetstid och ger adressen användaren skickas till. */
+  startAuthorization(request: AuthorizationRequest): Promise<{ url: string }>;
+  /** Byter koden från banken mot en session. */
+  createSession(code: string): Promise<BankSession>;
+}
+
 export interface BankDataProvider {
   /** Kontona i ett godkänt samtycke. */
   accounts(sessionId: string): Promise<BankAccount[]>;
