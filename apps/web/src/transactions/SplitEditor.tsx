@@ -133,7 +133,7 @@ export function SplitEditor(props: {
         <button type="button" onClick={() => { setParts([...parts, emptyPart()]); }}>
           Lägg till del
         </button>{" "}
-        <button type="button" disabled={busy || !complete} onClick={() => void save()}>
+        <button type="button" className="primary" disabled={busy || !complete} onClick={() => void save()}>
           Spara uppdelning
         </button>{" "}
         {existing && (
