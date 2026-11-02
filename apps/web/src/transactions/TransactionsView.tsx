@@ -1,6 +1,6 @@
 // Transaktionslistan (#32, KK-4, KK-9, KK-30): en budgetperiod i taget, grupperad per dag, nyast
-// först. Bankens text renderas alltid som text, aldrig som HTML. Kategorinamn, byte av kategori
-// och uppdelning kommer i egna PR:er.
+// först. Bankens text renderas alltid som text, aldrig som HTML. Kategorin visas med namn, t.ex.
+// "Mat › Livsmedel". Byte av kategori och uppdelning kommer i egna PR:er.
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson } from "../api.ts";
@@ -92,8 +92,29 @@ function groupByDay(items: readonly Transaction[]): [string, Transaction[]][] {
   return [...days];
 }
 
-function Row({ transaction: t }: { transaction: Transaction }) {
+/** Kategorinamn per id, t.ex. "Mat › Livsmedel", eller en tom karta om kategorierna inte går att hämta. */
+async function fetchCategoryNames(): Promise<ReadonlyMap<string, string>> {
+  const { status, body } = await getJson("/api/categories");
+  const items = field(body, "items");
+  if (status !== 200 || !Array.isArray(items)) return new Map();
+  const names = new Map<string, { name: string; parent: string | null }>();
+  for (const item of items) {
+    const id = field(item, "id");
+    const name = field(item, "name");
+    const parent = field(item, "parent_id");
+    if (typeof id === "string" && typeof name === "string") names.set(id, { name, parent: typeof parent === "string" ? parent : null });
+  }
+  return new Map(
+    [...names].map(([id, { name, parent }]) => {
+      const parentName = parent === null ? undefined : names.get(parent)?.name;
+      return [id, parentName === undefined ? name : `${parentName} › ${name}`];
+    }),
+  );
+}
+
+function Row({ transaction: t, categoryNames }: { transaction: Transaction; categoryNames: ReadonlyMap<string, string> }) {
   const notes = [
+    t.categoryId === null ? null : (categoryNames.get(t.categoryId) ?? null),
     t.status === "pending" ? "Preliminär" : null,
     t.isInternalTransfer ? "Intern överföring – räknas inte" : null,
     t.split ? "Uppdelad" : null,
@@ -111,6 +132,17 @@ export function TransactionsView() {
   const [filters, setFilters] = useState<Filters>({ period: null, q: "", uncategorized: false });
   const [search, setSearch] = useState("");
   const [state, setState] = useState<ListState>({ kind: "loading" });
+  const [categoryNames, setCategoryNames] = useState<ReadonlyMap<string, string>>(new Map());
+
+  useEffect(() => {
+    let current = true;
+    void fetchCategoryNames().then((names) => {
+      if (current) setCategoryNames(names);
+    });
+    return () => {
+      current = false;
+    };
+  }, []);
 
   useEffect(() => {
     let current = true;
@@ -175,7 +207,7 @@ export function TransactionsView() {
               <h2>{formatDateShort(day)}</h2>
               <ul>
                 {items.map((t) => (
-                  <Row key={t.id} transaction={t} />
+                  <Row key={t.id} transaction={t} categoryNames={categoryNames} />
                 ))}
               </ul>
             </li>

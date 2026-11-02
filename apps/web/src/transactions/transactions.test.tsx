@@ -38,7 +38,10 @@ function api(pages: unknown[], status = 200) {
   vi.stubGlobal(
     "fetch",
     vi.fn((input: RequestInfo | URL) => {
-      urls.push(new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "https://app.test"));
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "https://app.test");
+      // Kategorierna hämtas en gång vid start och räknas inte som en sida.
+      if (url.pathname === "/api/categories") return Promise.resolve(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+      urls.push(url);
       const body = pages[Math.min(urls.length - 1, pages.length - 1)];
       return Promise.resolve(new Response(JSON.stringify(body), { status }));
     }),
@@ -114,6 +117,44 @@ describe("Transaktioner (#32, KK-4, KK-9, KK-30)", () => {
     expect(row("UPPDELAD")).toContain("Uppdelad");
     expect(row("PRELIMINÄR")).toContain("Okategoriserad");
     expect(row("UPPDELAD")).not.toContain("Okategoriserad");
+  });
+
+  it("visar kategorins namn med huvudkategori, och klarar sig utan namn om kategorierna inte går att hämta", async () => {
+    const categories = {
+      items: [
+        { id: "mat", parent_id: null, name: "Mat", kind: "expense", archived: false },
+        { id: "mat-livsmedel", parent_id: "mat", name: "Livsmedel", kind: "expense", archived: false },
+        { id: "boende", parent_id: null, name: "Boende", kind: "expense", archived: false },
+      ],
+    };
+    const items = [tx({ id: "a", category_id: "mat-livsmedel", counterparty: "ICA" }), tx({ id: "b", category_id: "boende", counterparty: "HYRESVÄRDEN" })];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const path = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
+        const body = path.startsWith("/api/categories") ? categories : { period: NOVEMBER, items, next_cursor: null };
+        return Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
+      }),
+    );
+    await at("/transaktioner");
+    await settle();
+    expect(screen.getByText("ICA").closest("li")?.textContent).toContain("Mat › Livsmedel");
+    expect(screen.getByText("HYRESVÄRDEN").closest("li")?.textContent).toContain("Boende");
+  });
+
+  it("listan fungerar även om kategorierna inte går att hämta", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        const path = typeof input === "string" ? input : input instanceof URL ? input.pathname : input.url;
+        if (path.startsWith("/api/categories")) return Promise.resolve(new Response("{}", { status: 503 }));
+        return Promise.resolve(new Response(JSON.stringify({ period: NOVEMBER, items: [tx({ category_id: "mat-livsmedel", counterparty: "ICA" })], next_cursor: null }), { status: 200 }));
+      }),
+    );
+    await at("/transaktioner");
+    await settle();
+    expect(screen.getByText("ICA").closest("li")?.textContent).not.toContain("Okategoriserad");
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 
   it("visar bankens text som text, aldrig som HTML (KK-30)", async () => {

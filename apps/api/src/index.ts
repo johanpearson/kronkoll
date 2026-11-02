@@ -6,6 +6,7 @@ import { syncRunRepository } from "@kronkoll/adapter-d1";
 import { manualSyncGate, type BankConnector, type BankDataProvider } from "@kronkoll/domain";
 import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
+import { listCategories } from "./categories.ts";
 import { completeConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
 import { listTransactions } from "./transactions.ts";
@@ -66,6 +67,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/connections" || pathname === "/api/connections/callback") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     return pathname === "/api/connections" ? startConnection(request, env, context, email) : completeConnection(request, env, context, email);
+  }
+
+  if (pathname === "/api/categories") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return listCategories(env);
   }
 
   if (pathname === "/api/transactions") {
