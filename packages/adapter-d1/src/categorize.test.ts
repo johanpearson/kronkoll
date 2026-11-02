@@ -91,3 +91,47 @@ describe("okategoriserade transaktioner (KK-18)", () => {
     await expect(transactionRepository(db).setCategories([])).resolves.toBeUndefined();
   });
 });
+
+describe("manuell kategori och inlärda regler (KK-18-B, KK-18-C)", () => {
+  beforeEach(async () => {
+    await db.prepare(`DELETE FROM category_rules WHERE source = 'learned'`).run();
+    await seed([
+      ["t1", "ICA NARA", "booked", null, "none"],
+      ["t2", "SL", "pending", "transport-kollektivtrafik", "template"],
+      ["t3", "ICA", "booked", "hushall-forbrukning", "manual"],
+      ["t5", "ICA", "removed", null, "none"],
+    ]);
+  });
+
+  it("hämtar en transaktion i domänens form, men inte en borttagen", async () => {
+    const repo = transactionRepository(db);
+    expect(await repo.get("t2")).toEqual({ id: "t2", counterpartyNorm: "SL", description: "Kortköp", categoryId: "transport-kollektivtrafik", categorySource: "template" });
+    expect(await repo.get("t5")).toBeNull();
+    expect(await repo.get("saknas")).toBeNull();
+  });
+
+  it("listar alla transaktioner som regler kan gälla, även manuella, men inga borttagna", async () => {
+    expect((await transactionRepository(db).categorizable()).map((t) => t.id).sort()).toEqual(["t1", "t2", "t3"]);
+  });
+
+  it("sätter en manuell kategori, även på en som redan är manuell", async () => {
+    const repo = transactionRepository(db);
+    await repo.setManualCategory("t1", "mat-livsmedel");
+    await repo.setManualCategory("t3", "mat-livsmedel");
+    expect(await repo.get("t1")).toMatchObject({ categoryId: "mat-livsmedel", categorySource: "manual" });
+    expect(await repo.get("t3")).toMatchObject({ categoryId: "mat-livsmedel", categorySource: "manual" });
+  });
+
+  it("sparar en inlärd regel och uppdaterar den om den redan finns", async () => {
+    const rules = ruleRepository(db);
+    await rules.save({ id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "mat-livsmedel", source: "learned" });
+    await rules.save({ id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "hushall-forbrukning", source: "learned" });
+    expect((await rules.list()).filter((r) => r.source === "learned")).toEqual([
+      { id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "hushall-forbrukning", source: "learned" },
+    ]);
+  });
+
+  it("avvisar en regel mot en kategori som inte finns", async () => {
+    await expect(ruleRepository(db).save({ id: "r-x", match: "counterparty_prefix", pattern: "X", categoryId: "finns-inte", source: "learned" })).rejects.toThrow();
+  });
+});
