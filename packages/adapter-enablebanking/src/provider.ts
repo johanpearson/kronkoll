@@ -35,13 +35,13 @@ const PLACEHOLDER_ID = /^0+$/u;
 
 type Json = Record<string, unknown>;
 
-const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
-const text = (value: unknown): string | null => (typeof value === "string" && value.trim() !== "" ? value.trim() : null);
+export const isObject = (value: unknown): value is Json => typeof value === "object" && value !== null && !Array.isArray(value);
+export const text = (value: unknown): string | null => (typeof value === "string" && value.trim() !== "" ? value.trim() : null);
 const bad = (): never => {
   throw new ProviderError("BAD_RESPONSE");
 };
 
-function errorFor(status: number): ProviderError {
+export function errorFor(status: number): ProviderError {
   if (status === 401 || status === 403) return new ProviderError("UNAUTHORIZED");
   if (status === 429) return new ProviderError("RATE_LIMITED");
   if (status >= 500) return new ProviderError("UNAVAILABLE");
