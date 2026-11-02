@@ -46,18 +46,18 @@ async function call(method: "GET" | "POST", path: string, body?: object): Promis
  * tillbaka till REDIRECT_URL med ?error=, annars null (den visar en sida för inloggning).
  */
 async function probe(link: string): Promise<string | null> {
-  let url = link;
+  const target = new URL(REDIRECT_URL);
+  let url = new URL(link);
   for (let hop = 0; hop < 10; hop++) {
     const res = await fetch(url, { redirect: "manual" });
     const location = res.headers.get("location");
     if (res.status < 300 || res.status >= 400 || location === null) {
-      const html = res.status === 200 ? await res.text() : "";
-      const inPage = /[?&]error=([a-z_]+)/u.exec(html.includes(REDIRECT_URL) ? html : "");
-      return res.status >= 400 ? `HTTP ${String(res.status)}` : (inPage?.[1] ?? null);
+      return res.status >= 400 ? `HTTP ${String(res.status)}` : null;
     }
-    const next = new URL(location, url);
-    if (next.href.startsWith(REDIRECT_URL)) return next.searchParams.get("error") ?? "kom tillbaka utan fel";
-    url = next.href;
+    url = new URL(location, url);
+    if (url.origin === target.origin && url.pathname === target.pathname) {
+      return url.searchParams.get("error") ?? "kom tillbaka utan fel";
+    }
   }
   return "för många omdirigeringar";
 }
