@@ -153,6 +153,64 @@ describe("preliminär blir bokförd (KK-9-B)", () => {
   });
 });
 
+describe("preliminär blir bokförd med annat belopp (KK-9-B, 20 % tolerans)", () => {
+  const pending = (overrides: Partial<StoredTransaction> = {}) =>
+    stored({ id: "tx_kept", status: "pending", bookingDate: null, amountMinor: -10000, ...overrides });
+  const booked = (overrides: Partial<ImportedTransaction> = {}) => imported({ amountMinor: -11000, ...overrides });
+
+  it("matchar när beloppet skiljer högst 20 % (dricks), behåller id och tar det bokförda beloppet", () => {
+    const { result, state } = importInto([pending()], [booked({ amountMinor: -12000 })]);
+    expect(result.inserted).toEqual([]);
+    expect(state).toHaveLength(1);
+    expect(state[0]).toMatchObject({ id: "tx_kept", status: "booked", amountMinor: -12000 });
+  });
+
+  it("matchar även när det bokförda beloppet är lägre (valutakurs, förhandsreservation)", () => {
+    const { state } = importInto([pending()], [booked({ amountMinor: -8000 })]);
+    expect(state).toHaveLength(1);
+    expect(state[0]).toMatchObject({ id: "tx_kept", amountMinor: -8000 });
+  });
+
+  it("matchar inte när beloppet skiljer mer än 20 %", () => {
+    expect(importInto([pending()], [booked({ amountMinor: -12001 })]).state).toHaveLength(2);
+    expect(importInto([pending()], [booked({ amountMinor: -7999 })]).state).toHaveLength(2);
+  });
+
+  it("kräver samma riktning: en insättning matchar inte en preliminär utgift", () => {
+    expect(importInto([pending()], [booked({ amountMinor: 10000 })]).state).toHaveLength(2);
+  });
+
+  it("kräver samma motpart, konto och ±3 dagar", () => {
+    expect(importInto([pending()], [booked({ counterpartyNorm: "annat" })]).state).toHaveLength(2);
+    expect(importInto([pending()], [booked({ accountId: "acc_2" })]).state).toHaveLength(2);
+    expect(importInto([pending()], [booked({ transactionDate: "2026-11-14" })]).state).toHaveLength(2);
+  });
+
+  it("väljer kandidaten med minst beloppsskillnad när flera passar", () => {
+    const far = pending({ id: "tx_far", amountMinor: -10000 });
+    const near = pending({ id: "tx_near", amountMinor: -11500 });
+    const { state } = importInto([far, near], [booked({ amountMinor: -11400 })]);
+    expect(state.find((t) => t.id === "tx_near")).toMatchObject({ status: "booked", amountMinor: -11400 });
+    expect(state.find((t) => t.id === "tx_far")).toMatchObject({ status: "pending" });
+  });
+
+  it("gäller inte mellan två bokförda eller mellan två preliminära: där krävs exakt belopp", () => {
+    const bookedOld = stored({ amountMinor: -10000 });
+    expect(importInto([bookedOld], [booked({ amountMinor: -11000 })]).state).toHaveLength(2);
+    const pendingOld = pending();
+    expect(importInto([pendingOld], [booked({ status: "pending", bookingDate: null })]).state).toHaveLength(2);
+  });
+
+  it("matchar inte belopp 0 mot något annat belopp", () => {
+    expect(importInto([pending({ amountMinor: 0 })], [booked({ amountMinor: -100 })]).state).toHaveLength(2);
+  });
+
+  it("en ny import av samma bokförda rad ändrar inget", () => {
+    const first = importInto([pending()], [booked({ amountMinor: -12000 })]);
+    expect(importInto(first.state, [booked({ amountMinor: -12000 })]).result).toEqual({ inserted: [], updated: [] });
+  });
+});
+
 describe("försvunnen preliminär (KK-9-C)", () => {
   it("markeras som borttagen när den saknats i mer än 10 dagar", () => {
     const pending = stored({ status: "pending", lastSeenOn: "2026-11-09" });
