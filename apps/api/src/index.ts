@@ -1,14 +1,15 @@
 // API-workern. Nås bara via service binding från Pages Function (D-origin, workers_dev = false),
 // men litar ändå inte på det: varje anrop kräver giltig Access-token (KK-2-B) och ändrande
 // anrop dessutom CSRF-skydd (KK-29-B).
-import { createEnableBankingProvider, createJwtSigner } from "@kronkoll/adapter-enablebanking";
+import { createEnableBankingConnector, createEnableBankingProvider, createJwtSigner } from "@kronkoll/adapter-enablebanking";
 import { syncRunRepository } from "@kronkoll/adapter-d1";
-import { manualSyncGate, type BankDataProvider } from "@kronkoll/domain";
+import { manualSyncGate, type BankConnector, type BankDataProvider } from "@kronkoll/domain";
 import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
+import { startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
 
-export interface Env extends AccessEnv, SyncEnv {
+export interface Env extends AccessEnv, SyncEnv, ConnectEnv {
   /** Secret: Enable Bankings application id. */
   EB_APP_ID?: string | undefined;
   /** Secret: privat nyckel (PKCS#8 PEM) för att signera anrop till Enable Banking. */
@@ -32,10 +33,9 @@ async function databaseReachable(db: D1Database): Promise<boolean> {
   }
 }
 
-/** Det en route behöver utöver miljön: att kunna fortsätta efter svaret, och synkens beroenden. */
-export interface RouteContext {
+/** Det en route behöver utöver miljön: att kunna fortsätta efter svaret, synken och banken. */
+export interface RouteContext extends ConnectContext {
   readonly waitUntil: (promise: Promise<unknown>) => void;
-  readonly sync: SyncDeps;
 }
 
 /**
@@ -59,8 +59,13 @@ async function manualSync(env: Env, context: RouteContext): Promise<Response> {
   return json({ status: "started" }, 202);
 }
 
-async function route(request: Request, env: Env, context: RouteContext): Promise<Response> {
+async function route(request: Request, env: Env, context: RouteContext, email: string): Promise<Response> {
   const { pathname } = new URL(request.url);
+
+  if (pathname === "/api/connections") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return startConnection(request, env, context, email);
+  }
 
   if (pathname === "/api/sync") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
@@ -81,7 +86,7 @@ async function route(request: Request, env: Env, context: RouteContext): Promise
 
 export async function handle(request: Request, env: Env, deps: GuardDeps, context: RouteContext): Promise<Response> {
   const access = await guard(request, env, deps);
-  return access.allowed ? route(request, env, context) : access.response;
+  return access.allowed ? route(request, env, context, access.email) : access.response;
 }
 
 const defaultDeps: GuardDeps = {
@@ -91,13 +96,24 @@ const defaultDeps: GuardDeps = {
   }),
 };
 
-function enableBankingFrom(env: Env): BankDataProvider | null {
+/** Det Enable Banking-adaptrarna behöver, eller null när hemligheterna saknas. */
+function enableBankingOptions(env: Env) {
   if (!env.EB_APP_ID || !env.EB_PRIVATE_KEY) return null;
-  return createEnableBankingProvider({
+  return {
     signer: createJwtSigner({ privateKeyPem: env.EB_PRIVATE_KEY, applicationId: env.EB_APP_ID, now: () => Date.now() }),
     // Anropas via en pil, så att fetch inte tappar sin this i Workern.
-    fetch: (input, init) => fetch(input, init),
-  });
+    fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init),
+  };
+}
+
+function enableBankingFrom(env: Env): BankDataProvider | null {
+  const options = enableBankingOptions(env);
+  return options && createEnableBankingProvider(options);
+}
+
+function enableBankingConnectorFrom(env: Env): BankConnector | null {
+  const options = enableBankingOptions(env);
+  return options && createEnableBankingConnector(options);
 }
 
 /** Synkens beroenden i drift: riktig klocka, slumpade id och Enable Banking om hemligheterna finns. */
@@ -110,9 +126,13 @@ export function syncDeps(env: Env): SyncDeps {
   };
 }
 
+/** Routernas beroenden i drift. */
+export function routeContext(env: Env, ctx: ExecutionContext): RouteContext {
+  return { waitUntil: ctx.waitUntil.bind(ctx), sync: syncDeps(env), connectorFor: () => enableBankingConnectorFrom(env) };
+}
+
 export default {
-  fetch: (request, env, ctx) =>
-    handle(request, env, defaultDeps, { waitUntil: ctx.waitUntil.bind(ctx), sync: syncDeps(env) }),
+  fetch: (request, env, ctx) => handle(request, env, defaultDeps, routeContext(env, ctx)),
   // Cron Trigger "7 4,15 * * *" (UTC), två gånger per dygn (KK-7, D-sync).
   scheduled: (_controller, env, ctx) => {
     ctx.waitUntil(runSync(env, "cron", syncDeps(env)));
