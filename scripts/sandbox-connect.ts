@@ -44,13 +44,27 @@ async function call(method: "GET" | "POST", path: string, body?: object): Promis
 if (step === "start") {
   const name = process.env.EB_ASPSP ?? "Mock ASPSP";
   const country = process.env.EB_COUNTRY ?? "FI";
-  const validUntil = new Date(Date.now() + CONSENT_DAYS * 86_400_000).toISOString();
+  // Anpassa förfrågan efter testbankens egna gränser, annars avbryter den med invalid_request.
+  const list = await call("GET", `/aspsps?country=${encodeURIComponent(country)}`);
+  const aspsps = (Array.isArray(list.aspsps) ? list.aspsps : []) as Record<string, unknown>[];
+  const aspsp = aspsps.find((a) => a.name === name);
+  if (!aspsp) {
+    const names = aspsps.map((a) => String(a.name)).sort();
+    summary([`## Testbanken ${name} finns inte för ${country}`, "", "Bankerna som finns:", "", ...names.map((n) => `- ${n}`)]);
+    process.exit(1);
+  }
+  const psuTypes = Array.isArray(aspsp.psu_types) ? aspsp.psu_types.map(String) : [];
+  const psuType = psuTypes.includes("personal") ? "personal" : (psuTypes[0] ?? "personal");
+  const maxSeconds = typeof aspsp.maximum_consent_validity === "number" ? aspsp.maximum_consent_validity : CONSENT_DAYS * 86_400;
+  // En timmes marginal mot bankens gräns, och aldrig längre än CONSENT_DAYS.
+  const consentSeconds = Math.max(3600, Math.min(CONSENT_DAYS * 86_400, maxSeconds - 3600));
+  const validUntil = new Date(Date.now() + consentSeconds * 1000).toISOString();
   const auth = await call("POST", "/auth", {
     access: { valid_until: validUntil },
     aspsp: { name, country },
     state: crypto.randomUUID(),
     redirect_url: REDIRECT_URL,
-    psu_type: "personal",
+    psu_type: psuType,
   });
   if (typeof auth.url !== "string" || !auth.url.startsWith("https://")) throw new Error("Svaret saknade en inloggningslänk");
   summary([
@@ -64,7 +78,7 @@ if (step === "start") {
     "",
     `Länk: ${auth.url}`,
     "",
-    `Samtycket gäller i ${String(CONSENT_DAYS)} dagar.`,
+    `Samtycket gäller till ${validUntil.slice(0, 10)}. Kundtyp: ${psuType} (testbanken stöder ${psuTypes.join(", ") || "okänt"}).`,
   ]);
 } else if (step === "finish") {
   const redirect = process.env.REDIRECTED_TO ?? "";
