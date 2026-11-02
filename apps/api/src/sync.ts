@@ -9,7 +9,7 @@ import {
   syncRunRepository,
   transactionRepository,
 } from "@kronkoll/adapter-d1";
-import { applyRules, syncConnection, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
+import { applyRules, classifyTransfers, syncConnection, type BankDataProvider, type Clock, type OwnAccount, type SyncKind } from "@kronkoll/domain";
 import type { Logger } from "@kronkoll/logging";
 
 /** Det synken behöver ur Workerns miljö. Hemligheterna sätts i Cloudflare, aldrig i repot (KK-12). */
@@ -78,6 +78,7 @@ export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps, only
       }
     }
     await categorizeNew(env.DB, logger);
+    await markTransfers(env.DB, (await accounts.list()).map((a) => ({ id: a.id, type: a.type === "loan" ? "savings" : a.type })), logger);
   } catch {
     logger.error("sync.failed", { error_code: "FAILED" });
   }
@@ -96,5 +97,26 @@ async function categorizeNew(db: D1Database, logger: Logger): Promise<void> {
     if (changes.length > 0) logger.info("sync.categorized", { count: changes.length });
   } catch {
     logger.error("sync.categorize_failed", { error_code: "FAILED" });
+  }
+}
+
+/**
+ * Markerar interna överföringar mellan egna konton (KK-20-C, steget s-transfer i F-dataflode), så att
+ * budgeten inte räknar dem som utgift. Hela historiken räknas om, eftersom en ny transaktion kan ge en
+ * gammal sin motpost. Bara det som ändras skrivs. Ingen lista med kortfaktura-mottagare än: korten hör
+ * till vanliga konton. Ett fel här stoppar inte synken.
+ */
+async function markTransfers(db: D1Database, ownAccounts: OwnAccount[], logger: Logger): Promise<void> {
+  try {
+    const store = transactionRepository(db);
+    const current = await store.forTransfers();
+    const now = new Map(current.map((t) => [t.id, t]));
+    const changes = classifyTransfers({ transactions: current, accounts: ownAccounts, cardPaymentCounterparties: [] })
+      .filter((c) => now.get(c.id)?.internal !== c.internal || now.get(c.id)?.pairId !== c.pairId)
+      .map((c) => ({ id: c.id, internal: c.internal, pairId: c.pairId }));
+    await store.setTransfers(changes);
+    if (changes.length > 0) logger.info("sync.transfers", { count: changes.length });
+  } catch {
+    logger.error("sync.transfers_failed", { error_code: "FAILED" });
   }
 }
