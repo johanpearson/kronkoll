@@ -80,7 +80,8 @@ async function route(request: Request, env: Env, context: RouteContext): Promise
 }
 
 export async function handle(request: Request, env: Env, deps: GuardDeps, context: RouteContext): Promise<Response> {
-  return (await guard(request, env, deps)) ?? route(request, env, context);
+  const access = await guard(request, env, deps);
+  return access.allowed ? route(request, env, context) : access.response;
 }
 
 const defaultDeps: GuardDeps = {

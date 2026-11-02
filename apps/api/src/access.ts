@@ -78,16 +78,20 @@ function deny(status: number, error: string): Response {
   });
 }
 
+/** Släppt anrop med den inloggades e-postadress (gemener), eller ett färdigt nej. */
+export type GuardResult = { readonly allowed: true; readonly email: string } | { readonly allowed: false; readonly response: Response };
+
 /**
- * Släpper igenom anropet (returnerar null) bara om Access-token är giltig och kommer från en
- * inbjuden adress, och om ett ändrande anrop klarar CSRF-kontrollen. Annars ett färdigt nej.
- * Inget innehåll från anropet loggas, bara skälet (KK-13-A).
+ * Släpper igenom anropet bara om Access-token är giltig och kommer från en inbjuden adress, och
+ * om ett ändrande anrop klarar CSRF-kontrollen. Annars ett färdigt nej. Inget innehåll från
+ * anropet loggas, bara skälet (KK-13-A). E-postadressen loggas aldrig.
  */
-export async function guard(request: Request, env: AccessEnv, deps: GuardDeps): Promise<Response | null> {
+export async function guard(request: Request, env: AccessEnv, deps: GuardDeps): Promise<GuardResult> {
+  const denied = (response: Response): GuardResult => ({ allowed: false, response });
   const config = readAccessConfig(env);
   if (config === null) {
     deps.logger.error("access.not_configured");
-    return deny(503, "not_configured");
+    return denied(deny(503, "not_configured"));
   }
 
   let result: AccessResult;
@@ -95,16 +99,16 @@ export async function guard(request: Request, env: AccessEnv, deps: GuardDeps): 
     result = await deps.verifierFor(config)(request.headers.get("cf-access-jwt-assertion"));
   } catch {
     deps.logger.error("access.keys_unavailable");
-    return deny(503, "auth_unavailable");
+    return denied(deny(503, "auth_unavailable"));
   }
   if (!result.ok) {
     deps.logger.warn("access.denied", { kind: result.reason });
-    return deny(401, "unauthorized");
+    return denied(deny(401, "unauthorized"));
   }
 
   if (!checkCsrf(request, config.appOrigin)) {
     deps.logger.warn("access.csrf_rejected");
-    return deny(403, "forbidden");
+    return denied(deny(403, "forbidden"));
   }
-  return null;
+  return { allowed: true, email: result.email };
 }

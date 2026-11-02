@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
-import { cachedVerifier, guard, readAccessConfig, type AccessConfig, type GuardDeps } from "./access.ts";
+import { cachedVerifier, guard, readAccessConfig, type AccessConfig, type GuardDeps, type GuardResult } from "./access.ts";
 import {
   AUD,
   INVITED,
@@ -98,6 +98,12 @@ describe("guard (KK-2-B, KK-29-B)", () => {
   }
   const realVerifier = () => cachedVerifier({ issuer: ISSUER, audience: AUD, allowedEmails: [INVITED], appOrigin: ORIGIN }, jwksFetch(key).fetchImpl);
 
+  /** Svaret när anropet nekas. Ett släppt anrop får testet att fallera. */
+  function denied(result: GuardResult): Response {
+    if (result.allowed) throw new Error("Anropet släpptes igenom");
+    return result.response;
+  }
+
   async function request(init: RequestInit & { token?: string | null } = {}) {
     const { token = await signToken(key), ...rest } = init;
     const headers = new Headers(rest.headers);
@@ -107,32 +113,32 @@ describe("guard (KK-2-B, KK-29-B)", () => {
 
   it("nekar allt med 503 när inställningar saknas", async () => {
     const { lines, deps: d } = deps(realVerifier);
-    const res = await guard(await request(), configuredEnv({ ACCESS_AUD: undefined }), d);
-    expect(res?.status).toBe(503);
-    expect(await res?.json()).toEqual({ error: "not_configured" });
+    const res = denied(await guard(await request(), configuredEnv({ ACCESS_AUD: undefined }), d));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "not_configured" });
     expect(lines).toEqual([{ level: "error", event: "access.not_configured", fields: {} }]);
   });
 
   it("nekar med 503 när Access-nycklarna inte går att hämta", async () => {
     const { lines, deps: d } = deps(() => () => Promise.reject(new Error("nätverk")));
-    const res = await guard(await request(), configuredEnv(), d);
-    expect(res?.status).toBe(503);
-    expect(await res?.json()).toEqual({ error: "auth_unavailable" });
+    const res = denied(await guard(await request(), configuredEnv(), d));
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "auth_unavailable" });
     expect(lines.map((l) => l.event)).toEqual(["access.keys_unavailable"]);
   });
 
   it("släpper igenom en GET med giltig token", async () => {
     const { lines, deps: d } = deps(realVerifier);
-    expect(await guard(await request(), configuredEnv(), d)).toBeNull();
+    expect(await guard(await request(), configuredEnv(), d)).toEqual({ allowed: true, email: INVITED });
     expect(lines).toEqual([]);
   });
 
   it("nekar med 401 och loggar bara skälet, aldrig token eller e-post (KK-13-A)", async () => {
     const { lines, deps: d } = deps(realVerifier);
     const token = await signToken(key, { email: "okand@example.se" });
-    const res = await guard(await request({ token }), configuredEnv(), d);
-    expect(res?.status).toBe(401);
-    expect(await res?.json()).toEqual({ error: "unauthorized" });
+    const res = denied(await guard(await request({ token }), configuredEnv(), d));
+    expect(res.status).toBe(401);
+    expect(await res.json()).toEqual({ error: "unauthorized" });
     expect(lines).toEqual([{ level: "warn", event: "access.denied", fields: { kind: "email" } }]);
     expect(JSON.stringify(lines)).not.toContain("okand@example.se");
     expect(JSON.stringify(lines)).not.toContain(token);
@@ -144,15 +150,15 @@ describe("guard (KK-2-B, KK-29-B)", () => {
     ["utan origin", { "x-kronkoll": "1" }],
   ])("nekar en POST %s med 403", async (_, headers) => {
     const { lines, deps: d } = deps(realVerifier);
-    const res = await guard(await request({ method: "POST", headers }), configuredEnv(), d);
-    expect(res?.status).toBe(403);
-    expect(await res?.json()).toEqual({ error: "forbidden" });
+    const res = denied(await guard(await request({ method: "POST", headers }), configuredEnv(), d));
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "forbidden" });
     expect(lines.map((l) => l.event)).toEqual(["access.csrf_rejected"]);
   });
 
   it("släpper igenom en POST med giltig token, egen origin och X-Kronkoll", async () => {
     const { deps: d } = deps(realVerifier);
     const req = await request({ method: "POST", headers: { origin: ORIGIN, "x-kronkoll": "1" } });
-    expect(await guard(req, configuredEnv(), d)).toBeNull();
+    expect(await guard(req, configuredEnv(), d)).toEqual({ allowed: true, email: INVITED });
   });
 });
