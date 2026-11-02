@@ -31,7 +31,7 @@ async function call(path: string, init: RequestInit & { token?: string | null } 
   const { token = await signToken(key), ...rest } = init;
   const headers = new Headers(rest.headers);
   if (token !== null) headers.set("cf-access-jwt-assertion", token);
-  return handle(new Request(`${ORIGIN}${path}`, { ...rest, headers }), env, deps);
+  return handle(new Request(`${ORIGIN}${path}`, { ...rest, headers }), env, deps, { waitUntil: () => undefined, sync: syncDeps(env) });
 }
 
 describe("Access-krav för hela API:t (KK-2-B, V-i-access)", () => {
@@ -141,14 +141,16 @@ describe("synkens beroenden i drift", () => {
 });
 
 describe("exporterad fetch-handler", () => {
+  const ctx = { waitUntil: () => undefined, passThroughOnException: () => undefined } as unknown as ExecutionContext;
+
   it("kräver Access-token även med alla inställningar på plats", async () => {
-    const res = await worker.fetch(new Request(`${ORIGIN}/api/health`), configuredEnv());
+    const res = await worker.fetch(new Request(`${ORIGIN}/api/health`), configuredEnv(), ctx);
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "unauthorized" });
   });
 
   it("nekar allt när inställningarna saknas, utan att anropa nätet", async () => {
-    const res = await worker.fetch(new Request(`${ORIGIN}/api/health`), { DB: fakeDb().db });
+    const res = await worker.fetch(new Request(`${ORIGIN}/api/health`), { DB: fakeDb().db }, ctx);
     expect(res.status).toBe(503);
     expect(await res.json()).toEqual({ error: "not_configured" });
   });
