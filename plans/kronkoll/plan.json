@@ -571,10 +571,11 @@
       "id": "api-overview", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/overview",
       "summary": "Data till översikten för en budgetperiod",
       "auth": "Cloudflare Access-JWT (Cf-Access-Jwt-Assertion) valideras i Workern mot teamets JWKS, aud och iss",
-      "latency": "p95 < 300 ms (läser förberäknade månadsaggregat)",
+      "latency": "p95 < 300 ms (en läsning av 12 perioders transaktioner; aggregat först om det behövs)",
       "params": [{ "name": "period", "in": "query", "type": "YYYY-MM", "description": "Default: aktuell period i Europe/Stockholm" }],
+      "description": "Byggt i #31. `connections` har en rad per bankkoppling (avbrutna kopplingar utelämnas), så att flera banker får var sitt samtycke. `left_per_day_minor` är null när perioden är slut.",
       "responses": {
-        "200": { "description": "OK", "body": { "period": "2026-11", "balance_minor": 4831240, "income_minor": 4125000, "expense_minor": 2341835, "left_to_spend_minor": 858200, "left_per_day_minor": 28600, "last_sync_at": "2026-11-01T05:02:11Z", "consent": { "status": "active", "expires_on": "2027-04-30", "days_left": 180 }, "trend": [{ "period": "2025-12", "income_minor": 3100000, "expense_minor": 2950000 }] } },
+        "200": { "description": "OK", "body": { "period": { "key": "2026-11", "start": "2026-11-01", "end": "2026-11-30" }, "balance_minor": 4831240, "income_minor": 4125000, "expense_minor": 2341835, "net_minor": 1783165, "budget_minor": 3200000, "left_to_spend_minor": 858200, "left_per_day_minor": 28600, "days_left": 30, "over": false, "last_sync_at": "2026-11-01T05:02:11Z", "connections": [{ "bank": "Skandia", "status": "active", "consent_expires_on": "2027-04-30", "consent_days_left": 180 }], "trend": [{ "period": "2025-12", "income_minor": 3100000, "expense_minor": 2950000, "net_minor": 150000 }] } },
         "401": { "description": "Saknad/ogiltig Access-JWT", "body": { "error": "unauthorized" } }
       },
       "satisfies": ["KK-17", "KK-17-A", "KK-17-B", "KK-17-C", "KK-2-B", "KK-8-A"]
