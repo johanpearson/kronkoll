@@ -26,7 +26,8 @@ export interface SyncDeps {
   readonly providerFor: () => BankDataProvider | null;
 }
 
-export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps): Promise<void> {
+/** Synkar alla Enable Banking-kopplingar, eller bara en (`onlyConnectionId`, till exempel efter en ny koppling). */
+export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps, onlyConnectionId?: string): Promise<void> {
   const { logger } = deps;
   try {
     const provider = deps.providerFor();
@@ -42,7 +43,7 @@ export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps): Pro
     const store = transactionRepository(env.DB);
 
     for (const connection of await connections.list()) {
-      if (connection.provider !== "enablebanking") continue;
+      if (connection.provider !== "enablebanking" || (onlyConnectionId !== undefined && connection.id !== onlyConnectionId)) continue;
       try {
         const outcome = await syncConnection({
           connection,

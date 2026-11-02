@@ -63,7 +63,7 @@ export function connectionRepository(d1: D1Database, keys: Keys) {
       return (await db.select().from(bankConnections).all()).map(toConnection);
     },
     /** Banken har godkänt samtycket: spara det krypterade session-id:t och utgångsdagen. */
-    async activate(id: string, input: { sessionId: string; consentExpiresOn: string }): Promise<void> {
+    async activate(id: string, input: { sessionId: string; consentExpiresOn: string | null }): Promise<void> {
       const sessionIdEnc = await encryptSessionId(keys, input.sessionId);
       await db
         .update(bankConnections)

@@ -6,7 +6,7 @@ import { syncRunRepository } from "@kronkoll/adapter-d1";
 import { manualSyncGate, type BankConnector, type BankDataProvider } from "@kronkoll/domain";
 import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
-import { startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
+import { completeConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
 
 export interface Env extends AccessEnv, SyncEnv, ConnectEnv {
@@ -62,9 +62,9 @@ async function manualSync(env: Env, context: RouteContext): Promise<Response> {
 async function route(request: Request, env: Env, context: RouteContext, email: string): Promise<Response> {
   const { pathname } = new URL(request.url);
 
-  if (pathname === "/api/connections") {
+  if (pathname === "/api/connections" || pathname === "/api/connections/callback") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
-    return startConnection(request, env, context, email);
+    return pathname === "/api/connections" ? startConnection(request, env, context, email) : completeConnection(request, env, context, email);
   }
 
   if (pathname === "/api/sync") {
