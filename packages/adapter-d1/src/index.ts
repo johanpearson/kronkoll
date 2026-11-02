@@ -16,3 +16,4 @@ export { connectStateRepository, STATE_TTL_MINUTES } from "./connect-state.ts";
 export { categoryRepository, type CategoryRow } from "./categories.ts";
 export { ruleRepository } from "./rules.ts";
 export { splitRepository } from "./splits.ts";
+export { budgetRepository, type BudgetSource } from "./budget.ts";
