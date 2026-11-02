@@ -1,10 +1,11 @@
 // Budget (#33, KK-20, KK-34): utfall mot plan per kategori för en budgetperiod i taget. Varje rad
 // visar budget, utfall, kvar och andel, och en överskriden budget syns med både färg och text
 // (KK-20-B). Överföringar mellan egna konton räknas inte, och vyn säger hur mycket det gällde
-// (KK-20-C). Att sätta budget och förslag (KK-20-A) kommer i nästa steg.
+// (KK-20-C). Budgeten sätts i BudgetEditor (KK-20-A).
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
+import { BudgetEditor } from "./BudgetEditor.tsx";
 import { fetchCategories, NO_CATEGORIES, shiftPeriodKey, toPeriod, type Categories, type Period } from "../transactions/TransactionsView.tsx";
 
 interface Line {
@@ -23,6 +24,8 @@ interface Budget {
   readonly totalBudgetMinor: number;
   readonly totalActualMinor: number;
   readonly excludedInternalMinor: number;
+  /** Utgifter per kategori (null = okategoriserat), underlaget för förslag från snitt. */
+  readonly spending: ReadonlyMap<string | null, number>;
 }
 
 const minor = (value: unknown) => (Number.isSafeInteger(value) ? (value as number) : 0);
@@ -46,8 +49,15 @@ async function fetchBudget(key: string): Promise<Budget | null> {
   const { status, body } = await getJson(`/api/budgets/${encodeURIComponent(key)}`);
   const period = toPeriod(field(body, "period"));
   const lines = field(body, "lines");
+  const spending = field(body, "spending");
   if (status !== 200 || !period || !Array.isArray(lines)) return null;
   return {
+    spending: new Map(
+      (Array.isArray(spending) ? spending : []).map((s) => {
+        const id = field(s, "category_id");
+        return [typeof id === "string" ? id : null, minor(field(s, "actual_minor"))] as const;
+      }),
+    ),
     period,
     lines: lines.map(toLine).filter((l): l is Line => l !== null),
     unbudgetedMinor: minor(field(body, "unbudgeted_minor")),
@@ -86,6 +96,8 @@ export function BudgetView() {
   const [key, setKey] = useState("current");
   const [state, setState] = useState<State>({ kind: "loading" });
   const [categories, setCategories] = useState<Categories>(NO_CATEGORIES);
+  const [editing, setEditing] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     let current = true;
@@ -106,12 +118,13 @@ export function BudgetView() {
     return () => {
       current = false;
     };
-  }, [key]);
+  }, [key, reload]);
 
   const budget = state.kind === "ready" ? state.budget : null;
   const nameOf = (id: string) => categories.names.get(id) ?? id;
   const go = (months: number) => {
     if (budget) setKey(shiftPeriodKey(budget.period.key, months));
+    setEditing(false);
   };
 
   return (
@@ -146,6 +159,25 @@ export function BudgetView() {
               <dd>{formatSek(budget.totalBudgetMinor - budget.totalActualMinor)}</dd>
             </div>
           </dl>
+          {editing ? (
+            <BudgetEditor
+              periodKey={budget.period.key}
+              lines={budget.lines}
+              categories={categories.budgetable}
+              load={fetchBudget}
+              onSaved={() => {
+                setEditing(false);
+                setReload((n) => n + 1);
+              }}
+              onClose={() => { setEditing(false); }}
+            />
+          ) : (
+            <p>
+              <button type="button" className="primary" onClick={() => { setEditing(true); }}>
+                {budget.lines.length === 0 ? "Sätt budget" : "Ändra budget"}
+              </button>
+            </p>
+          )}
           {budget.lines.length === 0 ? (
             <p>Ingen budget är satt för perioden än.</p>
           ) : (

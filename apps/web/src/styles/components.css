@@ -274,6 +274,35 @@ main ul > li.budget-line {
   background: var(--danger);
 }
 
+/* Sätt budget: ett fält per kategori, två i bredd när det får plats. */
+.budget-editor {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.budget-editor h2,
+.budget-editor p {
+  margin: 0;
+}
+
+.budget-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-3);
+}
+
+.budget-fields label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.budget-fields input {
+  width: 100%;
+  text-align: right;
+}
+
 .note {
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-small);
