@@ -10,11 +10,64 @@
  */
 import type { D1Database } from "@cloudflare/workers-types";
 import { addDays, MATCH_WINDOW_DAYS, type ReconcileResult, type StoredTransaction } from "@kronkoll/domain";
-import { and, eq, gte, inArray, max, or } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { transactions } from "./schema.ts";
 
 type Row = typeof transactions.$inferSelect;
+
+export interface TransactionListQuery {
+  /** Första och sista dagen, båda inräknade. */
+  readonly from: string;
+  readonly to: string;
+  readonly limit: number;
+  readonly categoryId?: string | undefined;
+  readonly uncategorized?: boolean | undefined;
+  /** Fritext i motpart och beskrivning. */
+  readonly q?: string | undefined;
+  /** Från förra sidans `nextCursor`, eller null för första sidan. */
+  readonly cursor?: string | null | undefined;
+}
+
+export interface TransactionListItem {
+  readonly id: string;
+  readonly accountId: string;
+  readonly status: "pending" | "booked";
+  readonly transactionDate: string;
+  readonly bookingDate: string | null;
+  readonly amountMinor: number;
+  /** Bankens text. Opålitlig indata som alltid visas som text (KK-30). */
+  readonly counterparty: string;
+  readonly description: string;
+  readonly categoryId: string | null;
+  readonly categorySource: Row["categorySource"];
+  readonly isInternalTransfer: boolean;
+  /** Transaktionen är uppdelad på flera kategorier (KK-19). */
+  readonly split: boolean;
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+
+/** Cursorn är opak för anroparen: datum och id för sista raden på förra sidan. */
+function encodeCursor(item: TransactionListItem): string {
+  return btoa(JSON.stringify({ d: item.transactionDate, id: item.id })).replaceAll("+", "-").replaceAll("/", "_").replace(/=+$/u, "");
+}
+
+function decodeCursor(cursor: string): { d: string; id: string } {
+  try {
+    const value: unknown = JSON.parse(atob(cursor.replaceAll("-", "+").replaceAll("_", "/")));
+    if (typeof value === "object" && value !== null && "d" in value && "id" in value) {
+      const { d, id } = value;
+      if (typeof d === "string" && ISO_DATE.test(d) && typeof id === "string" && id !== "") return { d, id };
+    }
+  } catch {
+    // Hanteras nedan
+  }
+  throw new RangeError("Ogiltig cursor");
+}
+
+/** % och _ ska sökas som vanliga tecken i LIKE. */
+const likePattern = (text: string) => `%${text.replace(/[\\%_]/gu, (c) => `\\${c}`)}%`;
 
 function toStored(row: Row): StoredTransaction {
   return {
@@ -76,6 +129,59 @@ export function transactionRepository(d1: D1Database) {
       ];
       const [first, ...rest] = statements;
       if (first) await db.batch([first, ...rest]);
+    },
+
+    /**
+     * Transaktioner för listvyn (#32), nyast först. Borttagna preliminära visas inte. Sidorna
+     * bläddras med en cursor på datum och id, så att nya rader inte flyttar om tidigare sidor.
+     */
+    async list(query: TransactionListQuery): Promise<{ items: TransactionListItem[]; nextCursor: string | null }> {
+      const after = query.cursor === undefined || query.cursor === null ? null : decodeCursor(query.cursor);
+      const q = query.q?.trim() ?? "";
+      const conditions = [
+        ne(transactions.status, "removed"),
+        gte(transactions.transactionDate, query.from),
+        lte(transactions.transactionDate, query.to),
+        query.uncategorized ? isNull(transactions.categoryId) : undefined,
+        query.categoryId === undefined ? undefined : eq(transactions.categoryId, query.categoryId),
+        q === ""
+          ? undefined
+          : or(
+              sql`${transactions.counterparty} LIKE ${likePattern(q)} ESCAPE '\\'`,
+              sql`${transactions.counterpartyNorm} LIKE ${likePattern(q.toLocaleUpperCase("sv-SE"))} ESCAPE '\\'`,
+              sql`${transactions.description} LIKE ${likePattern(q)} ESCAPE '\\'`,
+            ),
+        after === null
+          ? undefined
+          : or(lt(transactions.transactionDate, after.d), and(eq(transactions.transactionDate, after.d), lt(transactions.id, after.id))),
+      ];
+      const rows = await db
+        .select({
+          id: transactions.id,
+          accountId: transactions.accountId,
+          status: transactions.status,
+          transactionDate: transactions.transactionDate,
+          bookingDate: transactions.bookingDate,
+          amountMinor: transactions.amountMinor,
+          counterparty: transactions.counterparty,
+          description: transactions.description,
+          categoryId: transactions.categoryId,
+          categorySource: transactions.categorySource,
+          isInternalTransfer: transactions.isInternalTransfer,
+          // Tabellnamnet behövs: utan det betyder "id" uppdelningens id inne i underfrågan.
+          split: sql<number>`EXISTS (SELECT 1 FROM transaction_splits s WHERE s.transaction_id = "transactions"."id")`,
+        })
+        .from(transactions)
+        .where(and(...conditions))
+        .orderBy(desc(transactions.transactionDate), desc(transactions.id))
+        // En rad extra visar om det finns en nästa sida, så att sista sidan aldrig blir tom.
+        .limit(query.limit + 1)
+        .all();
+      const items = rows
+        .slice(0, query.limit)
+        .map((row): TransactionListItem => ({ ...row, status: row.status === "pending" ? "pending" : "booked", split: Boolean(row.split) }));
+      const last = items.at(-1);
+      return { items, nextCursor: rows.length > query.limit && last ? encodeCursor(last) : null };
     },
 
     /** Bokföringsdagen för kontots senaste bokförda transaktion, underlag för `syncDateFrom`. */

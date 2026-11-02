@@ -11,5 +11,5 @@ export {
   type Settings,
   type SyncRun,
 } from "./repositories.ts";
-export { transactionRepository } from "./transactions.ts";
+export { transactionRepository, type TransactionListItem, type TransactionListQuery } from "./transactions.ts";
 export { connectStateRepository, STATE_TTL_MINUTES } from "./connect-state.ts";
