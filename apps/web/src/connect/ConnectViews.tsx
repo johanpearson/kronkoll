@@ -8,12 +8,10 @@ import { Link } from "../router.tsx";
 
 /**
  * Bankerna som går att koppla. Namnet måste vara exakt Enable Bankings namn för banken.
+ * SBAB är bortvald: bolånet syns inte via PSD2 och läggs in för hand (#72).
  * En lista från Enable Banking (GET /aspsps) kan ersätta den här senare.
  */
-const BANKS = [
-  { name: "Skandia", subtitle: "Konton och kort" },
-  { name: "SBAB", subtitle: "Sparkonton" },
-] as const;
+const BANKS = [{ name: "Skandia", subtitle: "Konton och kort" }] as const;
 
 export function ConnectBank() {
   return (
