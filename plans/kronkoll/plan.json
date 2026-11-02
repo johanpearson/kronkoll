@@ -680,7 +680,8 @@
     {
       "id": "api-sync", "group": "API: bankkoppling", "method": "POST", "path": "/api/sync",
       "summary": "Manuell synk (högst 1 gång per 15 min)",
-      "responses": { "202": { "body": { "sync_run_id": "run_…" } }, "429": { "body": { "error": "too_soon", "retry_after_s": 540 } } },
+      "responses": { "202": { "body": { "status": "started" } }, "429": { "body": { "error": "too_soon", "retry_after_s": 540 } }, "503": { "body": { "error": "not_configured" } } },
+      "description": "Synken körs i bakgrunden och svaret kommer direkt. Körnings-id skapas per koppling inne i synken och finns inte när svaret skickas, så resultatet läses ur körningsloggen. Gränsen räknas från start av senaste manuella körningen; schemalagda körningar räknas inte.",
       "satisfies": ["KK-7-C"]
     },
     {
