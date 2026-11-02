@@ -99,6 +99,13 @@ export {
   type SyncRunSummary,
 } from "./sync.ts";
 export {
+  DEFAULT_MAX_PAGES,
+  FIRST_SYNC_DAYS,
+  syncAccount,
+  type SyncAccountInput,
+  type TransactionStore,
+} from "./sync-account.ts";
+export {
   ProviderError,
   type BankAccount,
   type BankAccountType,
