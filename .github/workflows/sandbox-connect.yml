@@ -1,6 +1,6 @@
 # Kopplar Enable Bankings sandbox så att kontraktstestet kan köras varje natt (#24).
 # Startas för hand i två steg: Actions → sandbox-connect → Run workflow (fungerar i GitHub-appen).
-#   1. step = start: länken till testbanken visas i körningens sammanfattning.
+#   1. step = start: länken till testbanken visas i sammanfattningen och i loggen för steget "Koppla".
 #   2. step = finish: klistra in adressen du hamnade på efter godkännandet.
 # Bara sandbox-nyckeln används. Session-id:t visas aldrig: det skrivs direkt till secreten
 # EB_SANDBOX_SESSION_ID i miljön "sandbox", som är låst till main (D-secrets).

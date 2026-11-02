@@ -19,10 +19,14 @@ const signer = createJwtSigner({
   now: () => Date.now(),
 });
 
+/**
+ * Skriver både till körningens sammanfattning och till loggen, eftersom GitHub-appen i mobilen
+ * bara visar loggen. Inget av det här är hemligt: länken och texterna gäller bara sandboxen.
+ */
 function summary(lines: string[]): void {
   const text = `${lines.join("\n")}\n`;
   if (summaryFile) appendFileSync(summaryFile, text);
-  else process.stdout.write(text);
+  process.stdout.write(text);
 }
 
 /** Felkod och status från Enable Banking, aldrig svarstexten i övrigt. */
@@ -57,6 +61,8 @@ if (step === "start") {
     "3. Kör workflowen **sandbox-connect** igen med steget `finish` och klistra in adressen.",
     "",
     `**[Öppna testbanken](${auth.url})**`,
+    "",
+    `Länk: ${auth.url}`,
     "",
     `Samtycket gäller i ${String(CONSENT_DAYS)} dagar.`,
   ]);
