@@ -168,6 +168,8 @@ export const transactions = sqliteTable(
     incomeType: text("income_type", { enum: INCOME_TYPES }),
     isInternalTransfer: integer("is_internal_transfer", { mode: "boolean" }).notNull().default(false),
     transferPairId: text("transfer_pair_id").references((): AnySQLiteColumn => transactions.id, { onDelete: "set null" }),
+    /** Användarens eget val (KK-20-C): 1 = räkna inte som utgift, 0 = räkna som utgift, null = automatiskt. */
+    manualTransfer: integer("manual_transfer", { mode: "boolean" }),
   },
   (t) => [
     check("transactions_status", oneOf("status", ["pending", "booked", "removed"])),

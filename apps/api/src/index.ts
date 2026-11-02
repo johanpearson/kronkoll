@@ -9,6 +9,7 @@ import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.
 import { listCategories } from "./categories.ts";
 import { applyRule, setCategory } from "./set-category.ts";
 import { getSplits, putSplits } from "./splits.ts";
+import { putTransfer } from "./transfers.ts";
 import { completeConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
 import { listTransactions } from "./transactions.ts";
@@ -69,6 +70,12 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/connections" || pathname === "/api/connections/callback") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     return pathname === "/api/connections" ? startConnection(request, env, context, email) : completeConnection(request, env, context, email);
+  }
+
+  const transferMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})\/transfer$/u.exec(pathname);
+  if (transferMatch?.[1]) {
+    if (request.method !== "PUT") return json({ error: "method_not_allowed" }, 405, { allow: "PUT" });
+    return putTransfer(request, env, transferMatch[1]);
   }
 
   const splitMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})\/splits$/u.exec(pathname);
