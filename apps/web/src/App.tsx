@@ -1,20 +1,15 @@
-// Appens skal (#30). Sidorna som finns nu: start, koppla bank (#26) och "sidan finns inte".
-// Resten av webbskalet (tema, navigering, PWA, utloggning) kommer i egna PR:er.
+// Appens skal (#30): sidorna och huvudmenyn. Menyn har de vyer som finns; Budget, Sparmål och Inkomst
+// läggs till när de byggs. Tema, PWA och offline-cache kommer i egna PR:er.
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { Link, usePath } from "./router.tsx";
+import { SettingsView } from "./settings/SettingsView.tsx";
 import { TransactionsView } from "./transactions/TransactionsView.tsx";
 
-function Start() {
+function Overview() {
   return (
     <main>
-      <h1>Kronkoll</h1>
-      <p>Kommer snart.</p>
-      <p>
-        <Link to="/transaktioner">Transaktioner</Link>
-      </p>
-      <p>
-        <Link to="/koppla">Koppla bank</Link>
-      </p>
+      <h1>Översikt</h1>
+      <p>Översikten kommer snart.</p>
     </main>
   );
 }
@@ -31,14 +26,38 @@ function NotFound() {
 }
 
 const ROUTES: Record<string, () => React.JSX.Element> = {
-  "/": Start,
+  "/": Overview,
+  "/transaktioner": TransactionsView,
+  "/installningar": SettingsView,
   "/koppla": ConnectBank,
   "/koppla/samtycke": Consent,
   "/koppla/klar": ConnectDone,
-  "/transaktioner": TransactionsView,
 };
 
+/** Menyn i den ordning planen har den. Koppla bank hör till Inställningar. */
+const TABS = [
+  { to: "/", label: "Översikt", owns: (path: string) => path === "/" },
+  { to: "/transaktioner", label: "Transaktioner", owns: (path: string) => path === "/transaktioner" },
+  { to: "/installningar", label: "Inställningar", owns: (path: string) => path === "/installningar" || path.startsWith("/koppla") },
+];
+
 export function App() {
-  const Page = ROUTES[usePath()] ?? NotFound;
-  return <Page />;
+  const path = usePath();
+  const Page = ROUTES[path] ?? NotFound;
+  return (
+    <>
+      <Page />
+      <nav aria-label="Huvudmeny">
+        <ul>
+          {TABS.map((tab) => (
+            <li key={tab.to}>
+              <Link to={tab.to} current={tab.owns(path)}>
+                {tab.label}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    </>
+  );
 }

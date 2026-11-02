@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App.tsx";
@@ -44,8 +44,8 @@ async function at(path: string) {
 }
 
 describe("Koppla bank (#26, F-koppla)", () => {
-  it("startsidan leder till Koppla bank", async () => {
-    await at("/");
+  it("Inställningar leder till Koppla bank", async () => {
+    await at("/installningar");
     fireEvent.click(screen.getByRole("link", { name: "Koppla bank" }));
     expect(window.location.pathname).toBe("/koppla");
     expect(screen.getByRole("heading", { level: 1, name: "Koppla bank" })).toBeDefined();
@@ -53,7 +53,7 @@ describe("Koppla bank (#26, F-koppla)", () => {
 
   it("listar bankerna och leder vidare till godkännandet för vald bank", async () => {
     await at("/koppla");
-    expect(screen.getAllByRole("link").map((l) => l.textContent)).toEqual(["Skandia – Konton och kort"]);
+    expect(within(screen.getByRole("main")).getAllByRole("link").map((l) => l.textContent)).toEqual(["Skandia – Konton och kort"]);
     fireEvent.click(screen.getByRole("link", { name: /Skandia/u }));
     expect(window.location.pathname + window.location.search).toBe("/koppla/samtycke?bank=Skandia");
     expect(screen.getByRole("heading", { name: "Kronkoll vill läsa från Skandia" })).toBeDefined();

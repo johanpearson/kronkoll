@@ -14,9 +14,9 @@ function at(path: string) {
 }
 
 describe("appskalet (#30, KK-4)", () => {
-  it("visar startsidan på svenska", () => {
+  it("visar översikten som startsida, på svenska", () => {
     at("/");
-    expect(screen.getByRole("heading", { level: 1, name: "Kronkoll" })).toBeDefined();
+    expect(screen.getByRole("heading", { level: 1, name: "Översikt" })).toBeDefined();
     expect(document.documentElement.lang === "" || document.documentElement.lang === "sv").toBe(true);
   });
 
