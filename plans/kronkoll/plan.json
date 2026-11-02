@@ -452,15 +452,12 @@
     },
     {
       "id": "koppla-bank", "title": "Koppla bank", "group": "Bankkoppling",
-      "description": "Listan kommer från `GET /aspsps?country=SE` hos Enable Banking och cachas i 24 h. Spiken i M0 bekräftar att Skandia finns och om Visa-kortet blir ett eget konto (Q-skandia).",
+      "description": "Byggt i #103. Listan är fast i appen och innehåller bara Skandia (namnet verifierat i spiken). SBAB valdes bort 2026-11-02: bara bolånet var intressant och det syns inte via PSD2, så det läggs in för hand (#72). En lista från `GET /aspsps?country=SE` kan ersätta den fasta listan om fler banker behövs. Ingen Amex-notis: ägaren har inget Amex-kort (beslut 2026-11-02); CSV-importen finns kvar för kort som inte går att koppla.",
       "satisfies": ["KK-5", "KK-6"],
       "elements": [
-        { "type": "search", "placeholder": "Sök bank", "value": "Ska" },
         { "id": "aspsps", "type": "list", "items": [
-          { "title": "Skandia", "subtitle": "Konton och kort · BankID", "goto": "koppla-samtycke" },
-          { "title": "Skandiabanken (äldre)", "subtitle": "Visas om ASPSP-listan innehåller båda – verifieras i spike", "badge": "Antagande", "tone": "info" }
+          { "title": "Skandia", "subtitle": "Konton och kort · BankID", "goto": "koppla-samtycke" }
         ] },
-        { "id": "amex-note", "type": "alert", "tone": "info", "text": "American Express går inte att koppla i Sverige. Importera Amex-transaktioner med CSV i stället.", "satisfies": ["KK-6-B"] },
         { "type": "button", "label": "Importera CSV", "variant": "link", "goto": "csv-import" }
       ]
     },
@@ -481,6 +478,7 @@
     },
     {
       "id": "koppla-hamtar", "title": "Hämtar historik", "group": "Bankkoppling", "layout": "plain",
+      "description": "Sidan `/koppla/klar`. Första versionen (#103) visar rubriken, antalet konton och att historiken hämtas i bakgrunden; koden och state tas bort ur adressfältet. Förloppet per konto nedan är målbilden och byggs när det finns ett API för synkstatus.",
       "satisfies": ["KK-5-C", "KK-9"],
       "elements": [
         { "type": "heading", "text": "Kopplat! Hämtar historik…", "level": 3 },
@@ -649,9 +647,9 @@
     {
       "id": "api-conn-start", "group": "API: bankkoppling", "method": "POST", "path": "/api/connections",
       "summary": "Starta en koppling: anropar Enable Banking POST /auth och returnerar bankens URL",
-      "request": { "aspsp": { "name": "Skandia", "country": "SE" }, "psu_type": "personal" },
-      "responses": { "200": { "body": { "redirect_url": "https://tilisy.enablebanking.com/…", "state_expires_at": "2026-11-01T08:25:00Z" } } },
-      "description": "`state` = HMAC-signerat engångsvärde, bundet till användaren och giltigt i 15 min (KK-29). `valid_until` sätts till ASPSP:ns `maximum_consent_validity`. `access` begär bara AIS: konton, saldon och transaktioner.",
+      "request": { "aspsp": { "name": "Skandia", "country": "SE" } },
+      "responses": { "200": { "body": { "redirect_url": "https://tilisy.enablebanking.com/…", "state_expires_at": "2026-11-01T08:25:00Z", "connection_id": "conn_skandia" } }, "400": { "body": { "error": "invalid_request" } }, "502": { "body": { "error": "bank_error" } } },
+      "description": "`state` = HMAC-signerat engångsvärde, bundet till användaren och giltigt i 15 min (KK-29). `valid_until` sätts till ASPSP:ns `maximum_consent_validity`. `access` begär bara AIS: konton, saldon och transaktioner. `psu_type` väljs av adaptern (`personal` när banken stöder det). Svaret har också `connection_id` för den väntande kopplingen.",
       "satisfies": ["KK-5-A", "KK-5", "KK-29-A"]
     },
     {
@@ -805,7 +803,7 @@
         { "from": "Enable Banking", "to": "API Worker", "label": "session_id, konton, giltig till", "reply": true },
         { "from": "API Worker", "to": "D1", "label": "spara BankConnection (session_id AES-GCM-krypterat) + Account (maskerat)", "satisfies": ["KK-11-C"] },
         { "from": "API Worker", "to": "Enable Banking", "label": "GET transactions (maximal historik, sidvis)", "satisfies": ["KK-5-C"] },
-        { "from": "API Worker", "to": "PWA (pages.dev)", "label": "201 – progress via polling av /api/sync/{id}", "reply": true }
+        { "from": "API Worker", "to": "PWA (pages.dev)", "label": "201 – första hämtningen körs i bakgrunden; resultatet syns i körningsloggen", "reply": true }
       ]
     },
     {
