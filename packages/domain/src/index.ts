@@ -83,6 +83,21 @@ export {
   type PeriodTotals,
 } from "./overview.ts";
 export {
+  MANUAL_SYNC_INTERVAL_MINUTES,
+  SYNC_FAILURE_NOTICE_AFTER,
+  SYNC_OVERLAP_DAYS,
+  classifyProviderFailure,
+  manualSyncGate,
+  nextConsecutiveFailures,
+  shouldNotifySyncFailure,
+  summarizeSyncRun,
+  syncDateFrom,
+  type AccountSyncResult,
+  type FailureClass,
+  type ManualSyncGate,
+  type SyncRunSummary,
+} from "./sync.ts";
+export {
   ProviderError,
   type BankAccount,
   type BankAccountType,
