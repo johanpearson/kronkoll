@@ -1,10 +1,10 @@
-// Pages-projektet (D-origin). Statiska filer ligger i public/, och functions/api/[[path]].ts
+// Pages-projektet (D-origin). Appen byggs med Vite till dist/ (public/ kopieras dit), och functions/api/[[path]].ts
 // skickar /api/* vidare till API-workern via service binding. Projektnamnet är "kronkoll",
 // adressen blev kronkoll-25e.pages.dev eftersom kronkoll.pages.dev var upptaget.
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "kronkoll",
-  "pages_build_output_dir": "./public",
+  "pages_build_output_dir": "./dist",
   "compatibility_date": "2026-10-01",
   "services": [{ "binding": "API", "service": "kronkoll-api" }]
 }

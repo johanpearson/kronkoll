@@ -1,5 +1,5 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": { "types": ["@cloudflare/workers-types"] },
-  "include": ["functions/**/*.ts", "server/**/*.ts", "vitest.config.ts"]
+  "include": ["functions/**/*.ts", "server/**/*.ts", "vitest.config.ts", "vite.config.ts"]
 }
