@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `manual_transfer` integer;

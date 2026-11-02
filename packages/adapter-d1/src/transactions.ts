@@ -16,11 +16,12 @@ import {
   type CategoryChange,
   type ReconcileResult,
   type StoredTransaction,
+  type OwnAccount,
   type TransferInput,
 } from "@kronkoll/domain";
 import { and, desc, eq, gte, inArray, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { transactions } from "./schema.ts";
+import { accounts, transactions } from "./schema.ts";
 
 type Row = typeof transactions.$inferSelect;
 
@@ -262,11 +263,33 @@ export function transactionRepository(d1: D1Database) {
           status: transactions.status,
           internal: transactions.isInternalTransfer,
           pairId: transactions.transferPairId,
+          manualTransfer: transactions.manualTransfer,
         })
         .from(transactions)
         .where(ne(transactions.status, "removed"))
         .all();
-      return rows.map((row) => ({ ...row, manualTransfer: null }));
+      return rows;
+    },
+
+    /**
+     * Användarens eget val för en transaktion (KK-20-C): true = räkna inte som utgift, false = räkna
+     * som utgift, null = automatiskt. Ger false om transaktionen saknas eller är borttagen.
+     */
+    async setManualTransfer(id: string, value: boolean | null): Promise<boolean> {
+      const updated = await db
+        .update(transactions)
+        .set({ manualTransfer: value })
+        .where(and(eq(transactions.id, id), ne(transactions.status, "removed")))
+        .returning({ id: transactions.id })
+        .all();
+      return updated.length > 0;
+    },
+
+    /** De egna kontona med typ, för att para ihop överföringar. Kräver inga nycklar. */
+    async ownAccounts(): Promise<OwnAccount[]> {
+      const rows = await db.select({ id: accounts.id, type: accounts.type }).from(accounts).all();
+      // Ett lånekonto paras som ett sparkonto: en amortering flyttar pengar mellan egna konton.
+      return rows.map((row) => ({ id: row.id, type: row.type === "loan" ? "savings" : row.type }));
     },
 
     /** Sparar vilka som är interna överföringar och deras motpost, i en batch. */

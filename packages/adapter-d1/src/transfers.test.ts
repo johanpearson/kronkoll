@@ -76,6 +76,29 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
     await expect(transactionRepository(db).setTransfers([])).resolves.toBeUndefined();
   });
 
+  it("sparar användarens eget val och läser tillbaka det som manualTransfer", async () => {
+    const repo = transactionRepository(db);
+    expect(await repo.setManualTransfer("kop", true)).toBe(true);
+    expect((await repo.forTransfers()).find((r) => r.id === "kop")).toMatchObject({ manualTransfer: true });
+    await repo.setManualTransfer("kop", false);
+    expect((await repo.forTransfers()).find((r) => r.id === "kop")).toMatchObject({ manualTransfer: false });
+    await repo.setManualTransfer("kop", null);
+    expect((await repo.forTransfers()).find((r) => r.id === "kop")).toMatchObject({ manualTransfer: null });
+  });
+
+  it("säger till om transaktionen saknas eller är borttagen", async () => {
+    const repo = transactionRepository(db);
+    expect(await repo.setManualTransfer("saknas", true)).toBe(false);
+    expect(await repo.setManualTransfer("borta", true)).toBe(false);
+  });
+
+  it("ger de egna kontona med typ utan att behöva nycklar", async () => {
+    expect((await transactionRepository(db).ownAccounts()).sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+      { id: "acc_budget", type: "checking" },
+      { id: "acc_spar", type: "savings" },
+    ]);
+  });
+
   it("listar egna konton med typ för parningen", async () => {
     const keys = await deriveKeys(randomSecret());
     const accounts = (await accountRepository(db, keys).list()).map((a) => [a.id, a.type]).sort();
