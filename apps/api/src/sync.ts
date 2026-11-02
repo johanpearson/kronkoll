@@ -5,10 +5,11 @@ import {
   accountRepository,
   connectionRepository,
   deriveKeys,
+  ruleRepository,
   syncRunRepository,
   transactionRepository,
 } from "@kronkoll/adapter-d1";
-import { syncConnection, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
+import { applyRules, syncConnection, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
 import type { Logger } from "@kronkoll/logging";
 
 /** Det synken behöver ur Workerns miljö. Hemligheterna sätts i Cloudflare, aldrig i repot (KK-12). */
@@ -76,7 +77,24 @@ export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps, only
         logger.error("sync.connection_failed", { connection_id: connection.id, error_code: "FAILED" });
       }
     }
+    await categorizeNew(env.DB, logger);
   } catch {
     logger.error("sync.failed", { error_code: "FAILED" });
+  }
+}
+
+/**
+ * Kategoriserar transaktioner som saknar kategori med reglerna (KK-18, steget s-categorize i
+ * F-dataflode). Manuella och redan kategoriserade rörs inte. Ett fel här stoppar inte synken:
+ * transaktionerna är redan sparade och kategoriseras vid nästa körning.
+ */
+async function categorizeNew(db: D1Database, logger: Logger): Promise<void> {
+  try {
+    const store = transactionRepository(db);
+    const changes = applyRules(await store.uncategorized(), await ruleRepository(db).list());
+    await store.setCategories(changes);
+    if (changes.length > 0) logger.info("sync.categorized", { count: changes.length });
+  } catch {
+    logger.error("sync.categorize_failed", { error_code: "FAILED" });
   }
 }

@@ -121,6 +121,44 @@ describe("schemalagd synk (KK-7-A, V-i-sync)", () => {
   });
 });
 
+describe("kategorisering efter synken (KK-18, F-dataflode)", () => {
+  it("sätter mallkategorin på nya transaktioner och lämnar dem utan träff okategoriserade", async () => {
+    await seedConnection("c1");
+    const { deps, logs } = setup(
+      fakeBank({ transactions: [bankTx({ providerTxId: "ica", counterparty: "ICA NARA SOFO 1234 STHLM" }), bankTx({ providerTxId: "kaffe" })] }),
+    );
+    await runSync(env(), "cron", deps);
+    const rows = await db.prepare(`SELECT counterparty_norm AS norm, category_id AS c, category_source AS s FROM transactions ORDER BY norm`).all();
+    expect(rows.results).toEqual([
+      { norm: "ESPRESSO HOUSE", c: null, s: "none" },
+      { norm: "ICA NARA SOFO", c: "mat-livsmedel", s: "template" },
+    ]);
+    expect(logs.lines.at(-1)).toEqual({ level: "info", event: "sync.categorized", fields: { count: 1 } });
+  });
+
+  it("rör aldrig en manuellt satt kategori, och inte heller en som redan har kategori (KK-18-C)", async () => {
+    await seedConnection("c1");
+    const { deps } = setup(fakeBank({ transactions: [bankTx({ providerTxId: "ica", counterparty: "ICA NARA SOFO" })] }));
+    await runSync(env(), "cron", deps);
+    await db.prepare(`UPDATE transactions SET category_id = 'hushall-forbrukning', category_source = 'manual'`).run();
+    await runSync(env(), "manual", deps);
+    expect(await db.prepare(`SELECT category_id AS c, category_source AS s FROM transactions`).first()).toEqual({ c: "hushall-forbrukning", s: "manual" });
+  });
+
+  it("kategoriserar även äldre transaktioner som saknar kategori, till exempel från före den här funktionen", async () => {
+    await seedConnection("c1");
+    const { deps } = setup(fakeBank({ transactions: [] }));
+    await db
+      .prepare(
+        `INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor, counterparty, counterparty_norm)
+         SELECT 'gammal', id, 'fp', 'booked', '2026-10-01', '2026-10-01', -300, 'SL', 'SL' FROM accounts LIMIT 1`,
+      )
+      .run();
+    await runSync(env(), "cron", deps);
+    expect(await db.prepare(`SELECT category_id AS c FROM transactions WHERE id = 'gammal'`).first()).toEqual({ c: "transport-kollektivtrafik" });
+  });
+});
+
 describe("fel isoleras (KK-7-B)", () => {
   it("401 från banken sätter kopplingen till utgången och loggar felkoden", async () => {
     await seedConnection("c1");

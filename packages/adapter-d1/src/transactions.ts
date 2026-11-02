@@ -9,7 +9,14 @@
  * (StoredTransaction.lastSeenOn), inte ett klockslag: reconcile räknar bara i dagar.
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import { addDays, MATCH_WINDOW_DAYS, type ReconcileResult, type StoredTransaction } from "@kronkoll/domain";
+import {
+  addDays,
+  MATCH_WINDOW_DAYS,
+  type CategorizableTransaction,
+  type CategoryChange,
+  type ReconcileResult,
+  type StoredTransaction,
+} from "@kronkoll/domain";
 import { and, desc, eq, gte, inArray, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { transactions } from "./schema.ts";
@@ -182,6 +189,37 @@ export function transactionRepository(d1: D1Database) {
         .map((row): TransactionListItem => ({ ...row, status: row.status === "pending" ? "pending" : "booked", split: Boolean(row.split) }));
       const last = items.at(-1);
       return { items, nextCursor: rows.length > query.limit && last ? encodeCursor(last) : null };
+    },
+
+    /**
+     * Transaktioner som ännu saknar kategori, för att kategoriseras efter en synk (KK-18).
+     * Manuella och redan kategoriserade rörs inte: en ny regel gäller bakåt bara när användaren
+     * väljer det.
+     */
+    async uncategorized(): Promise<CategorizableTransaction[]> {
+      return db
+        .select({
+          id: transactions.id,
+          counterpartyNorm: transactions.counterpartyNorm,
+          description: transactions.description,
+          categoryId: transactions.categoryId,
+          categorySource: transactions.categorySource,
+        })
+        .from(transactions)
+        .where(and(eq(transactions.categorySource, "none"), ne(transactions.status, "removed")))
+        .all();
+    },
+
+    /** Sparar kategorier i en batch. En manuellt satt kategori skrivs aldrig över (KK-18-C). */
+    async setCategories(changes: readonly CategoryChange[]): Promise<void> {
+      const statements = changes.map((change) =>
+        db
+          .update(transactions)
+          .set({ categoryId: change.categoryId, categorySource: change.categorySource })
+          .where(and(eq(transactions.id, change.id), ne(transactions.categorySource, "manual"))),
+      );
+      const [first, ...rest] = statements;
+      if (first) await db.batch([first, ...rest]);
     },
 
     /** Bokföringsdagen för kontots senaste bokförda transaktion, underlag för `syncDateFrom`. */
