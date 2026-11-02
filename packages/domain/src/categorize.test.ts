@@ -85,7 +85,7 @@ describe("kategorisering med regler (KK-18)", () => {
   });
 });
 
-describe("inlärning: \"Gör alltid så för ICA\" (KK-18-B)", () => {
+describe("inlärning: \"Gör alltid så\" (KK-18-B)", () => {
   it("markerar transaktionen som manuell och skapar en inlärd regel på normaliserad motpart", () => {
     const result = learnFromManualChoice({
       transaction: tx({ id: "t1" }),
@@ -98,26 +98,34 @@ describe("inlärning: \"Gör alltid så för ICA\" (KK-18-B)", () => {
     expect(result.rule).toEqual({
       id: "r-ny-1",
       match: "counterparty_prefix",
-      pattern: "ICA",
+      pattern: "ICA NARA SOFO",
       categoryId: "livsmedel",
       source: "learned",
     });
   });
 
-  it("framtida ICA-transaktioner kategoriseras sedan automatiskt", () => {
+  it("framtida köp hos samma motpart kategoriseras sedan automatiskt, men inte andra motparter med samma första ord", () => {
     const { rule } = learnFromManualChoice({ transaction: tx({ id: "t1" }), categoryId: "livsmedel", alwaysDoThis: true, rules: [], newId: counter() });
-    expect(categorize(tx({ id: "t2", counterpartyNorm: "ICA KVANTUM" }), rule ? [rule] : [])?.categoryId).toBe("livsmedel");
+    const rules = rule ? [rule] : [];
+    expect(categorize(tx({ id: "t2", counterpartyNorm: "ICA NARA SOFO" }), rules)?.categoryId).toBe("livsmedel");
+    expect(categorize(tx({ id: "t3", counterpartyNorm: "ICA KVANTUM" }), rules)).toBeNull();
+  });
+
+  it("lär in hela motparten för ett vanligt första ord som SWISH", () => {
+    const { rule } = learnFromManualChoice({ transaction: tx({ id: "t1", counterpartyNorm: "SWISH ANNA" }), categoryId: "vänner", alwaysDoThis: true, rules: [], newId: counter() });
+    expect(rule).toMatchObject({ pattern: "SWISH ANNA" });
+    expect(categorize(tx({ id: "t2", counterpartyNorm: "SWISH KALLE" }), rule ? [rule] : [])).toBeNull();
   });
 
   it("uppdaterar en befintlig inlärd regel för samma mönster i stället för att skapa en ny", () => {
-    const existing: CategoryRule = { id: "r-lärd", match: "counterparty_prefix", pattern: "ICA", categoryId: "gammal", source: "learned" };
+    const existing: CategoryRule = { id: "r-lärd", match: "counterparty_prefix", pattern: "ICA NARA SOFO", categoryId: "gammal", source: "learned" };
     const { rule } = learnFromManualChoice({ transaction: tx({ id: "t1" }), categoryId: "ny", alwaysDoThis: true, rules: [existing], newId: counter() });
     expect(rule).toEqual({ ...existing, categoryId: "ny" });
   });
 
   it("en mallregel ändras aldrig, men en inlärd regel skapas som vinner över den", () => {
     const { rule } = learnFromManualChoice({ transaction: tx({ id: "t1" }), categoryId: "ny", alwaysDoThis: true, rules: [templateIca], newId: counter() });
-    expect(rule).toMatchObject({ source: "learned", pattern: "ICA", categoryId: "ny" });
+    expect(rule).toMatchObject({ source: "learned", pattern: "ICA NARA SOFO", categoryId: "ny" });
     expect(rule?.id).not.toBe(templateIca.id);
   });
 
