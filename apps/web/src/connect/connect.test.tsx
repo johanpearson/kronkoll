@@ -53,15 +53,15 @@ describe("Koppla bank (#26, F-koppla)", () => {
 
   it("listar bankerna och leder vidare till godkännandet för vald bank", async () => {
     await at("/koppla");
-    expect(screen.getByRole("link", { name: /Skandia/u })).toBeDefined();
-    fireEvent.click(screen.getByRole("link", { name: /SBAB/u }));
-    expect(window.location.pathname + window.location.search).toBe("/koppla/samtycke?bank=SBAB");
-    expect(screen.getByRole("heading", { name: "Kronkoll vill läsa från SBAB" })).toBeDefined();
+    expect(screen.getAllByRole("link").map((l) => l.textContent)).toEqual(["Skandia – Konton och kort"]);
+    fireEvent.click(screen.getByRole("link", { name: /Skandia/u }));
+    expect(window.location.pathname + window.location.search).toBe("/koppla/samtycke?bank=Skandia");
+    expect(screen.getByRole("heading", { name: "Kronkoll vill läsa från Skandia" })).toBeDefined();
     expect(screen.getByText("Inga betalningar eller överföringar – kan inte göras")).toBeDefined();
   });
 
-  it("en okänd bank i adressen leder tillbaka till listan", async () => {
-    await at("/koppla/samtycke?bank=Ond%20Bank");
+  it.each(["Ond%20Bank", "SBAB"])("en bank som inte finns i listan (%s) leder tillbaka till listan", async (bank) => {
+    await at(`/koppla/samtycke?bank=${bank}`);
     expect(screen.getByText("Banken finns inte i listan.")).toBeDefined();
     expect(screen.getByRole("link", { name: "Välj bank" })).toBeDefined();
   });
