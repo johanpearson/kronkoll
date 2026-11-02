@@ -14,10 +14,12 @@ const MAX_PAGES = 50;
 
 const lines: string[] = [];
 const out = (line = "") => lines.push(line);
+// Både sammanfattning och logg: GitHub-appen i mobilen visar bara loggen. Texten innehåller
+// bara antal och datum, så den är lika ofarlig i loggen.
 const flush = () => {
   const text = `${lines.join("\n")}\n`;
   if (summaryFile) appendFileSync(summaryFile, text);
-  else process.stdout.write(text);
+  process.stdout.write(text);
 };
 const failures: string[] = [];
 const expect = (ok: boolean, rule: string) => {
