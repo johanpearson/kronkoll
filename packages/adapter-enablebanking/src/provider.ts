@@ -6,6 +6,9 @@
  * - Svaren är opålitlig indata. De kontrolleras fält för fält och mappas till domänens typer,
  *   och allt annat kastas (KK-11-C). Ett fel innehåller bara en felkod, aldrig svarstexten.
  * - Transaktioner hämtas en sida i taget med continuation key, så att en synk kan delas upp.
+ * - Bankens transaktions-id används bara när det går att lita på. Ett id med bara nollor hoppas
+ *   över, och ett som återkommer på samma sida blir null, så att avstämningen matchar på fingeravtryck
+ *   i stället för att slå ihop olika köp (Enable Bankings egen exempeldata har båda).
  */
 import {
   ProviderError,
@@ -28,6 +31,7 @@ const ACCOUNT_TYPES: Record<string, BankAccountType> = { CACC: "checking", CARD:
 /** Bokfört saldo först, sedan tillgängligt. */
 const BALANCE_PREFERENCE = ["CLBD", "ITBD", "XPCD", "CLAV", "ITAV", "OPBD"];
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
+const PLACEHOLDER_ID = /^0+$/u;
 
 type Json = Record<string, unknown>;
 
@@ -53,6 +57,18 @@ function amountOf(value: unknown): number {
   }
 }
 
+const idOf = (value: unknown): string | null => {
+  const id = text(value);
+  return id === null || PLACEHOLDER_ID.test(id) ? null : id;
+};
+
+/** Tar bort id:n som inte identifierar en enda transaktion på sidan. */
+function trustedIds(rows: ProviderTransaction[]): ProviderTransaction[] {
+  const seen = new Map<string, number>();
+  for (const row of rows) if (row.providerTxId !== null) seen.set(row.providerTxId, (seen.get(row.providerTxId) ?? 0) + 1);
+  return rows.map((row) => (row.providerTxId !== null && (seen.get(row.providerTxId) ?? 0) > 1 ? { ...row, providerTxId: null } : row));
+}
+
 function mapTransaction(raw: unknown): ProviderTransaction | null {
   if (!isObject(raw)) return bad();
   const status = raw.status === "BOOK" ? "booked" : raw.status === "PDNG" ? "pending" : null;
@@ -68,7 +84,7 @@ function mapTransaction(raw: unknown): ProviderTransaction | null {
   const party = debit ? raw.creditor : raw.debtor;
   const remittance = Array.isArray(raw.remittance_information) ? raw.remittance_information.filter((r) => typeof r === "string") : [];
   return {
-    providerTxId: text(raw.entry_reference) ?? text(raw.transaction_id),
+    providerTxId: idOf(raw.entry_reference) ?? idOf(raw.transaction_id),
     status,
     transactionDate,
     bookingDate: date("booking_date"),
@@ -132,7 +148,7 @@ export function createEnableBankingProvider(options: EnableBankingOptions): Bank
       const body = await get(`/accounts/${segment(accountUid)}/transactions`, params);
       const rows = Array.isArray(body.transactions) ? body.transactions : bad();
       return {
-        transactions: rows.map(mapTransaction).filter((t): t is ProviderTransaction => t !== null),
+        transactions: trustedIds(rows.map(mapTransaction).filter((t): t is ProviderTransaction => t !== null)),
         continuationKey: text(body.continuation_key),
       };
     },

@@ -34,13 +34,21 @@ if (sessionId === "") {
   process.exit(0);
 }
 
+// Vilket steg som pågår och bankens senaste HTTP-status, så att ett fel går att felsöka.
+// Bara statuskoden sparas, aldrig svarstexten (KK-13).
+let stepName = "sessionen och kontona";
+const last: { status: number | null } = { status: null };
 const provider = createEnableBankingProvider({
   signer: createJwtSigner({
     applicationId: process.env.EB_APP_ID ?? "",
     privateKeyPem: process.env.EB_PRIVATE_KEY ?? "",
     now: () => Date.now(),
   }),
-  fetch,
+  fetch: async (input, init) => {
+    const res = await fetch(input, init);
+    last.status = res.status;
+    return res;
+  },
 });
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/u;
@@ -58,6 +66,7 @@ try {
 
   for (const [index, account] of accounts.entries()) {
     expect(account.providerUid !== "", "kontot har ett uid");
+    stepName = `saldo för konto ${String(index + 1)}`;
     const balance = await provider.balance(account.providerUid);
     expect(balance === null || Number.isSafeInteger(balance), "saldot är heltal öre");
 
@@ -65,6 +74,7 @@ try {
     let key: string | null = null;
     let pages = 0;
     let slowest = 0;
+    stepName = `transaktioner för konto ${String(index + 1)}`;
     do {
       const started = performance.now();
       const page = await provider.transactions(account.providerUid, { dateFrom, continuationKey: key });
@@ -93,7 +103,8 @@ try {
   if (error instanceof ProviderError && error.code === "UNAUTHORIZED") {
     out("Sandbox-sessionen har gått ut eller återkallats. Kör workflowen **sandbox-connect** igen.");
   } else {
-    out(`Fel: ${error instanceof ProviderError ? error.code : "okänt"}`);
+    const status = last.status === null ? "inget svar" : `HTTP ${String(last.status)}`;
+    out(`Fel vid ${stepName}: ${error instanceof ProviderError ? error.code : "okänt"} (${status})`);
   }
   flush();
   process.exit(1);
