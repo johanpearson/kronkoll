@@ -1,9 +1,10 @@
 // Transaktionslistan (#32, KK-4, KK-9, KK-30): en budgetperiod i taget, grupperad per dag, nyast
 // först. Bankens text renderas alltid som text, aldrig som HTML. Kategorin visas med namn, t.ex.
-// "Mat › Livsmedel". Byte av kategori och uppdelning kommer i egna PR:er.
+// "Mat › Livsmedel" och kan bytas direkt i listan. Uppdelning kommer i en egen PR.
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson } from "../api.ts";
+import { CategoryEditor, type CategoryOption } from "./CategoryEditor.tsx";
 
 interface Transaction {
   readonly id: string;
@@ -92,27 +93,52 @@ function groupByDay(items: readonly Transaction[]): [string, Transaction[]][] {
   return [...days];
 }
 
-/** Kategorinamn per id, t.ex. "Mat › Livsmedel", eller en tom karta om kategorierna inte går att hämta. */
-async function fetchCategoryNames(): Promise<ReadonlyMap<string, string>> {
+interface Categories {
+  /** Namn per id, t.ex. "Mat › Livsmedel", även för arkiverade. */
+  readonly names: ReadonlyMap<string, string>;
+  /** Det som går att välja: inte arkiverade, sorterade efter namn. */
+  readonly options: readonly CategoryOption[];
+}
+
+/** Kategorierna, eller inga om de inte går att hämta. Listan fungerar ändå. */
+async function fetchCategories(): Promise<Categories> {
   const { status, body } = await getJson("/api/categories");
   const items = field(body, "items");
-  if (status !== 200 || !Array.isArray(items)) return new Map();
-  const names = new Map<string, { name: string; parent: string | null }>();
+  if (status !== 200 || !Array.isArray(items)) return { names: new Map(), options: [] };
+  const raw = new Map<string, { name: string; parent: string | null; archived: boolean }>();
   for (const item of items) {
     const id = field(item, "id");
     const name = field(item, "name");
     const parent = field(item, "parent_id");
-    if (typeof id === "string" && typeof name === "string") names.set(id, { name, parent: typeof parent === "string" ? parent : null });
+    if (typeof id === "string" && typeof name === "string") {
+      raw.set(id, { name, parent: typeof parent === "string" ? parent : null, archived: field(item, "archived") === true });
+    }
   }
-  return new Map(
-    [...names].map(([id, { name, parent }]) => {
-      const parentName = parent === null ? undefined : names.get(parent)?.name;
+  const names = new Map(
+    [...raw].map(([id, { name, parent }]) => {
+      const parentName = parent === null ? undefined : raw.get(parent)?.name;
       return [id, parentName === undefined ? name : `${parentName} › ${name}`];
     }),
   );
+  const options = [...raw]
+    .filter(([, c]) => !c.archived)
+    .map(([id]) => ({ id, label: names.get(id) ?? id }))
+    .sort((a, b) => a.label.localeCompare(b.label, "sv"));
+  return { names, options };
 }
 
-function Row({ transaction: t, categoryNames }: { transaction: Transaction; categoryNames: ReadonlyMap<string, string> }) {
+function Row(props: {
+  transaction: Transaction;
+  categories: Categories;
+  editing: boolean;
+  onEdit: () => void;
+  onSaved: (categoryId: string) => void;
+  onApplied: (updated: number) => void;
+  onClose: () => void;
+}) {
+  const { transaction: t, categories } = props;
+  const categoryNames = categories.names;
+  const name = t.counterparty || t.description || "Okänd motpart";
   const notes = [
     t.categoryId === null ? null : (categoryNames.get(t.categoryId) ?? null),
     t.status === "pending" ? "Preliminär" : null,
@@ -122,8 +148,23 @@ function Row({ transaction: t, categoryNames }: { transaction: Transaction; cate
   ].filter((n): n is string => n !== null);
   return (
     <li className={t.isInternalTransfer ? "internal" : undefined}>
-      <span>{t.counterparty || t.description || "Okänd motpart"}</span> <span>{formatSek(t.amountMinor)}</span>
-      {notes.length > 0 && <small> · {notes.join(" · ")}</small>}
+      <span>{name}</span> <span>{formatSek(t.amountMinor)}</span>
+      {notes.length > 0 && <small> · {notes.join(" · ")}</small>}{" "}
+      {!props.editing && (
+        <button type="button" aria-label={`Ändra kategori för ${name}`} onClick={props.onEdit}>
+          Ändra
+        </button>
+      )}
+      {props.editing && (
+        <CategoryEditor
+          transactionId={t.id}
+          name={name}
+          options={categories.options}
+          onSaved={props.onSaved}
+          onApplied={props.onApplied}
+          onClose={props.onClose}
+        />
+      )}
     </li>
   );
 }
@@ -132,12 +173,14 @@ export function TransactionsView() {
   const [filters, setFilters] = useState<Filters>({ period: null, q: "", uncategorized: false });
   const [search, setSearch] = useState("");
   const [state, setState] = useState<ListState>({ kind: "loading" });
-  const [categoryNames, setCategoryNames] = useState<ReadonlyMap<string, string>>(new Map());
+  const [categories, setCategories] = useState<Categories>({ names: new Map(), options: [] });
+  const [editing, setEditing] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let current = true;
-    void fetchCategoryNames().then((names) => {
-      if (current) setCategoryNames(names);
+    void fetchCategories().then((loaded) => {
+      if (current) setCategories(loaded);
     });
     return () => {
       current = false;
@@ -164,6 +207,15 @@ export function TransactionsView() {
   }, [filters, state]);
 
   const period = state.kind === "ready" ? state.period : null;
+  const markSaved = (id: string, categoryId: string) => {
+    if (state.kind === "ready") setState({ ...state, items: state.items.map((t) => (t.id === id ? { ...t, categoryId } : t)) });
+  };
+  // Hämtar om samma period, så att transaktioner som regeln ändrade visar sin nya kategori.
+  const applied = (updated: number) => {
+    setNotice(`${String(updated)} transaktioner fick den nya kategorin.`);
+    setEditing(null);
+    setFilters({ ...filters, period: period?.key ?? filters.period });
+  };
   const go = (months: number) => {
     if (period) setFilters({ ...filters, period: shiftPeriodKey(period.key, months) });
   };
@@ -197,6 +249,7 @@ export function TransactionsView() {
         Bara okategoriserade
       </label>
 
+      {notice && <p role="status">{notice}</p>}
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta transaktionerna. Försök igen om en stund.</p>}
       {state.kind === "ready" && state.items.length === 0 && <p>Inga transaktioner i perioden.</p>}
@@ -207,7 +260,16 @@ export function TransactionsView() {
               <h2>{formatDateShort(day)}</h2>
               <ul>
                 {items.map((t) => (
-                  <Row key={t.id} transaction={t} categoryNames={categoryNames} />
+                  <Row
+                    key={t.id}
+                    transaction={t}
+                    categories={categories}
+                    editing={editing === t.id}
+                    onEdit={() => { setEditing(t.id); }}
+                    onSaved={(categoryId) => { markSaved(t.id, categoryId); }}
+                    onApplied={applied}
+                    onClose={() => { setEditing(null); }}
+                  />
                 ))}
               </ul>
             </li>
