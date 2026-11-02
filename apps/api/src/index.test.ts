@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { cachedVerifier, type GuardDeps } from "./access.ts";
-import worker, { handle, syncDeps } from "./index.ts";
+import worker, { handle, routeContext, syncDeps } from "./index.ts";
 import {
   AUD,
   INVITED,
@@ -31,7 +31,7 @@ async function call(path: string, init: RequestInit & { token?: string | null } 
   const { token = await signToken(key), ...rest } = init;
   const headers = new Headers(rest.headers);
   if (token !== null) headers.set("cf-access-jwt-assertion", token);
-  return handle(new Request(`${ORIGIN}${path}`, { ...rest, headers }), env, deps, { waitUntil: () => undefined, sync: syncDeps(env) });
+  return handle(new Request(`${ORIGIN}${path}`, { ...rest, headers }), env, deps, { waitUntil: () => undefined, sync: syncDeps(env), connectorFor: () => null });
 }
 
 describe("Access-krav för hela API:t (KK-2-B, V-i-access)", () => {
@@ -106,6 +106,18 @@ describe("exporterad scheduled-handler (KK-7)", () => {
     spy.mockRestore();
     expect(pending).toHaveLength(1);
     expect(written.map((l) => JSON.parse(l) as { event: string }).map((l) => l.event)).toEqual(["sync.not_configured"]);
+  });
+});
+
+describe("routernas beroenden i drift", () => {
+  it("kopplar bara mot banken när hemligheterna finns, och låter Workern fortsätta efter svaret", () => {
+    const pending: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => pending.push(p), passThroughOnException: () => undefined } as unknown as ExecutionContext;
+    expect(routeContext(configuredEnv(), ctx).connectorFor()).toBeNull();
+    const context = routeContext(configuredEnv({ EB_APP_ID: "app-id", EB_PRIVATE_KEY: "pem" }), ctx);
+    expect(context.connectorFor()).not.toBeNull();
+    context.waitUntil(Promise.resolve());
+    expect(pending).toHaveLength(1);
   });
 });
 

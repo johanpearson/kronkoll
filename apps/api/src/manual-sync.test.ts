@@ -67,6 +67,7 @@ async function call(path: string, init: { method?: string; at?: string; env?: Pa
   const response = await handle(new Request(`${ORIGIN}${path}`, { method: init.method ?? "POST", headers }), configuredEnv({ DB: db, SESSION_ENC_KEY: secret, ...init.env }), guardDeps, {
     waitUntil: (p) => pending.push(p),
     sync,
+    connectorFor: () => null,
   });
   await Promise.all(pending);
   return response;
