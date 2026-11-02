@@ -3,13 +3,14 @@
  *
  * Här sker minimeringen: session-id krypteras innan det skrivs, IBAN blir en HMAC och
  * kontonamnet maskeras. Inget av klartextvärdena lämnar den här modulen mot databasen.
- * Transaktionerna får sitt repository tillsammans med synken (#25), där formen bestäms.
+ * Körningsloggen (sync_runs) hör också hit. Transaktionerna får sitt repository i ett senare steg av synken (#25).
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import { and, eq } from "drizzle-orm";
+import { nextConsecutiveFailures, type SyncRunSummary } from "@kronkoll/domain";
+import { and, eq, max } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { decryptSessionId, encryptSessionId, hashIban, maskAccountName, type Keys } from "./crypto.ts";
-import { accounts, bankConnections, settings } from "./schema.ts";
+import { accounts, bankConnections, settings, syncRuns } from "./schema.ts";
 
 export interface Settings {
   readonly budgetPeriodStartDay: number;
@@ -76,9 +77,54 @@ export function connectionRepository(d1: D1Database, keys: Keys) {
     async setStatus(id: string, status: ConnectionStatus): Promise<void> {
       await db.update(bankConnections).set({ status }).where(eq(bankConnections.id, id));
     },
+    /**
+     * Registrerar utfallet av en synk. Tidpunkten för senaste lyckade synk sätts bara när alla
+     * konton gick bra, och felräknaren nollställs om inte hela körningen misslyckades. Returnerar
+     * antal misslyckade körningar i rad, som avgör om notisen ska skickas (KK-7-B).
+     */
+    async recordSyncOutcome(id: string, status: SyncRunSummary["status"], at: string): Promise<number> {
+      const row = await db
+        .select({ failures: bankConnections.consecutiveFailures })
+        .from(bankConnections)
+        .where(eq(bankConnections.id, id))
+        .get();
+      if (!row) throw new Error("Kopplingen finns inte");
+      const consecutiveFailures = nextConsecutiveFailures(row.failures, status);
+      await db
+        .update(bankConnections)
+        .set(status === "ok" ? { consecutiveFailures, lastSuccessAt: at } : { consecutiveFailures })
+        .where(eq(bankConnections.id, id));
+      return consecutiveFailures;
+    },
     /** Raderar kopplingen med dess konton och transaktioner (KK-11). */
     async delete(id: string): Promise<void> {
       await db.delete(bankConnections).where(eq(bankConnections.id, id));
+    },
+  };
+}
+
+export type SyncRun = typeof syncRuns.$inferSelect;
+
+/** Körningsloggen. Innehåller bara antal, tider och felkoder, aldrig bankdata (KK-13). */
+export function syncRunRepository(d1: D1Database) {
+  const db = drizzle(d1);
+  return {
+    async start(input: { id: string; connectionId: string; kind: SyncRun["kind"]; startedAt: string }): Promise<void> {
+      await db.insert(syncRuns).values({ ...input, status: "running" });
+    },
+    async finish(id: string, finishedAt: string, summary: SyncRunSummary): Promise<void> {
+      await db
+        .update(syncRuns)
+        .set({ finishedAt, status: summary.status, newCount: summary.newCount, updatedCount: summary.updatedCount, errorCode: summary.errorCode })
+        .where(eq(syncRuns.id, id));
+    },
+    async get(id: string): Promise<SyncRun | null> {
+      return (await db.select().from(syncRuns).where(eq(syncRuns.id, id)).get()) ?? null;
+    },
+    /** När startades den senaste manuella synken? Underlag för gränsen en gång per 15 minuter (KK-7-C). */
+    async lastManualStartedAt(): Promise<Date | null> {
+      const row = await db.select({ at: max(syncRuns.startedAt) }).from(syncRuns).where(eq(syncRuns.kind, "manual")).get();
+      return row?.at ? new Date(row.at) : null;
     },
   };
 }
