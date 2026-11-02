@@ -70,7 +70,7 @@ export function Consent() {
       </ul>
       <p>Samtycket gäller så länge banken tillåter. Du får en påminnelse innan det går ut, och du kan radera kopplingen när du vill.</p>
       {error && <p role="alert">{error}</p>}
-      <button type="button" disabled={busy} onClick={() => void start()}>
+      <button type="button" className="primary" disabled={busy} onClick={() => void start()}>
         {busy ? "Startar…" : "Fortsätt till BankID"}
       </button>
       <p>Du skickas till {bank.name} via Enable Banking och kommer tillbaka hit.</p>

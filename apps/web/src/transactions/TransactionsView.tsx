@@ -150,31 +150,38 @@ function Row(props: {
     t.categoryId === null && !t.split ? "Okategoriserad" : null,
   ].filter((n): n is string => n !== null);
   return (
-    <li className={t.isInternalTransfer ? "internal" : undefined}>
-      <span>{name}</span> <span className="amount">{formatSek(t.amountMinor)}</span>
-      {notes.length > 0 && <small> · {notes.join(" · ")}</small>}{" "}
+    <li className={t.isInternalTransfer ? "tx internal" : "tx"}>
+      <div className="tx-main">
+        <span className="tx-name">{name}</span>
+        <span className={t.amountMinor > 0 ? "amount income" : "amount"}>{formatSek(t.amountMinor)}</span>
+      </div>
+      {notes.length > 0 && <small className="tx-notes">{notes.join(" · ")}</small>}
       {props.mode === null && (
-        <>
-          <button type="button" aria-label={`Ändra kategori för ${name}`} onClick={() => { props.onOpen("category"); }}>
+        <div className="tx-actions">
+          <button type="button" className="small" aria-label={`Ändra kategori för ${name}`} onClick={() => { props.onOpen("category"); }}>
             Ändra
-          </button>{" "}
-          <button type="button" aria-label={`Dela upp ${name}`} onClick={() => { props.onOpen("split"); }}>
+          </button>
+          <button type="button" className="small" aria-label={`Dela upp ${name}`} onClick={() => { props.onOpen("split"); }}>
             Dela upp
           </button>
-        </>
+        </div>
       )}
       {props.mode === "split" && (
-        <SplitEditor transactionId={t.id} amountMinor={t.amountMinor} options={categories.options} onSaved={props.onSplitSaved} onClose={props.onClose} />
+        <div className="tx-editor">
+          <SplitEditor transactionId={t.id} amountMinor={t.amountMinor} options={categories.options} onSaved={props.onSplitSaved} onClose={props.onClose} />
+        </div>
       )}
       {props.mode === "category" && (
-        <CategoryEditor
-          transactionId={t.id}
-          name={name}
-          options={categories.options}
-          onSaved={props.onSaved}
-          onApplied={props.onApplied}
-          onClose={props.onClose}
-        />
+        <div className="tx-editor">
+          <CategoryEditor
+            transactionId={t.id}
+            name={name}
+            options={categories.options}
+            onSaved={props.onSaved}
+            onApplied={props.onApplied}
+            onClose={props.onClose}
+          />
+        </div>
       )}
     </li>
   );

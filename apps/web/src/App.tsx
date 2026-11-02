@@ -1,5 +1,6 @@
 // Appens skal (#30): sidorna och huvudmenyn. Menyn har de vyer som finns; Budget, Sparmål och Inkomst
 // läggs till när de byggs. Tema, PWA och offline-cache kommer i egna PR:er.
+import { House, ReceiptText, Settings } from "lucide-react";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { Link, usePath } from "./router.tsx";
 import { SettingsView } from "./settings/SettingsView.tsx";
@@ -36,9 +37,9 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
 
 /** Menyn i den ordning planen har den. Koppla bank hör till Inställningar. */
 const TABS = [
-  { to: "/", label: "Översikt", owns: (path: string) => path === "/" },
-  { to: "/transaktioner", label: "Transaktioner", owns: (path: string) => path === "/transaktioner" },
-  { to: "/installningar", label: "Inställningar", owns: (path: string) => path === "/installningar" || path.startsWith("/koppla") },
+  { to: "/", label: "Översikt", Icon: House, owns: (path: string) => path === "/" },
+  { to: "/transaktioner", label: "Transaktioner", Icon: ReceiptText, owns: (path: string) => path === "/transaktioner" },
+  { to: "/installningar", label: "Inställningar", Icon: Settings, owns: (path: string) => path === "/installningar" || path.startsWith("/koppla") },
 ];
 
 export function App() {
@@ -52,6 +53,7 @@ export function App() {
           {TABS.map((tab) => (
             <li key={tab.to}>
               <Link to={tab.to} current={tab.owns(path)}>
+                <tab.Icon aria-hidden="true" size={22} strokeWidth={1.75} />
                 {tab.label}
               </Link>
             </li>

@@ -96,7 +96,7 @@ export function CategoryEditor(props: {
       </label>
       {error && <p role="alert">{error}</p>}
       <p>
-        <button type="button" disabled={busy || categoryId === ""} onClick={() => void save()}>
+        <button type="button" className="primary" disabled={busy || categoryId === ""} onClick={() => void save()}>
           Spara
         </button>{" "}
         <button type="button" onClick={props.onClose}>
