@@ -55,6 +55,27 @@ export interface TransactionListItem {
   readonly split: boolean;
 }
 
+export interface TransactionDetail {
+  readonly id: string;
+  readonly accountId: string;
+  /** Maskerat, t.ex. "Privatkonto ••7466". */
+  readonly accountName: string;
+  readonly accountType: string;
+  readonly status: "pending" | "booked";
+  readonly transactionDate: string;
+  readonly bookingDate: string | null;
+  readonly amountMinor: number;
+  /** Bankens text. Opålitlig indata som alltid visas som text (KK-30). */
+  readonly counterparty: string;
+  readonly counterpartyNorm: string;
+  readonly description: string;
+  readonly categoryId: string | null;
+  readonly categorySource: Row["categorySource"];
+  readonly isInternalTransfer: boolean;
+  readonly manualTransfer: boolean | null;
+  readonly transferPair: { id: string; accountName: string; amountMinor: number; transactionDate: string } | null;
+}
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
 
 /** Cursorn är opak för anroparen: datum och id för sista raden på förra sidan. */
@@ -283,6 +304,64 @@ export function transactionRepository(d1: D1Database) {
         .returning({ id: transactions.id })
         .all();
       return updated.length > 0;
+    },
+
+    /**
+     * Allt om en transaktion för detaljsidan: kontots maskerade namn, bankens råa text och motposten om
+     * det är en intern överföring. Null om den saknas eller är borttagen.
+     */
+    async detail(id: string): Promise<TransactionDetail | null> {
+      const [row] = await db
+        .select({
+          id: transactions.id,
+          accountId: accounts.id,
+          accountName: accounts.displayName,
+          accountType: accounts.type,
+          status: transactions.status,
+          transactionDate: transactions.transactionDate,
+          bookingDate: transactions.bookingDate,
+          amountMinor: transactions.amountMinor,
+          counterparty: transactions.counterparty,
+          counterpartyNorm: transactions.counterpartyNorm,
+          description: transactions.description,
+          categoryId: transactions.categoryId,
+          categorySource: transactions.categorySource,
+          isInternalTransfer: transactions.isInternalTransfer,
+          manualTransfer: transactions.manualTransfer,
+          pairId: transactions.transferPairId,
+        })
+        .from(transactions)
+        .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+        .where(and(eq(transactions.id, id), ne(transactions.status, "removed")))
+        .all();
+      if (!row) return null;
+      const [pair] =
+        row.pairId === null
+          ? []
+          : await db
+              .select({ id: transactions.id, accountName: accounts.displayName, amountMinor: transactions.amountMinor, transactionDate: transactions.transactionDate })
+              .from(transactions)
+              .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+              .where(eq(transactions.id, row.pairId))
+              .all();
+      return {
+        id: row.id,
+        accountId: row.accountId,
+        accountName: row.accountName,
+        accountType: row.accountType,
+        status: row.status === "pending" ? "pending" : "booked",
+        transactionDate: row.transactionDate,
+        bookingDate: row.bookingDate,
+        amountMinor: row.amountMinor,
+        counterparty: row.counterparty,
+        counterpartyNorm: row.counterpartyNorm,
+        description: row.description,
+        categoryId: row.categoryId,
+        categorySource: row.categorySource,
+        isInternalTransfer: row.isInternalTransfer,
+        manualTransfer: row.manualTransfer,
+        transferPair: pair ?? null,
+      };
     },
 
     /** De egna kontona med typ, för att para ihop överföringar. Kräver inga nycklar. */
