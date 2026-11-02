@@ -199,3 +199,85 @@ main form[role="search"] input {
 .tx-name a:hover {
   text-decoration: underline;
 }
+
+/* Budget: summering i tre kolumner och en stapel per kategori. Över budget är rött och står i text. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+}
+
+.stats dt {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.stats dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+main ul > li.budget-line {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+}
+
+.budget-share {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.budget-line.near .budget-share {
+  color: var(--warning);
+}
+
+.budget-line.over .budget-share {
+  color: var(--danger);
+}
+
+.budget-bar {
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  overflow: hidden;
+}
+
+.budget-bar::-webkit-progress-bar {
+  background: var(--border);
+}
+
+.budget-bar::-webkit-progress-value {
+  background: var(--primary);
+}
+
+.budget-bar::-moz-progress-bar {
+  background: var(--primary);
+}
+
+.near .budget-bar::-webkit-progress-value {
+  background: var(--warning);
+}
+
+.near .budget-bar::-moz-progress-bar {
+  background: var(--warning);
+}
+
+.over .budget-bar::-webkit-progress-value {
+  background: var(--danger);
+}
+
+.over .budget-bar::-moz-progress-bar {
+  background: var(--danger);
+}
+
+.note {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-small);
+  border: 1px solid var(--info);
+  color: var(--text);
+  background: var(--surface);
+}

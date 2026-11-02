@@ -20,7 +20,7 @@ interface Transaction {
   readonly split: boolean;
 }
 
-interface Period {
+export interface Period {
   readonly key: string;
   readonly start: string;
   readonly end: string;
@@ -55,7 +55,7 @@ function toTransaction(raw: unknown): Transaction | null {
   };
 }
 
-function toPeriod(raw: unknown): Period | null {
+export function toPeriod(raw: unknown): Period | null {
   const key = field(raw, "key");
   const start = field(raw, "start");
   const end = field(raw, "end");
@@ -102,11 +102,13 @@ export interface Categories {
   readonly options: readonly CategoryOption[];
 }
 
+export const NO_CATEGORIES: Categories = { names: new Map(), options: [] };
+
 /** Kategorierna, eller inga om de inte går att hämta. Listan fungerar ändå. */
 export async function fetchCategories(): Promise<Categories> {
   const { status, body } = await getJson("/api/categories");
   const items = field(body, "items");
-  if (status !== 200 || !Array.isArray(items)) return { names: new Map(), options: [] };
+  if (status !== 200 || !Array.isArray(items)) return NO_CATEGORIES;
   const raw = new Map<string, { name: string; parent: string | null; archived: boolean }>();
   for (const item of items) {
     const id = field(item, "id");
@@ -194,7 +196,7 @@ export function TransactionsView() {
   const [filters, setFilters] = useState<Filters>({ period: null, q: "", uncategorized: false });
   const [search, setSearch] = useState("");
   const [state, setState] = useState<ListState>({ kind: "loading" });
-  const [categories, setCategories] = useState<Categories>({ names: new Map(), options: [] });
+  const [categories, setCategories] = useState<Categories>(NO_CATEGORIES);
   const [editing, setEditing] = useState<{ id: string; mode: "category" | "split" } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
