@@ -9,6 +9,7 @@ import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.
 import { listAccounts, patchAccount } from "./accounts.ts";
 import { getBudget, putBudget } from "./budget.ts";
 import { listCategories } from "./categories.ts";
+import { getOverview } from "./overview.ts";
 import { applyRule, setCategory } from "./set-category.ts";
 import { getSplits, putSplits } from "./splits.ts";
 import { putTransfer } from "./transfers.ts";
@@ -116,6 +117,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/accounts") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
     return listAccounts(env);
+  }
+
+  if (pathname === "/api/overview") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return getOverview(request, env, context.sync);
   }
 
   if (pathname === "/api/categories") {
