@@ -22,7 +22,7 @@ export function usePath(): string {
   return useSyncExternalStore(subscribe, () => window.location.pathname);
 }
 
-export function Link({ to, children }: { to: string; children: ReactNode }) {
+export function Link({ to, children, current = false }: { to: string; children: ReactNode; current?: boolean }) {
   const onClick = (event: MouseEvent<HTMLAnchorElement>) => {
     // Ny flik, nytt fönster och liknande sköts av webbläsaren som vanligt.
     if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
@@ -30,7 +30,7 @@ export function Link({ to, children }: { to: string; children: ReactNode }) {
     navigate(to);
   };
   return (
-    <a href={to} onClick={onClick}>
+    <a href={to} onClick={onClick} aria-current={current ? "page" : undefined}>
       {children}
     </a>
   );
