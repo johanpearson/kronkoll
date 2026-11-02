@@ -6,7 +6,7 @@
  * Körningsloggen (sync_runs) hör också hit. Transaktionerna får sitt repository i ett senare steg av synken (#25).
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import { nextConsecutiveFailures, type SyncRunSummary } from "@kronkoll/domain";
+import { assertMinor, nextConsecutiveFailures, type SyncRunSummary } from "@kronkoll/domain";
 import { and, eq, max } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { decryptSessionId, encryptSessionId, hashIban, maskAccountName, type Keys } from "./crypto.ts";
@@ -76,6 +76,12 @@ export function connectionRepository(d1: D1Database, keys: Keys) {
     },
     async setStatus(id: string, status: ConnectionStatus): Promise<void> {
       await db.update(bankConnections).set({ status }).where(eq(bankConnections.id, id));
+    },
+    /** Samtycket har gått ut eller banken nekar åtkomst: kopplingen behöver kopplas om (KK-8). */
+    async expire(id: string): Promise<void> {
+      const row = await db.select({ id: bankConnections.id }).from(bankConnections).where(eq(bankConnections.id, id)).get();
+      if (!row) throw new Error("Kopplingen finns inte");
+      await db.update(bankConnections).set({ status: "expired" }).where(eq(bankConnections.id, id));
     },
     /**
      * Registrerar utfallet av en synk. Tidpunkten för senaste lyckade synk sätts bara när alla
@@ -173,6 +179,22 @@ export function accountRepository(d1: D1Database, keys: Keys) {
     },
     async list(): Promise<(typeof accounts.$inferSelect)[]> {
       return db.select().from(accounts).all();
+    },
+    /** Kopplingens konton hos banken. Manuella konton saknar bankens id och synkas inte. */
+    async listForConnection(connectionId: string): Promise<{ id: string; providerUid: string }[]> {
+      const rows = await db
+        .select({ id: accounts.id, providerUid: accounts.providerUid })
+        .from(accounts)
+        .where(eq(accounts.connectionId, connectionId))
+        .all();
+      return rows.flatMap((r) => (r.providerUid === null ? [] : [{ id: r.id, providerUid: r.providerUid }]));
+    },
+    /** Bokfört saldo från banken i öre (heltal med tecken). */
+    async setBalance(accountId: string, balanceMinor: number): Promise<void> {
+      assertMinor(balanceMinor);
+      const exists = await db.select({ id: accounts.id }).from(accounts).where(eq(accounts.id, accountId)).get();
+      if (!exists) throw new Error("Kontot finns inte");
+      await db.update(accounts).set({ balanceMinor }).where(eq(accounts.id, accountId));
     },
   };
 }

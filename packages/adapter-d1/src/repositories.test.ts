@@ -1,9 +1,10 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import type { SyncRunSummary } from "@kronkoll/domain";
+import type { BalanceStore, ConnectionSyncState, SyncRunLog, SyncRunSummary, TransactionStore } from "@kronkoll/domain";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { deriveKeys, type Keys } from "./crypto.ts";
 import { accountRepository, connectionRepository, settingsRepository, syncRunRepository } from "./repositories.ts";
 import { migratedDb, randomSecret } from "./test-support.ts";
+import { transactionRepository } from "./transactions.ts";
 
 let db: D1Database;
 let dispose: () => Promise<void>;
@@ -85,6 +86,52 @@ describe("konton", () => {
     const repo = accountRepository(db, keys);
     const id = await repo.upsertFromBank({ connectionId: "c3", providerUid: "card-1", iban: null, name: "Visa", type: "credit_card", balanceMinor: -320000 }, newId);
     expect((await repo.list()).find((a) => a.id === id)).toMatchObject({ displayName: "Visa", ibanHash: null });
+  });
+});
+
+describe("synkens portar (KK-7, KK-14)", () => {
+  it("repositories uppfyller domänens portar, så att synken kan kopplas in utan omskrivning", () => {
+    // Kontrolleras av typkontrollen: tilldelningarna kompilerar bara om formerna stämmer.
+    const runs: SyncRunLog = syncRunRepository(db);
+    const connections: ConnectionSyncState = connectionRepository(db, keys);
+    const balances: BalanceStore = accountRepository(db, keys);
+    const store: TransactionStore = transactionRepository(db);
+    expect([runs, connections, balances, store]).toHaveLength(4);
+  });
+
+  it("sätter ett kontos saldo, och kastar för ett konto som inte finns", async () => {
+    const accounts = accountRepository(db, keys);
+    const id = await accounts.upsertFromBank({ connectionId: "c1", providerUid: "saldo-1", iban: null, name: "Sparkonto", type: "savings", balanceMinor: null }, newId);
+    await accounts.setBalance(id, 4_250_075);
+    expect((await accounts.list()).find((a) => a.id === id)?.balanceMinor).toBe(4_250_075);
+    await accounts.setBalance(id, -1200);
+    expect((await accounts.list()).find((a) => a.id === id)?.balanceMinor).toBe(-1200);
+    await expect(accounts.setBalance("saknas", 1)).rejects.toThrow();
+  });
+
+  it("avvisar ett saldo som inte är heltal öre", async () => {
+    const accounts = accountRepository(db, keys);
+    const [first] = await accounts.list();
+    await expect(accounts.setBalance(first?.id ?? "", 12.5)).rejects.toThrow(RangeError);
+  });
+
+  it("listar en kopplings konton med bankens id, utan manuella konton", async () => {
+    const connections = connectionRepository(db, keys);
+    await connections.create({ id: "c7", provider: "enablebanking", aspspName: "Skandia" });
+    const accounts = accountRepository(db, keys);
+    const a = await accounts.upsertFromBank({ connectionId: "c7", providerUid: "u-a", iban: null, name: "A", type: "checking", balanceMinor: 0 }, newId);
+    await db.prepare(`INSERT INTO accounts (id, connection_id, display_name, type) VALUES ('manuellt', 'c7', 'Kontant', 'manual')`).run();
+    expect(await accounts.listForConnection("c7")).toEqual([{ id: a, providerUid: "u-a" }]);
+    expect(await accounts.listForConnection("ingen")).toEqual([]);
+  });
+
+  it("sätter en koppling till utgången", async () => {
+    const connections = connectionRepository(db, keys);
+    await connections.create({ id: "c8", provider: "enablebanking", aspspName: "Skandia" });
+    await connections.activate("c8", { sessionId: SESSION_ID, consentExpiresOn: "2027-04-30" });
+    await connections.expire("c8");
+    expect((await connections.get("c8"))?.status).toBe("expired");
+    await expect(connections.expire("saknas")).rejects.toThrow();
   });
 });
 
