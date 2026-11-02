@@ -42,6 +42,15 @@ importers:
       '@kronkoll/adapter-access':
         specifier: workspace:*
         version: link:../../packages/adapter-access
+      '@kronkoll/adapter-d1':
+        specifier: workspace:*
+        version: link:../../packages/adapter-d1
+      '@kronkoll/adapter-enablebanking':
+        specifier: workspace:*
+        version: link:../../packages/adapter-enablebanking
+      '@kronkoll/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@kronkoll/logging':
         specifier: workspace:*
         version: link:../../packages/logging

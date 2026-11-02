@@ -1,6 +1,6 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { cachedVerifier, type GuardDeps } from "./access.ts";
-import worker, { handle } from "./index.ts";
+import worker, { handle, syncDeps } from "./index.ts";
 import {
   AUD,
   INVITED,
@@ -90,6 +90,53 @@ describe("/api/health", () => {
     const res = await call("/api/finns-inte");
     expect(res.status).toBe(404);
     expect(await res.json()).toEqual({ error: "not_found" });
+  });
+});
+
+describe("exporterad scheduled-handler (KK-7)", () => {
+  it("startar synken i bakgrunden och loggar att den inte är konfigurerad när hemligheterna saknas", async () => {
+    const written: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((line: unknown) => {
+      written.push(String(line));
+    });
+    const pending: Promise<unknown>[] = [];
+    const ctx = { waitUntil: (p: Promise<unknown>) => pending.push(p), passThroughOnException: () => undefined } as unknown as ExecutionContext;
+    worker.scheduled({ cron: "7 4,15 * * *", scheduledTime: 0, type: "scheduled", noRetry: () => undefined } as unknown as ScheduledController, configuredEnv(), ctx);
+    await Promise.all(pending);
+    spy.mockRestore();
+    expect(pending).toHaveLength(1);
+    expect(written.map((l) => JSON.parse(l) as { event: string }).map((l) => l.event)).toEqual(["sync.not_configured"]);
+  });
+});
+
+describe("synkens beroenden i drift", () => {
+  it("har ingen bank när Enable Banking-hemligheterna saknas, och en när båda finns", () => {
+    expect(syncDeps(configuredEnv()).providerFor()).toBeNull();
+    expect(syncDeps(configuredEnv({ EB_APP_ID: "app-id" })).providerFor()).toBeNull();
+    expect(syncDeps(configuredEnv({ EB_APP_ID: "app-id", EB_PRIVATE_KEY: "pem" })).providerFor()).not.toBeNull();
+  });
+
+  it("använder riktig klocka och unika id", () => {
+    const deps = syncDeps(configuredEnv());
+    expect(Math.abs(deps.clock.now().getTime() - Date.now())).toBeLessThan(5000);
+    expect(deps.newId()).toMatch(/^[0-9a-f-]{36}$/u);
+    expect(deps.newId()).not.toBe(deps.newId());
+  });
+
+  it("anropar Enable Banking med den inbyggda fetch, men aldrig utan en signerad nyckel", async () => {
+    const calls: string[] = [];
+    const original = globalThis.fetch;
+    globalThis.fetch = () => {
+      calls.push("fetch");
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    };
+    try {
+      const provider = syncDeps(configuredEnv({ EB_APP_ID: "app-id", EB_PRIVATE_KEY: "inte-en-nyckel" })).providerFor();
+      await expect(provider?.balance("uid-1")).rejects.toThrow();
+      expect(calls).toEqual([]);
+    } finally {
+      globalThis.fetch = original;
+    }
   });
 });
 
