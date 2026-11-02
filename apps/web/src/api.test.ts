@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { field, postJson } from "./api.ts";
+import { field, getJson, postJson } from "./api.ts";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -32,6 +32,31 @@ describe("postJson", () => {
     );
     expect(await postJson("/api/x", {}, 10)).toEqual({ status: 0, body: null });
     expect(aborted).toBe(true);
+  });
+});
+
+describe("getJson", () => {
+  it("hämtar JSON med Access-cookien och ger status och svar", async () => {
+    const fetchMock = vi.fn<typeof fetch>(() => Promise.resolve(new Response(JSON.stringify({ items: [] }), { status: 200 })));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await getJson("/api/transactions")).toEqual({ status: 200, body: { items: [] } });
+    expect(fetchMock.mock.calls[0]?.[1]?.credentials).toBe("same-origin");
+  });
+
+  it("ett nätverksfel ger status 0", async () => {
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+    expect(await getJson("/api/x")).toEqual({ status: 0, body: null });
+  });
+
+  it("ett anrop som aldrig svarar avbryts efter tidsgränsen", async () => {
+    vi.stubGlobal("fetch", (_input: RequestInfo | URL, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener("abort", () => {
+          reject(new DOMException("Avbrutet", "AbortError"));
+        });
+      }),
+    );
+    expect(await getJson("/api/x", 10)).toEqual({ status: 0, body: null });
   });
 });
 

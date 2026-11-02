@@ -31,6 +31,22 @@ export async function postJson(path: string, body: unknown, timeoutMs = TIMEOUT_
   }
 }
 
+/** GET som ger JSON, med samma tidsgräns och felhantering som postJson. */
+export async function getJson(path: string, timeoutMs = TIMEOUT_MS): Promise<ApiResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+  try {
+    const response = await fetch(path, { credentials: "same-origin", signal: controller.signal });
+    return { status: response.status, body: await response.json().catch(() => null) };
+  } catch {
+    return { status: 0, body: null };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /** Ett textfält ur ett JSON-svar, eller null. Svaret behandlas som okänd indata. */
 export function field(body: unknown, name: string): unknown {
   return typeof body === "object" && body !== null && name in body ? (body as Record<string, unknown>)[name] : null;
