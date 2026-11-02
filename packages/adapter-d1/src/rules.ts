@@ -21,5 +21,10 @@ export function ruleRepository(d1: D1Database) {
           : [],
       );
     },
+    /** Sparar en inlärd regel ("Gör alltid så"). Finns regeln redan uppdateras dess kategori. */
+    async save(rule: CategoryRule): Promise<void> {
+      const values = { id: rule.id, match: rule.match, pattern: rule.pattern, categoryId: rule.categoryId, source: rule.source };
+      await db.insert(categoryRules).values(values).onConflictDoUpdate({ target: categoryRules.id, set: { categoryId: rule.categoryId } });
+    },
   };
 }

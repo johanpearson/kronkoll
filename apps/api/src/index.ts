@@ -7,6 +7,7 @@ import { manualSyncGate, type BankConnector, type BankDataProvider } from "@kron
 import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
 import { listCategories } from "./categories.ts";
+import { applyRule, setCategory } from "./set-category.ts";
 import { completeConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
 import { listTransactions } from "./transactions.ts";
@@ -67,6 +68,18 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/connections" || pathname === "/api/connections/callback") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     return pathname === "/api/connections" ? startConnection(request, env, context, email) : completeConnection(request, env, context, email);
+  }
+
+  const txMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (txMatch?.[1]) {
+    if (request.method !== "PATCH") return json({ error: "method_not_allowed" }, 405, { allow: "PATCH" });
+    return setCategory(request, env, context.sync, txMatch[1]);
+  }
+
+  const ruleMatch = /^\/api\/rules\/([A-Za-z0-9_-]{1,64})\/apply$/u.exec(pathname);
+  if (ruleMatch?.[1]) {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return applyRule(env, ruleMatch[1]);
   }
 
   if (pathname === "/api/categories") {
