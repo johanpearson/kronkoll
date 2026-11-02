@@ -142,7 +142,7 @@ if (step === "start") {
   if (!out) throw new Error("SESSION_OUT saknas");
   writeFileSync(out, session.session_id, { mode: 0o600 });
   const accounts = Array.isArray(session.accounts) ? session.accounts.length : 0;
-  summary(["## Koppla sandboxen, steg 2 av 2", "", `Klart. Sessionen har **${String(accounts)}** konton och sparas som secret i miljön \`sandbox\`.`]);
+  summary(["## Koppla sandboxen, steg 2 av 2", "", `Klart. Sessionen har **${String(accounts)}** konton och sparas som repo-secret.`]);
 } else {
   throw new Error("STEP måste vara start eller finish");
 }

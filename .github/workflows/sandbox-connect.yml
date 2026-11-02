@@ -2,8 +2,9 @@
 # Startas för hand i två steg: Actions → sandbox-connect → Run workflow (fungerar i GitHub-appen).
 #   1. step = start: länken till testbanken visas i sammanfattningen och i loggen för steget "Koppla".
 #   2. step = finish: klistra in adressen du hamnade på efter godkännandet.
-# Bara sandbox-nyckeln används. Session-id:t visas aldrig: det skrivs direkt till secreten
-# EB_SANDBOX_SESSION_ID i miljön "sandbox", som är låst till main (D-secrets).
+# Bara sandbox-nyckeln används. Session-id:t visas aldrig: det skrivs direkt till repo-secreten
+# EB_SANDBOX_SESSION_ID. Den är oanvändbar utan sandbox-nyckeln, som bara finns i miljön
+# "sandbox" (låst till main), och ger bara åtkomst till testbankens påhittade data (D-secrets).
 name: sandbox-connect
 
 on:
@@ -51,8 +52,10 @@ jobs:
           SESSION_OUT: ${{ runner.temp }}/session
         run: node scripts/sandbox-connect.ts
 
-      # Kräver en fine-grained token med behörigheten Secrets: Read and write för det här repot,
-      # sparad som SANDBOX_SECRETS_TOKEN i miljön "sandbox".
+      # Kräver en fine-grained token med bara behörigheten Secrets: Read and write för det här
+      # repot, sparad som SANDBOX_SECRETS_TOKEN i miljön "sandbox". Repo-secret i stället för
+      # miljö-secret, eftersom miljö-secrets kräver Environments: write, som också kan ändra
+      # skyddet på miljön production.
       - name: Spara sessionen som secret
         if: inputs.step == 'finish'
         env:
@@ -60,5 +63,5 @@ jobs:
           SESSION_FILE: ${{ runner.temp }}/session
         run: |
           echo "::add-mask::$(cat "$SESSION_FILE")"
-          gh secret set EB_SANDBOX_SESSION_ID --env sandbox --repo "$GITHUB_REPOSITORY" < "$SESSION_FILE"
+          gh secret set EB_SANDBOX_SESSION_ID --repo "$GITHUB_REPOSITORY" < "$SESSION_FILE"
           rm -f "$SESSION_FILE"
