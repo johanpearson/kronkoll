@@ -31,10 +31,22 @@ describe("normalisering av motpart (F-learn)", () => {
 });
 
 describe("mönster att lära sig", () => {
-  it("är första ordet i den normaliserade motparten", () => {
-    expect(learnPattern("ICA NARA SOFO")).toBe("ICA");
+  it("är hela den normaliserade motparten, inte bara första ordet", () => {
+    expect(learnPattern("ICA NARA SOFO")).toBe("ICA NARA SOFO");
+    expect(learnPattern("SWISH ANNA")).toBe("SWISH ANNA");
     expect(learnPattern("SL")).toBe("SL");
+  });
+
+  it("ger inget mönster för tom motpart", () => {
     expect(learnPattern("")).toBeNull();
+    expect(learnPattern("   ")).toBeNull();
+  });
+
+  it("slår inte ihop motparter som bara delar första ord", () => {
+    const pattern = learnPattern("SWISH ANNA");
+    expect(pattern).not.toBeNull();
+    expect(matchesWordPrefix(pattern ?? "", "SWISH ANNA")).toBe(true);
+    expect(matchesWordPrefix(pattern ?? "", "SWISH KALLE")).toBe(false);
   });
 });
 

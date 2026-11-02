@@ -3,7 +3,7 @@
  *
  * Prioritet: en manuellt satt kategori rörs aldrig (KK-18-C). Bland reglerna vinner en inlärd
  * över en mallregel, sedan exakt matchning före prefix före text i beskrivningen, sedan längre
- * mönster. "Gör alltid så" lär in en regel på motpartens första ord (KK-18-B).
+ * mönster. "Gör alltid så" lär in en regel på hela den normaliserade motparten (KK-18-B).
  */
 import { learnPattern, matchesWordPrefix } from "./normalize.ts";
 

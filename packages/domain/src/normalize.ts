@@ -26,10 +26,14 @@ export function normalizeCounterparty(raw: string): string {
   return tokens.join(" ");
 }
 
-/** Mönstret som lärs in när användaren väljer "Gör alltid så": första ordet, t.ex. "ICA". */
+/**
+ * Mönstret som lärs in när användaren väljer "Gör alltid så": hela den normaliserade motparten, t.ex.
+ * "ICA KVANTUM". Första ordet vore för brett ("SWISH", "MAX", "THE" slår ihop orelaterade motparter).
+ * Regeln används som ordprefix, se matchesWordPrefix.
+ */
 export function learnPattern(counterpartyNorm: string): string | null {
-  const first = counterpartyNorm.split(" ")[0] ?? "";
-  return first === "" ? null : first;
+  const pattern = counterpartyNorm.trim();
+  return pattern === "" ? null : pattern;
 }
 
 /** Sant om värdet börjar med mönstret som hela ord: "ICA" matchar "ICA KVANTUM" men inte "ICAROS". */
