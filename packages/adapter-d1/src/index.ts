@@ -12,3 +12,4 @@ export {
   type SyncRun,
 } from "./repositories.ts";
 export { transactionRepository } from "./transactions.ts";
+export { connectStateRepository, STATE_TTL_MINUTES } from "./connect-state.ts";

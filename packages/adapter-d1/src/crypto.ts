@@ -19,6 +19,8 @@ type Key = Awaited<ReturnType<typeof crypto.subtle.importKey>>;
 export interface Keys {
   readonly sessionKey: Key;
   readonly ibanKey: Key;
+  /** Signerar och verifierar engångs-state för bankflödet. */
+  readonly stateKey: Key;
 }
 
 function fromBase64(text: string): Uint8Array<ArrayBuffer> {
@@ -49,6 +51,10 @@ export async function deriveKeys(secretBase64: string): Promise<Keys> {
     ]),
     ibanKey: await crypto.subtle.deriveKey(hkdf("kronkoll/iban/v1"), master, { name: "HMAC", hash: "SHA-256", length: 256 }, false, [
       "sign",
+    ]),
+    stateKey: await crypto.subtle.deriveKey(hkdf("kronkoll/connect-state/v1"), master, { name: "HMAC", hash: "SHA-256", length: 256 }, false, [
+      "sign",
+      "verify",
     ]),
   };
 }

@@ -81,7 +81,26 @@ export const bankConnections = sqliteTable(
   ],
 );
 
-const ACCOUNT_TYPES = ["checking", "credit_card", "savings", "loan", "manual"] as const;
+/**
+ * Engångs-state för bankflödet (KK-29-A, T-S2). Bara id:t sparas, aldrig den signerade
+ * strängen. Raden är bunden till användaren och kopplingen och kan användas en gång.
+ */
+export const connectStates = sqliteTable(
+  "connect_states",
+  {
+    id: text("id").primaryKey(),
+    connectionId: text("connection_id")
+      .notNull()
+      .references(() => bankConnections.id, { onDelete: "cascade" }),
+    userId: text("user_id").notNull(),
+    expiresAt: text("expires_at").notNull(),
+    usedAt: text("used_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [index("connect_states_expires").on(t.expiresAt)],
+);
+
+const ACCOUNT_TYPES =["checking", "credit_card", "savings", "loan", "manual"] as const;
 
 export const accounts = sqliteTable(
   "accounts",
