@@ -2,12 +2,16 @@
 // Resten av webbskalet (tema, navigering, PWA, utloggning) kommer i egna PR:er.
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { Link, usePath } from "./router.tsx";
+import { TransactionsView } from "./transactions/TransactionsView.tsx";
 
 function Start() {
   return (
     <main>
       <h1>Kronkoll</h1>
       <p>Kommer snart.</p>
+      <p>
+        <Link to="/transaktioner">Transaktioner</Link>
+      </p>
       <p>
         <Link to="/koppla">Koppla bank</Link>
       </p>
@@ -31,6 +35,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/koppla": ConnectBank,
   "/koppla/samtycke": Consent,
   "/koppla/klar": ConnectDone,
+  "/transaktioner": TransactionsView,
 };
 
 export function App() {
