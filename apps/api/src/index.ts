@@ -2,7 +2,8 @@
 // men litar ändå inte på det: varje anrop kräver giltig Access-token (KK-2-B) och ändrande
 // anrop dessutom CSRF-skydd (KK-29-B).
 import { createEnableBankingProvider, createJwtSigner } from "@kronkoll/adapter-enablebanking";
-import type { BankDataProvider } from "@kronkoll/domain";
+import { syncRunRepository } from "@kronkoll/adapter-d1";
+import { manualSyncGate, type BankDataProvider } from "@kronkoll/domain";
 import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
@@ -31,8 +32,40 @@ async function databaseReachable(db: D1Database): Promise<boolean> {
   }
 }
 
-async function route(request: Request, env: Env): Promise<Response> {
+/** Det en route behöver utöver miljön: att kunna fortsätta efter svaret, och synkens beroenden. */
+export interface RouteContext {
+  readonly waitUntil: (promise: Promise<unknown>) => void;
+  readonly sync: SyncDeps;
+}
+
+/**
+ * Manuell synk (KK-7-C): högst en gång per 15 minuter, räknat från start av senaste manuella
+ * körningen. Synken körs i bakgrunden och svaret kommer direkt. Gränsen läses ur körningsloggen,
+ * så ett par anrop i exakt samma ögonblick kan båda slippa igenom. Det är acceptabelt för en
+ * enda användare, och knappen i appen stängs av medan synken pågår.
+ */
+async function manualSync(env: Env, context: RouteContext): Promise<Response> {
+  if (!env.SESSION_ENC_KEY || context.sync.providerFor() === null) return json({ error: "not_configured" }, 503);
+  let gate;
+  try {
+    gate = manualSyncGate(await syncRunRepository(env.DB).lastManualStartedAt(), context.sync.clock.now());
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
+  if (!gate.allowed) {
+    return json({ error: "too_soon", retry_after_s: gate.retryAfterSeconds }, 429, { "retry-after": String(gate.retryAfterSeconds) });
+  }
+  context.waitUntil(runSync(env, "manual", context.sync));
+  return json({ status: "started" }, 202);
+}
+
+async function route(request: Request, env: Env, context: RouteContext): Promise<Response> {
   const { pathname } = new URL(request.url);
+
+  if (pathname === "/api/sync") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return manualSync(env, context);
+  }
 
   if (pathname === "/api/health") {
     if (request.method !== "GET" && request.method !== "HEAD") {
@@ -46,8 +79,8 @@ async function route(request: Request, env: Env): Promise<Response> {
   return json({ error: "not_found" }, 404);
 }
 
-export async function handle(request: Request, env: Env, deps: GuardDeps): Promise<Response> {
-  return (await guard(request, env, deps)) ?? route(request, env);
+export async function handle(request: Request, env: Env, deps: GuardDeps, context: RouteContext): Promise<Response> {
+  return (await guard(request, env, deps)) ?? route(request, env, context);
 }
 
 const defaultDeps: GuardDeps = {
@@ -77,7 +110,8 @@ export function syncDeps(env: Env): SyncDeps {
 }
 
 export default {
-  fetch: (request, env) => handle(request, env, defaultDeps),
+  fetch: (request, env, ctx) =>
+    handle(request, env, defaultDeps, { waitUntil: ctx.waitUntil.bind(ctx), sync: syncDeps(env) }),
   // Cron Trigger "7 4,15 * * *" (UTC), två gånger per dygn (KK-7, D-sync).
   scheduled: (_controller, env, ctx) => {
     ctx.waitUntil(runSync(env, "cron", syncDeps(env)));
