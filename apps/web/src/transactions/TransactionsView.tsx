@@ -1,10 +1,11 @@
 // Transaktionslistan (#32, KK-4, KK-9, KK-30): en budgetperiod i taget, grupperad per dag, nyast
 // först. Bankens text renderas alltid som text, aldrig som HTML. Kategorin visas med namn, t.ex.
-// "Mat › Livsmedel" och kan bytas direkt i listan. Uppdelning kommer i en egen PR.
+// "Mat › Livsmedel". Kategorin kan bytas och transaktionen delas upp direkt i listan.
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson } from "../api.ts";
 import { CategoryEditor, type CategoryOption } from "./CategoryEditor.tsx";
+import { SplitEditor } from "./SplitEditor.tsx";
 
 interface Transaction {
   readonly id: string;
@@ -130,9 +131,11 @@ async function fetchCategories(): Promise<Categories> {
 function Row(props: {
   transaction: Transaction;
   categories: Categories;
-  editing: boolean;
-  onEdit: () => void;
+  /** Vad som är öppet på raden just nu, om något. */
+  mode: "category" | "split" | null;
+  onOpen: (mode: "category" | "split") => void;
   onSaved: (categoryId: string) => void;
+  onSplitSaved: (split: boolean) => void;
   onApplied: (updated: number) => void;
   onClose: () => void;
 }) {
@@ -150,12 +153,20 @@ function Row(props: {
     <li className={t.isInternalTransfer ? "internal" : undefined}>
       <span>{name}</span> <span>{formatSek(t.amountMinor)}</span>
       {notes.length > 0 && <small> · {notes.join(" · ")}</small>}{" "}
-      {!props.editing && (
-        <button type="button" aria-label={`Ändra kategori för ${name}`} onClick={props.onEdit}>
-          Ändra
-        </button>
+      {props.mode === null && (
+        <>
+          <button type="button" aria-label={`Ändra kategori för ${name}`} onClick={() => { props.onOpen("category"); }}>
+            Ändra
+          </button>{" "}
+          <button type="button" aria-label={`Dela upp ${name}`} onClick={() => { props.onOpen("split"); }}>
+            Dela upp
+          </button>
+        </>
       )}
-      {props.editing && (
+      {props.mode === "split" && (
+        <SplitEditor transactionId={t.id} amountMinor={t.amountMinor} options={categories.options} onSaved={props.onSplitSaved} onClose={props.onClose} />
+      )}
+      {props.mode === "category" && (
         <CategoryEditor
           transactionId={t.id}
           name={name}
@@ -174,7 +185,7 @@ export function TransactionsView() {
   const [search, setSearch] = useState("");
   const [state, setState] = useState<ListState>({ kind: "loading" });
   const [categories, setCategories] = useState<Categories>({ names: new Map(), options: [] });
-  const [editing, setEditing] = useState<string | null>(null);
+  const [editing, setEditing] = useState<{ id: string; mode: "category" | "split" } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
@@ -207,8 +218,8 @@ export function TransactionsView() {
   }, [filters, state]);
 
   const period = state.kind === "ready" ? state.period : null;
-  const markSaved = (id: string, categoryId: string) => {
-    if (state.kind === "ready") setState({ ...state, items: state.items.map((t) => (t.id === id ? { ...t, categoryId } : t)) });
+  const update = (id: string, change: Partial<Transaction>) => {
+    if (state.kind === "ready") setState({ ...state, items: state.items.map((t) => (t.id === id ? { ...t, ...change } : t)) });
   };
   // Hämtar om samma period, så att transaktioner som regeln ändrade visar sin nya kategori.
   const applied = (updated: number) => {
@@ -264,9 +275,10 @@ export function TransactionsView() {
                     key={t.id}
                     transaction={t}
                     categories={categories}
-                    editing={editing === t.id}
-                    onEdit={() => { setEditing(t.id); }}
-                    onSaved={(categoryId) => { markSaved(t.id, categoryId); }}
+                    mode={editing?.id === t.id ? editing.mode : null}
+                    onOpen={(mode) => { setEditing({ id: t.id, mode }); }}
+                    onSaved={(categoryId) => { update(t.id, { categoryId }); }}
+                    onSplitSaved={(split) => { update(t.id, { split }); }}
                     onApplied={applied}
                     onClose={() => { setEditing(null); }}
                   />
