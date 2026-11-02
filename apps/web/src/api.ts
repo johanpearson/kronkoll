@@ -10,14 +10,23 @@ export const TIMEOUT_MS = 20_000;
  * POST med JSON. Ett nätverksfel eller ett anrop som tar längre än tidsgränsen ger status 0,
  * så att anroparen alltid får ett svar att visa.
  */
-export async function postJson(path: string, body: unknown, timeoutMs = TIMEOUT_MS): Promise<ApiResult> {
+export function postJson(path: string, body: unknown, timeoutMs = TIMEOUT_MS): Promise<ApiResult> {
+  return sendJson("POST", path, body, timeoutMs);
+}
+
+/** PATCH med JSON, likadant som postJson. */
+export function patchJson(path: string, body: unknown, timeoutMs = TIMEOUT_MS): Promise<ApiResult> {
+  return sendJson("PATCH", path, body, timeoutMs);
+}
+
+async function sendJson(method: "POST" | "PATCH", path: string, body: unknown, timeoutMs: number): Promise<ApiResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
   }, timeoutMs);
   try {
     const response = await fetch(path, {
-      method: "POST",
+      method,
       credentials: "same-origin",
       headers: { "content-type": "application/json", "x-kronkoll": "1" },
       body: JSON.stringify(body),
