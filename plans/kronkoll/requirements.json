@@ -683,6 +683,29 @@
           "text": "Lånvyn visar per lån kvarvarande skuld, ränta, bindningstid, amortering och månadskostnad, samt total skuld och total månadskostnad. Ett lån vars bindningstid går ut inom 60 dagar markeras med både färg och text."
         }
       ]
+    },
+    {
+      "id": "KK-37",
+      "title": "Egna namn på konton",
+      "normative_strength": "should",
+      "statement": "Användaren kan ge varje konto ett eget namn, till exempel Privat kort, Gemensamt kort, Buffert eller Sparkonto, och det namnet visas överallt där kontot syns. (Motiv: Bankens namn är ofta lika för flera konton; hos Skandia har alla fyra konton samma typ. Ägarens önskemål 2026-11-02.)",
+      "verification_note": "Integrationstester av API:t mot lokal D1 (sätta, ta bort, behålla vid synk); komponenttest av inställningssidan.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-37-A",
+          "text": "Under Inställningar kan varje konto få ett eget namn på högst 40 tecken. Ett tomt namn tar bort det egna namnet, och då visas bankens maskerade namn igen."
+        },
+        {
+          "id": "KK-37-B",
+          "given": "kontot Privatkonto ••4821 har fått namnet Privat kort",
+          "when": "synken körs eller banken kopplas om",
+          "then": "heter kontot fortfarande Privat kort, och bankens maskerade namn visas som komplement"
+        },
+        {
+          "id": "KK-37-C",
+          "text": "Det egna namnet är användarens text och renderas alltid som text, aldrig som HTML (som KK-30-A)."
+        }
+      ]
     }
   ]
 }

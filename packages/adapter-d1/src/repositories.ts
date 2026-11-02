@@ -7,7 +7,7 @@
  */
 import type { D1Database } from "@cloudflare/workers-types";
 import { assertMinor, nextConsecutiveFailures, type SyncRunSummary } from "@kronkoll/domain";
-import { and, eq, max } from "drizzle-orm";
+import { and, asc, eq, max } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { decryptSessionId, encryptSessionId, hashIban, maskAccountName, type Keys } from "./crypto.ts";
 import { accounts, bankConnections, settings, syncRuns } from "./schema.ts";
@@ -143,6 +143,37 @@ export interface BankAccountInput {
   readonly name: string;
   readonly type: (typeof accounts.$inferSelect)["type"];
   readonly balanceMinor: number | null;
+}
+
+export interface NamedAccount {
+  readonly id: string;
+  /** Användarens eget namn, eller null om kontot heter som hos banken. */
+  readonly nickname: string | null;
+  /** Bankens maskerade namn, t.ex. "Privatkonto ••4821". */
+  readonly bankName: string;
+  readonly bank: string | null;
+  readonly type: (typeof accounts.$inferSelect)["type"];
+}
+
+/** Egna kontonamn (KK-37). Behöver inga nycklar, eftersom inget krypterat läses eller skrivs. */
+export function accountNameRepository(d1: D1Database) {
+  const db = drizzle(d1);
+  return {
+    /** Kontona med eget namn, bankens maskerade namn och bankens namn, för Inställningar. */
+    async list(): Promise<NamedAccount[]> {
+      return db
+        .select({ id: accounts.id, nickname: accounts.nickname, bankName: accounts.displayName, bank: bankConnections.aspspName, type: accounts.type })
+        .from(accounts)
+        .innerJoin(bankConnections, eq(bankConnections.id, accounts.connectionId))
+        .orderBy(asc(accounts.displayName), asc(accounts.id))
+        .all();
+    },
+    /** Sätter kontots egna namn, eller tar bort det med null. Falskt om kontot inte finns. */
+    async set(accountId: string, nickname: string | null): Promise<boolean> {
+      const updated = await db.update(accounts).set({ nickname }).where(eq(accounts.id, accountId)).returning({ id: accounts.id }).all();
+      return updated.length > 0;
+    },
+  };
 }
 
 export function accountRepository(d1: D1Database, keys: Keys) {

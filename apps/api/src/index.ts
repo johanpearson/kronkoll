@@ -6,6 +6,7 @@ import { syncRunRepository } from "@kronkoll/adapter-d1";
 import { manualSyncGate, type BankConnector, type BankDataProvider } from "@kronkoll/domain";
 import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
+import { listAccounts, patchAccount } from "./accounts.ts";
 import { getBudget, putBudget } from "./budget.ts";
 import { listCategories } from "./categories.ts";
 import { applyRule, setCategory } from "./set-category.ts";
@@ -104,6 +105,17 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     if (request.method === "GET") return getBudget(env, budgetMatch[1], context.sync);
     if (request.method === "PUT") return putBudget(request, env, budgetMatch[1], context.sync);
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, PUT" });
+  }
+
+  const accountMatch = /^\/api\/accounts\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (accountMatch?.[1]) {
+    if (request.method !== "PATCH") return json({ error: "method_not_allowed" }, 405, { allow: "PATCH" });
+    return patchAccount(request, env, accountMatch[1]);
+  }
+
+  if (pathname === "/api/accounts") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return listAccounts(env);
   }
 
   if (pathname === "/api/categories") {

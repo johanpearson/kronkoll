@@ -23,6 +23,9 @@ import { and, desc, eq, gte, inArray, isNull, lt, lte, max, ne, or, sql } from "
 import { drizzle } from "drizzle-orm/d1";
 import { accounts, transactions } from "./schema.ts";
 
+/** Kontots namn som det visas: användarens eget namn, annars bankens maskerade (KK-37). */
+const accountName = sql<string>`coalesce(${accounts.nickname}, ${accounts.displayName})`;
+
 type Row = typeof transactions.$inferSelect;
 
 export interface TransactionListQuery {
@@ -315,7 +318,7 @@ export function transactionRepository(d1: D1Database) {
         .select({
           id: transactions.id,
           accountId: accounts.id,
-          accountName: accounts.displayName,
+          accountName,
           accountType: accounts.type,
           status: transactions.status,
           transactionDate: transactions.transactionDate,
@@ -339,7 +342,7 @@ export function transactionRepository(d1: D1Database) {
         row.pairId === null
           ? []
           : await db
-              .select({ id: transactions.id, accountName: accounts.displayName, amountMinor: transactions.amountMinor, transactionDate: transactions.transactionDate })
+              .select({ id: transactions.id, accountName, amountMinor: transactions.amountMinor, transactionDate: transactions.transactionDate })
               .from(transactions)
               .innerJoin(accounts, eq(accounts.id, transactions.accountId))
               .where(eq(transactions.id, row.pairId))
