@@ -4,6 +4,8 @@ export default defineConfig({
   test: {
     // Gränssnittstesterna väljer själva jsdom med en kommentar överst i filen.
     include: ["functions/**/*.test.ts", "server/**/*.test.ts", "src/**/*.test.ts", "src/**/*.test.tsx"],
+    // Kontrasttestet läser tokens.css som text. Utan detta ger vitest en tom sträng för CSS.
+    css: { include: [/tokens\.css/u] },
     coverage: {
       provider: "v8",
       include: ["functions/**/*.ts", "server/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
