@@ -92,6 +92,46 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
     expect(await repo.setManualTransfer("borta", true)).toBe(false);
   });
 
+  it("detaljen för en transaktion har kontots namn och motposten för en överföring", async () => {
+    const repo = transactionRepository(db);
+    await repo.setTransfers([
+      { id: "ut", internal: true, pairId: "in" },
+      { id: "in", internal: true, pairId: "ut" },
+    ]);
+    expect(await repo.detail("ut")).toEqual({
+      id: "ut",
+      accountId: "acc_budget",
+      accountName: "Budget",
+      accountType: "checking",
+      status: "booked",
+      transactionDate: "2026-11-02",
+      bookingDate: null,
+      amountMinor: -500000,
+      counterparty: "SPARKONTO",
+      counterpartyNorm: "SPARKONTO",
+      description: "",
+      categoryId: null,
+      categorySource: "none",
+      isInternalTransfer: true,
+      manualTransfer: null,
+      transferPair: { id: "in", accountName: "Spar", amountMinor: 500000, transactionDate: "2026-11-02" },
+    });
+  });
+
+  it("detaljen för en preliminär utan motpost, och null för en borttagen eller okänd", async () => {
+    const repo = transactionRepository(db);
+    await db.prepare(`UPDATE transactions SET status = 'pending' WHERE id = 'kop'`).run();
+    expect(await repo.detail("kop")).toMatchObject({ status: "pending", transferPair: null });
+    expect(await repo.detail("borta")).toBeNull();
+    expect(await repo.detail("saknas")).toBeNull();
+  });
+
+  it("ett lånekonto paras som ett sparkonto", async () => {
+    await db.prepare(`UPDATE accounts SET type = 'loan' WHERE id = 'acc_spar'`).run();
+    expect((await transactionRepository(db).ownAccounts()).find((a) => a.id === "acc_spar")).toEqual({ id: "acc_spar", type: "savings" });
+    await db.prepare(`UPDATE accounts SET type = 'savings' WHERE id = 'acc_spar'`).run();
+  });
+
   it("ger de egna kontona med typ utan att behöva nycklar", async () => {
     expect((await transactionRepository(db).ownAccounts()).sort((a, b) => a.id.localeCompare(b.id))).toEqual([
       { id: "acc_budget", type: "checking" },
