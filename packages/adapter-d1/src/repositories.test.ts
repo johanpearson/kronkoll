@@ -1,7 +1,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
+import type { SyncRunSummary } from "@kronkoll/domain";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { deriveKeys, type Keys } from "./crypto.ts";
-import { accountRepository, connectionRepository, settingsRepository } from "./repositories.ts";
+import { accountRepository, connectionRepository, settingsRepository, syncRunRepository } from "./repositories.ts";
 import { migratedDb, randomSecret } from "./test-support.ts";
 
 let db: D1Database;
@@ -84,6 +85,90 @@ describe("konton", () => {
     const repo = accountRepository(db, keys);
     const id = await repo.upsertFromBank({ connectionId: "c3", providerUid: "card-1", iban: null, name: "Visa", type: "credit_card", balanceMinor: -320000 }, newId);
     expect((await repo.list()).find((a) => a.id === id)).toMatchObject({ displayName: "Visa", ibanHash: null });
+  });
+});
+
+describe("körningslogg (KK-7-A, KK-7-B)", () => {
+  const summary = (overrides: Partial<SyncRunSummary> = {}): SyncRunSummary => ({
+    status: "ok",
+    newCount: 0,
+    updatedCount: 0,
+    errorCode: null,
+    ...overrides,
+  });
+
+  it("sparar en körning som pågående och sedan resultatet utan bankdata", async () => {
+    const repo = syncRunRepository(db);
+    await repo.start({ id: "run-1", connectionId: "c1", kind: "cron", startedAt: "2026-11-02T04:07:00.000Z" });
+    expect(await repo.get("run-1")).toMatchObject({ status: "running", finishedAt: null, newCount: 0, errorCode: null });
+
+    await repo.finish("run-1", "2026-11-02T04:07:03.000Z", summary({ status: "partial", newCount: 4, updatedCount: 2, errorCode: "EB_429" }));
+    expect(await repo.get("run-1")).toEqual({
+      id: "run-1",
+      connectionId: "c1",
+      kind: "cron",
+      startedAt: "2026-11-02T04:07:00.000Z",
+      finishedAt: "2026-11-02T04:07:03.000Z",
+      status: "partial",
+      newCount: 4,
+      updatedCount: 2,
+      errorCode: "EB_429",
+    });
+  });
+
+  it("returnerar null för en körning som inte finns", async () => {
+    expect(await syncRunRepository(db).get("saknas")).toBeNull();
+  });
+
+  it("avvisar en felkod som kan innehålla bankens text", async () => {
+    const repo = syncRunRepository(db);
+    await repo.start({ id: "run-2", connectionId: "c1", kind: "cron", startedAt: "2026-11-02T04:07:00.000Z" });
+    await expect(repo.finish("run-2", "2026-11-02T04:07:01.000Z", summary({ status: "failed", errorCode: "Bank says: no" }))).rejects.toThrow();
+  });
+
+  it("ger starttiden för senaste manuella körningen, och null när ingen finns", async () => {
+    const repo = syncRunRepository(db);
+    expect(await repo.lastManualStartedAt()).toBeNull();
+    await repo.start({ id: "run-m1", connectionId: "c1", kind: "manual", startedAt: "2026-11-02T08:00:00.000Z" });
+    await repo.start({ id: "run-m2", connectionId: "c1", kind: "manual", startedAt: "2026-11-02T09:30:00.000Z" });
+    await repo.start({ id: "run-c3", connectionId: "c1", kind: "cron", startedAt: "2026-11-02T15:07:00.000Z" });
+    expect(await repo.lastManualStartedAt()).toEqual(new Date("2026-11-02T09:30:00.000Z"));
+  });
+});
+
+describe("kopplingens synkstatus (KK-7-A, KK-7-B)", () => {
+  async function failureCount(id: string) {
+    const row = await db.prepare(`SELECT consecutive_failures AS n, last_success_at AS at FROM bank_connections WHERE id = ?`).bind(id).first<{ n: number; at: string | null }>();
+    return row;
+  }
+
+  it("sparar tidpunkten för senaste lyckade synk och nollställer felräknaren", async () => {
+    const repo = connectionRepository(db, keys);
+    await repo.create({ id: "c4", provider: "enablebanking", aspspName: "Skandia" });
+    expect(await repo.recordSyncOutcome("c4", "failed", "2026-11-02T04:07:00.000Z")).toBe(1);
+    expect(await repo.recordSyncOutcome("c4", "ok", "2026-11-02T15:07:00.000Z")).toBe(0);
+    expect(await failureCount("c4")).toEqual({ n: 0, at: "2026-11-02T15:07:00.000Z" });
+  });
+
+  it("räknar misslyckade körningar i rad utan att röra senaste lyckade tidpunkt", async () => {
+    const repo = connectionRepository(db, keys);
+    await repo.create({ id: "c5", provider: "enablebanking", aspspName: "Skandia" });
+    await repo.recordSyncOutcome("c5", "ok", "2026-11-01T15:07:00.000Z");
+    await repo.recordSyncOutcome("c5", "failed", "2026-11-02T04:07:00.000Z");
+    expect(await repo.recordSyncOutcome("c5", "failed", "2026-11-02T15:07:00.000Z")).toBe(2);
+    expect(await failureCount("c5")).toEqual({ n: 2, at: "2026-11-01T15:07:00.000Z" });
+  });
+
+  it("en delvis lyckad körning nollställer felräknaren men räknas inte som lyckad synk", async () => {
+    const repo = connectionRepository(db, keys);
+    await repo.create({ id: "c6", provider: "enablebanking", aspspName: "Skandia" });
+    await repo.recordSyncOutcome("c6", "failed", "2026-11-02T04:07:00.000Z");
+    expect(await repo.recordSyncOutcome("c6", "partial", "2026-11-02T15:07:00.000Z")).toBe(0);
+    expect(await failureCount("c6")).toEqual({ n: 0, at: null });
+  });
+
+  it("kastar för en koppling som inte finns", async () => {
+    await expect(connectionRepository(db, keys).recordSyncOutcome("saknas", "ok", "2026-11-02T04:07:00.000Z")).rejects.toThrow();
   });
 });
 
