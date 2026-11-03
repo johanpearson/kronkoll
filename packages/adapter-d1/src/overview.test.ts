@@ -37,10 +37,10 @@ describe("översikten i D1 (KK-17)", () => {
     );
   });
 
-  it("ger kopplingarnas bank, status, samtyckets slut och senaste lyckade synk", async () => {
+  it("ger kopplingarnas bank, status, samtyckets slut, senaste lyckade synk, fel i rad och antal konton", async () => {
     expect(await overviewRepository(db).connections()).toEqual([
-      { bank: "Skandia", status: "active", consentExpiresOn: "2027-05-01", lastSuccessAt: "2026-11-02T05:02:11.000Z" },
-      { bank: "SBAB", status: "pending_auth", consentExpiresOn: null, lastSuccessAt: null },
+      { id: "c1", bank: "Skandia", status: "active", consentExpiresOn: "2027-05-01", lastSuccessAt: "2026-11-02T05:02:11.000Z", consecutiveFailures: 0, accountCount: 3 },
+      { id: "c2", bank: "SBAB", status: "pending_auth", consentExpiresOn: null, lastSuccessAt: null, consecutiveFailures: 0, accountCount: 0 },
     ]);
   });
 });

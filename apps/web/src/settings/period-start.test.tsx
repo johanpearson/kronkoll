@@ -26,7 +26,7 @@ function api(get: [number, unknown] = [200, CALENDAR], patch: [number, unknown] 
         return json(...patch);
       }
       if (url.pathname === "/api/settings") return json(...get);
-      if (url.pathname === "/api/accounts") return json(200, { items: [] });
+      if (url.pathname === "/api/accounts" || url.pathname === "/api/connections") return json(200, { items: [] });
       return json(404, { error: "not_found" });
     }),
   );
