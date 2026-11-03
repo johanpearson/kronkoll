@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  applyAllRules,
   applyRules,
   ruleReach,
   categorize,
   learnFromManualChoice,
   patternChoices,
   ruleHits,
+  ruleMatches,
   type CategorizableTransaction,
   type CategoryRule,
 } from "./categorize.ts";
@@ -284,5 +286,49 @@ describe("hur många transaktioner varje regel träffar (KK-18)", () => {
 
   it("en regel utan träffar finns inte i resultatet", () => {
     expect(ruleHits([tx({ id: "a", counterpartyNorm: "SL" })], [ica]).get("r-ica")).toBeUndefined();
+  });
+});
+
+describe("förhandsvisning av en regel (KK-18-B, KK-18-C)", () => {
+  const ikea: CategoryRule = { id: "r-ikea", match: "counterparty_prefix", pattern: "IKEA", categoryId: "hushall", source: "learned" };
+  const history = [
+    tx({ id: "ny", counterpartyNorm: "IKEA KARLSTAD" }),
+    tx({ id: "redan", counterpartyNorm: "IKEA KUNGENS KURVA", categoryId: "hushall", categorySource: "learned" }),
+    tx({ id: "manuell", counterpartyNorm: "IKEA BARKARBY", categoryId: "fritid", categorySource: "manual" }),
+    tx({ id: "annan", counterpartyNorm: "SL" }),
+  ];
+
+  it("listar de transaktioner regeln gäller och vad som händer med var och en", () => {
+    expect(ruleMatches(history, [ikea], "r-ikea")).toEqual([
+      { id: "ny", effect: "change" },
+      { id: "redan", effect: "unchanged" },
+      { id: "manuell", effect: "manual" },
+    ]);
+  });
+
+  it("räknar inte transaktioner där en annan regel vinner", () => {
+    const kungens: CategoryRule = { ...ikea, id: "r-kungens", pattern: "IKEA KUNGENS KURVA", categoryId: "mobler" };
+    expect(ruleMatches(history, [ikea, kungens], "r-ikea").map((m) => m.id)).toEqual(["ny", "manuell"]);
+  });
+});
+
+describe("applicera alla regler (KK-18-C)", () => {
+  const ica: CategoryRule = { id: "r-ica", match: "counterparty_prefix", pattern: "ICA", categoryId: "mat", source: "template" };
+
+  it("ger nya kategorier enligt reglerna, men rör aldrig manuella och tar aldrig bort en kategori", () => {
+    const changes = applyAllRules(
+      [
+        tx({ id: "a" }),
+        tx({ id: "b", categoryId: "fel", categorySource: "learned" }),
+        tx({ id: "c", categoryId: "hushall", categorySource: "manual" }),
+        tx({ id: "d", counterpartyNorm: "SL", categoryId: "transport", categorySource: "learned" }),
+        tx({ id: "e", categoryId: "mat", categorySource: "template" }),
+      ],
+      [ica],
+    );
+    expect(changes).toEqual([
+      { id: "a", categoryId: "mat", categorySource: "template" },
+      { id: "b", categoryId: "mat", categorySource: "template" },
+    ]);
   });
 });

@@ -114,6 +114,21 @@ describe("manuell kategori och inlärda regler (KK-18-B, KK-18-C)", () => {
     expect((await transactionRepository(db).categorizable()).map((t) => t.id).sort()).toEqual(["t1", "t2", "t3"]);
   });
 
+  it("ger samma transaktioner med datum, belopp och motpart för förhandsvisningen", async () => {
+    const rows = await transactionRepository(db).forRulePreview();
+    expect(rows.map((t) => t.id)).toEqual(["t3", "t2", "t1"]);
+    expect(rows.find((t) => t.id === "t1")).toEqual({
+      id: "t1",
+      counterpartyNorm: "ICA NARA",
+      description: "Kortköp",
+      categoryId: null,
+      categorySource: "none",
+      transactionDate: "2026-11-02",
+      amountMinor: -100,
+      counterparty: "ICA NARA",
+    });
+  });
+
   it("sätter en manuell kategori, även på en som redan är manuell", async () => {
     const repo = transactionRepository(db);
     await repo.setManualCategory("t1", "mat-livsmedel");

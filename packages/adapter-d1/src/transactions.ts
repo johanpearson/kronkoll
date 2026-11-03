@@ -267,6 +267,28 @@ export function transactionRepository(d1: D1Database) {
         .all();
     },
 
+    /**
+     * Som `categorizable`, men med datum, belopp och bankens text, för att förhandsvisa vilka transaktioner
+     * en regel gäller. Nyast först.
+     */
+    async forRulePreview(): Promise<(CategorizableTransaction & { transactionDate: string; amountMinor: number; counterparty: string })[]> {
+      return db
+        .select({
+          id: transactions.id,
+          counterpartyNorm: transactions.counterpartyNorm,
+          description: transactions.description,
+          categoryId: transactions.categoryId,
+          categorySource: transactions.categorySource,
+          transactionDate: transactions.transactionDate,
+          amountMinor: transactions.amountMinor,
+          counterparty: transactions.counterparty,
+        })
+        .from(transactions)
+        .where(ne(transactions.status, "removed"))
+        .orderBy(desc(transactions.transactionDate), desc(transactions.id))
+        .all();
+    },
+
     /** Användaren väljer kategori. Den markeras som manuell och rörs sedan aldrig av regler (KK-18-C). */
     async setManualCategory(id: string, categoryId: string): Promise<void> {
       await db.update(transactions).set({ categoryId, categorySource: "manual" }).where(eq(transactions.id, id));
