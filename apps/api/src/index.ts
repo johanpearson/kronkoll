@@ -8,7 +8,7 @@ import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
 import { listAccounts, patchAccount } from "./accounts.ts";
 import { getBudget, putBudget } from "./budget.ts";
-import { listCategories } from "./categories.ts";
+import { createCategory, listCategories, mergeCategory, patchCategory } from "./categories.ts";
 import { listConnections } from "./connection-list.ts";
 import { getOverview } from "./overview.ts";
 import { getSettings, patchSettings } from "./settings.ts";
@@ -135,8 +135,21 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   }
 
   if (pathname === "/api/categories") {
-    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
-    return listCategories(env);
+    if (request.method === "GET") return listCategories(env);
+    if (request.method === "POST") return createCategory(request, env, context.sync);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
+  }
+
+  const mergeMatch = /^\/api\/categories\/([A-Za-z0-9_-]{1,64})\/merge$/u.exec(pathname);
+  if (mergeMatch?.[1]) {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return mergeCategory(request, env, mergeMatch[1]);
+  }
+
+  const categoryMatch = /^\/api\/categories\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (categoryMatch?.[1]) {
+    if (request.method !== "PATCH") return json({ error: "method_not_allowed" }, 405, { allow: "PATCH" });
+    return patchCategory(request, env, categoryMatch[1]);
   }
 
   if (pathname === "/api/transactions") {
