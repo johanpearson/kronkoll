@@ -4,9 +4,10 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev --port 8787",
-    "typecheck": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json && tsc -p integration/tsconfig.json",
     "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
     "@kronkoll/adapter-access": "workspace:*",
@@ -16,6 +17,7 @@
     "@kronkoll/logging": "workspace:*"
   },
   "devDependencies": {
+    "@cloudflare/vitest-plugin": "1.5.1",
     "@cloudflare/workers-types": "5.20261016.1",
     "@vitest/coverage-v8": "5.0.5",
     "vitest": "5.0.5"

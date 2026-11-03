@@ -227,10 +227,27 @@ jobs:
           retention-days: 14
           if-no-files-found: ignore
 
+  # Den riktiga API-workern i workerd med en migrerad lokal D1 (KK-16, V-i-access).
+  integration:
+    name: integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Integrationstester i Workers-miljön (vitest-plugin, Worker + D1)
+        run: pnpm --filter @kronkoll/api test:integration
+
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [secret-scan, workflow-lint, pr-size, pr-description, lint, typecheck, unit, architecture, mutation]
+    needs: [secret-scan, workflow-lint, pr-size, pr-description, lint, typecheck, unit, architecture, mutation, integration]
     runs-on: ubuntu-latest
     steps:
       - name: Alla grindar gröna?

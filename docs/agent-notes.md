@@ -39,6 +39,16 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Överlevande mutanter dödas med tester, inte med `// Stryker disable`. Felmeddelanden testas med texten,
   t.ex. `toThrow("Ogiltigt belopp")`, inte bara `toThrow(RangeError)`.
 
+## Integrationstester (Workers-miljön)
+
+- `pnpm --filter @kronkoll/api test:integration` kör den riktiga API-workern i workerd med en migrerad lokal D1
+  (`apps/api/integration/`, `vitest.integration.config.ts`). Är en egen grind i CI (`integration`).
+- `@cloudflare/vitest-pool-workers` stöder inte Vitest 5. Paketet har bytt namn till `@cloudflare/vitest-plugin`
+  med samma API. Använd det.
+- `cloudflare:test` och `cloudflare:workers` finns bara i runtime. De är tillagda som `builtInModules` i
+  `.dependency-cruiser.json`, annars faller `pnpm architecture`.
+- Workern körs i samma isolat som testerna, så `vi.spyOn(globalThis, "fetch")` stubbar även workerns anrop.
+
 ## Cloudflare och D1: gränser som har orsakat riktiga fel
 
 - **CPU-tid:** Workern får runt 10 ms CPU per anrop på gratisnivån. Gör dyra steg (normalisering av
@@ -73,6 +83,8 @@ pnpm --filter @kronkoll/<paket> test:coverage
 
 - Heredocs och `sed` med backslash eller `'` i SQL har gått sönder flera gånger, bland annat ett regex som
   tappade sina `\d`. Använd redigeringsverktyget för kod med backslash, och läs tillbaka raden efteråt.
+- Windows PowerShell 5: `Get-Content`/`Set-Content` utan `-Encoding` förstör å, ä och ö i UTF-8-filer, och
+  `-Encoding utf8` lägger till BOM. Använd redigeringsverktyget.
 
 ## Öppna trådar
 
@@ -80,5 +92,5 @@ pnpm --filter @kronkoll/<paket> test:coverage
   nytt konto. Matcha på namn och typ inom kopplingen om det händer.
 - "Bara okategoriserade" i Transaktioner visar även okategoriserade insättningar, medan budgetens belopp bara
   räknar utbetalningar (#153).
-- Kvar i M1: #35 (mutationstest klart, kvar: integrationstester i Workers-miljö och E2E), #29 (CSV-import,
+- Kvar i M1: #35 (mutationstest och integrationstester klara, kvar: E2E), #29 (CSV-import,
   kanske stryks) och #24 (avsluta spiken).

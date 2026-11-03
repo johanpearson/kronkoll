@@ -71,6 +71,12 @@
     }
   ],
   "options": {
+    "builtInModules": {
+      "add": [
+        "cloudflare:test",
+        "cloudflare:workers"
+      ]
+    },
     "doNotFollow": {
       "path": "node_modules"
     },
