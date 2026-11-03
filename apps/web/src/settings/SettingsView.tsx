@@ -1,8 +1,9 @@
-// Inställningar (#34, KK-26-A, KK-34, KK-35, KK-37): bankkopplingarna och att koppla en bank, egna
-// kontonamn, budgetperiodens startdag, utseende, och logga ut och rensa enheten. Kategorier och regler
-// kommer i senare steg av #34.
+// Inställningar (#34, KK-18-A, KK-26-A, KK-34, KK-35, KK-37): bankkopplingarna och att koppla en bank,
+// egna kontonamn, budgetperiodens startdag, länk till kategorierna, utseende, och logga ut och rensa
+// enheten. Regellistan kommer i ett senare steg av #34.
 import { useState } from "react";
 import { browser } from "../browser.ts";
+import { Link } from "../router.tsx";
 import { setTheme, storedTheme, type Theme } from "../theme.ts";
 import { AccountNames } from "./AccountNames.tsx";
 import { Connections } from "./Connections.tsx";
@@ -42,6 +43,9 @@ export function SettingsView() {
       <h2>Budget</h2>
       <section className="card">
         <PeriodStart />
+      </section>
+      <section className="card">
+        <Link to="/installningar/kategorier">Kategorier</Link>
       </section>
       <h2 id="theme-heading">Utseende</h2>
       <section className="card">

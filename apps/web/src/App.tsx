@@ -5,6 +5,7 @@ import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
 import { Link, usePath } from "./router.tsx";
+import { CategoriesView } from "./settings/CategoriesView.tsx";
 import { SettingsView } from "./settings/SettingsView.tsx";
 import { TransactionDetail } from "./transactions/TransactionDetail.tsx";
 import { TransactionsView } from "./transactions/TransactionsView.tsx";
@@ -25,6 +26,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/transaktioner": TransactionsView,
   "/budget": BudgetView,
   "/installningar": SettingsView,
+  "/installningar/kategorier": CategoriesView,
   "/koppla": ConnectBank,
   "/koppla/samtycke": Consent,
   "/koppla/klar": ConnectDone,
@@ -35,7 +37,7 @@ const TABS = [
   { to: "/", label: "Översikt", Icon: House, owns: (path: string) => path === "/" },
   { to: "/transaktioner", label: "Transaktioner", Icon: ReceiptText, owns: (path: string) => path === "/transaktioner" || path.startsWith("/transaktioner/") },
   { to: "/budget", label: "Budget", Icon: PiggyBank, owns: (path: string) => path === "/budget" },
-  { to: "/installningar", label: "Inställningar", Icon: Settings, owns: (path: string) => path === "/installningar" || path.startsWith("/koppla") },
+  { to: "/installningar", label: "Inställningar", Icon: Settings, owns: (path: string) => path === "/installningar" || path.startsWith("/installningar/") || path.startsWith("/koppla") },
 ];
 
 /** /transaktioner/{id}: detaljsidan för en transaktion. */
