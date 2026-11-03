@@ -3,19 +3,11 @@
 import { House, PiggyBank, ReceiptText, Settings } from "lucide-react";
 import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
+import { OverviewView } from "./overview/OverviewView.tsx";
 import { Link, usePath } from "./router.tsx";
 import { SettingsView } from "./settings/SettingsView.tsx";
 import { TransactionDetail } from "./transactions/TransactionDetail.tsx";
 import { TransactionsView } from "./transactions/TransactionsView.tsx";
-
-function Overview() {
-  return (
-    <main>
-      <h1>Översikt</h1>
-      <p>Översikten kommer snart.</p>
-    </main>
-  );
-}
 
 function NotFound() {
   return (
@@ -29,7 +21,7 @@ function NotFound() {
 }
 
 const ROUTES: Record<string, () => React.JSX.Element> = {
-  "/": Overview,
+  "/": OverviewView,
   "/transaktioner": TransactionsView,
   "/budget": BudgetView,
   "/installningar": SettingsView,
