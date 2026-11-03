@@ -5,6 +5,7 @@ import {
   categorize,
   learnFromManualChoice,
   patternChoices,
+  ruleHits,
   type CategorizableTransaction,
   type CategoryRule,
 } from "./categorize.ts";
@@ -261,5 +262,27 @@ describe("en regels effekt bakåt (KK-18-B, KK-18-C)", () => {
 
   it("en regel som inte finns ger ingen effekt", () => {
     expect(ruleReach(history, [learned], "saknas")).toEqual({ changes: [], protectedManual: 0 });
+  });
+});
+
+describe("hur många transaktioner varje regel träffar (KK-18)", () => {
+  const ica: CategoryRule = { id: "r-ica", match: "counterparty_prefix", pattern: "ICA", categoryId: "mat", source: "template" };
+  const nara: CategoryRule = { id: "r-nara", match: "counterparty_prefix", pattern: "ICA NARA SOFO", categoryId: "fika", source: "learned" };
+
+  it("räknar bara där regeln vinner, och manuellt valda räknas med", () => {
+    const hits = ruleHits(
+      [
+        tx({ id: "a" }),
+        tx({ id: "b", counterpartyNorm: "ICA KVANTUM" }),
+        tx({ id: "c", categoryId: "hushall", categorySource: "manual" }),
+        tx({ id: "d", counterpartyNorm: "SL" }),
+      ],
+      [ica, nara],
+    );
+    expect(hits).toEqual(new Map([["r-nara", 2], ["r-ica", 1]]));
+  });
+
+  it("en regel utan träffar finns inte i resultatet", () => {
+    expect(ruleHits([tx({ id: "a", counterpartyNorm: "SL" })], [ica]).get("r-ica")).toBeUndefined();
   });
 });

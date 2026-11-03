@@ -180,3 +180,17 @@ export function ruleReach(transactions: readonly CategorizableTransaction[], rul
   }
   return { changes, protectedManual };
 }
+
+/**
+ * Hur många transaktioner varje regel träffar, för regellistan: där regeln är den som vinner, med
+ * manuellt valda inräknade (de visar vad regeln skulle ge, även om de aldrig ändras). Regler utan träffar
+ * saknas i resultatet.
+ */
+export function ruleHits(transactions: readonly CategorizableTransaction[], rules: readonly CategoryRule[]): Map<string, number> {
+  const hits = new Map<string, number>();
+  for (const tx of transactions) {
+    const ruleId = categorize({ ...tx, categorySource: "none" }, rules)?.ruleId;
+    if (ruleId) hits.set(ruleId, (hits.get(ruleId) ?? 0) + 1);
+  }
+  return hits;
+}

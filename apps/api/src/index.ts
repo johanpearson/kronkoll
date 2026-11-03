@@ -12,6 +12,7 @@ import { createCategory, listCategories, mergeCategory, patchCategory } from "./
 import { listConnections } from "./connection-list.ts";
 import { getOverview } from "./overview.ts";
 import { getSettings, patchSettings } from "./settings.ts";
+import { createRule, deleteRule, listRules, patchRule } from "./rules.ts";
 import { applyRule, setCategory } from "./set-category.ts";
 import { getSplits, putSplits } from "./splits.ts";
 import { putTransfer } from "./transfers.ts";
@@ -97,6 +98,19 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     if (request.method === "GET") return getTransaction(env, txMatch[1]);
     if (request.method === "PATCH") return setCategory(request, env, context.sync, txMatch[1]);
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, PATCH" });
+  }
+
+  if (pathname === "/api/rules") {
+    if (request.method === "GET") return listRules(env);
+    if (request.method === "POST") return createRule(request, env, context.sync);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
+  }
+
+  const oneRuleMatch = /^\/api\/rules\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (oneRuleMatch?.[1]) {
+    if (request.method === "PATCH") return patchRule(request, env, oneRuleMatch[1]);
+    if (request.method === "DELETE") return deleteRule(env, oneRuleMatch[1]);
+    return json({ error: "method_not_allowed" }, 405, { allow: "PATCH, DELETE" });
   }
 
   const ruleMatch = /^\/api\/rules\/([A-Za-z0-9_-]{1,64})\/apply$/u.exec(pathname);

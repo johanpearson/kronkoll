@@ -30,6 +30,7 @@ export {
   categorize,
   learnFromManualChoice,
   patternChoices,
+  ruleHits,
   ruleKey,
   type CategorizableTransaction,
   type Categorization,
