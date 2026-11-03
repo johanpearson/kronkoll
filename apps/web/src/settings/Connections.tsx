@@ -87,7 +87,9 @@ export function Connections() {
             return (
               <li key={c.id} className="tx">
                 <div className="tx-main">
-                  <span className="tx-name">{c.bank}</span>
+                  <span className="tx-name">
+                    <Link to={`/installningar/koppling/${encodeURIComponent(c.id)}`}>{c.bank}</Link>
+                  </span>
                   <span className={`badge ${b.tone}`}>{b.text}</span>
                 </div>
                 <small className="tx-notes">{details(c).join(" · ")}</small>
