@@ -1,6 +1,7 @@
 // Transaktionslistan (#32, KK-4, KK-9, KK-30): en budgetperiod i taget, grupperad per dag, nyast
 // först. Bankens text renderas alltid som text, aldrig som HTML. Kategorin visas med namn, t.ex.
-// "Mat › Livsmedel". Kategorin kan bytas och transaktionen delas upp direkt i listan.
+// "Mat › Livsmedel". Kategorin kan bytas och transaktionen delas upp direkt i listan. Från budgeten kan
+// listan öppnas filtrerad på en kategori med underkategorier (?period=…&kategori=…, KK-20).
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson } from "../api.ts";
@@ -62,7 +63,21 @@ export function toPeriod(raw: unknown): Period | null {
   return typeof key === "string" && typeof start === "string" && typeof end === "string" ? { key, start, end } : null;
 }
 
-type Filters = { readonly period: string | null; readonly q: string; readonly uncategorized: boolean };
+type Filters = {
+  readonly period: string | null;
+  readonly q: string;
+  readonly uncategorized: boolean;
+  /** En kategori med underkategorier, t.ex. från budgeten (KK-20). */
+  readonly categoryId: string | null;
+};
+
+/** Filtret ur adressen, t.ex. /transaktioner?period=2026-11&kategori=mat från en budgetrad. */
+function filtersFromAddress(): Filters {
+  const params = new URLSearchParams(window.location.search);
+  const period = params.get("period");
+  const categoryId = params.get("kategori");
+  return { period: period !== null && /^\d{4}-\d{2}$/u.test(period) ? period : null, q: "", uncategorized: false, categoryId: categoryId === "" ? null : categoryId };
+}
 
 type ListState =
   | { readonly kind: "loading" }
@@ -74,6 +89,7 @@ function url(filters: Filters, cursor: string | null): string {
   if (filters.period) params.set("period", filters.period);
   if (filters.q.trim() !== "") params.set("q", filters.q.trim());
   if (filters.uncategorized) params.set("uncategorized", "true");
+  if (filters.categoryId) params.set("category_id", filters.categoryId);
   if (cursor) params.set("cursor", cursor);
   const query = params.toString();
   return query === "" ? "/api/transactions" : `/api/transactions?${query}`;
@@ -200,7 +216,7 @@ function Row(props: {
 }
 
 export function TransactionsView() {
-  const [filters, setFilters] = useState<Filters>({ period: null, q: "", uncategorized: false });
+  const [filters, setFilters] = useState<Filters>(filtersFromAddress);
   const [search, setSearch] = useState("");
   const [state, setState] = useState<ListState>({ kind: "loading" });
   const [categories, setCategories] = useState<Categories>(NO_CATEGORIES);
@@ -257,6 +273,21 @@ export function TransactionsView() {
   return (
     <main>
       <h1>Transaktioner</h1>
+      {filters.categoryId && (
+        <p className="note" role="note">
+          Visar {categories.names.get(filters.categoryId) ?? filters.categoryId} med underkategorier.{" "}
+          <button
+            type="button"
+            className="small"
+            onClick={() => {
+              window.history.replaceState(null, "", "/transaktioner");
+              setFilters({ ...filters, period: period?.key ?? filters.period, categoryId: null });
+            }}
+          >
+            Visa alla
+          </button>
+        </p>
+      )}
       <p>
         <button type="button" disabled={!period} onClick={() => { go(-1); }}>
           Föregående period

@@ -33,6 +33,7 @@ export interface TransactionListQuery {
   readonly from: string;
   readonly to: string;
   readonly limit: number;
+  /** En kategori med dess underkategorier, och uppdelningar med en del i dem. */
   readonly categoryId?: string | undefined;
   readonly uncategorized?: boolean | undefined;
   /** Fritext i motpart och beskrivning. */
@@ -98,6 +99,19 @@ function decodeCursor(cursor: string): { d: string; id: string } {
   }
   throw new RangeError("Ogiltig cursor");
 }
+
+/**
+ * Transaktioner i en kategori eller dess underkategorier, även uppdelade med en del där, så att budgetens
+ * utgifter för en huvudkategori går att se (KK-20). Underfrågor i stället för id-listor (D1:s gräns på 100
+ * parametrar).
+ */
+const inCategory = (categoryId: string) => {
+  const family = sql`SELECT id FROM categories WHERE id = ${categoryId} OR parent_id = ${categoryId}`;
+  return or(
+    sql`${transactions.categoryId} IN (${family})`,
+    sql`${transactions.id} IN (SELECT transaction_id FROM transaction_splits WHERE category_id IN (${family}))`,
+  );
+};
 
 /** % och _ ska sökas som vanliga tecken i LIKE. */
 const likePattern = (text: string) => `%${text.replace(/[\\%_]/gu, (c) => `\\${c}`)}%`;
@@ -176,7 +190,7 @@ export function transactionRepository(d1: D1Database) {
         gte(transactions.transactionDate, query.from),
         lte(transactions.transactionDate, query.to),
         query.uncategorized ? isNull(transactions.categoryId) : undefined,
-        query.categoryId === undefined ? undefined : eq(transactions.categoryId, query.categoryId),
+        query.categoryId === undefined ? undefined : inCategory(query.categoryId),
         q === ""
           ? undefined
           : or(
