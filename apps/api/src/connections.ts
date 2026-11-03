@@ -62,6 +62,35 @@ export async function startConnection(request: Request, env: ConnectEnv, context
   }
 }
 
+/** Bankerna är svenska (KK-6); landet sparas inte på kopplingen. */
+const RENEW_COUNTRY = "SE";
+
+/**
+ * Förnya samtycket (#27, KK-8-B): POST /api/connections/{id}/renew startar BankID igen för samma bank och
+ * samma koppling. Återhoppet går till samma callback, som då uppdaterar kopplingen i stället för att skapa
+ * en ny, så att konton och historik finns kvar. Går det inte att starta ändras ingenting.
+ */
+export async function renewConnection(env: ConnectEnv, context: ConnectContext, email: string, connectionId: string): Promise<Response> {
+  const { logger, clock } = context.sync;
+  const connector = context.connectorFor();
+  const keys = connector && env.SESSION_ENC_KEY && env.APP_ORIGIN ? await deriveKeys(env.SESSION_ENC_KEY).catch(() => null) : null;
+  if (!connector || !keys || !env.APP_ORIGIN) return json({ error: "not_configured" }, 503);
+  try {
+    const connection = await connectionRepository(env.DB, keys).get(connectionId);
+    if (!connection || connection.provider !== "enablebanking" || connection.status === "pending_auth" || connection.aspspName === null) {
+      return json({ error: "not_found" }, 404);
+    }
+    const { state, expiresAt } = await connectStateRepository(env.DB, keys).issue({ connectionId, userId: email, now: clock.now() });
+    const { url } = await connector.startAuthorization({ aspspName: connection.aspspName, country: RENEW_COUNTRY, state, redirectUrl: `${env.APP_ORIGIN}/koppla/klar` });
+    logger.info("connect.renew_started", { connection_id: connectionId });
+    return json({ redirect_url: url, state_expires_at: expiresAt, connection_id: connectionId }, 200);
+  } catch (error) {
+    const errorCode = error instanceof ProviderError ? classifyProviderFailure(error.code).errorCode : "FAILED";
+    logger.warn("connect.renew_failed", { connection_id: connectionId, error_code: errorCode });
+    return error instanceof ProviderError ? json({ error: "bank_error" }, 502) : json({ error: "unavailable" }, 503);
+  }
+}
+
 const MAX_CODE_LENGTH = 2048;
 const MAX_STATE_LENGTH = 200;
 
@@ -108,10 +137,19 @@ export async function completeConnection(
 
   const { connectionId } = consumed;
   const connections = connectionRepository(env.DB, keys);
+  // En koppling som redan har varit aktiv förnyas (#27): den får aldrig raderas här, för då försvinner historiken.
+  // Säkert standardval: radera bara när vi vet att kopplingen är ny.
+  let renewal = true;
   try {
+    // Avgörs före allt annat, så att ett fel hos banken aldrig raderar en förnyad koppling.
+    const before = await connections.get(connectionId);
+    renewal = before !== null && before.status !== "pending_auth";
+    const oldSessionId = renewal ? await connections.sessionId(connectionId) : null;
     const session = await connector.createSession(callback.code);
     const bankAccounts = await provider.accounts(session.sessionId);
     await connections.activate(connectionId, session);
+    // Den gamla sessionen behövs inte längre. Att återkalla den får inte stoppa förnyelsen.
+    if (oldSessionId !== null && oldSessionId !== session.sessionId) await connector.revokeSession(oldSessionId).catch(() => undefined);
     const accounts = accountRepository(env.DB, keys);
     for (const account of bankAccounts) {
       await accounts.upsertFromBank(
@@ -120,11 +158,11 @@ export async function completeConnection(
       );
     }
     context.waitUntil(runSync(env, "initial", context.sync, connectionId));
-    logger.info("connect.completed", { connection_id: connectionId, count: bankAccounts.length });
-    return json({ connection_id: connectionId, accounts: bankAccounts.length, initial_sync: "started" }, 201);
+    logger.info(renewal ? "connect.renewed" : "connect.completed", { connection_id: connectionId, count: bankAccounts.length });
+    return json({ connection_id: connectionId, accounts: bankAccounts.length, initial_sync: "started", renewed: renewal }, 201);
   } catch (error) {
-    // Ingen halv koppling: användaren får börja om med en ny.
-    await connections.delete(connectionId).catch(() => undefined);
+    // Ingen halv ny koppling: användaren får börja om. En förnyad koppling lämnas som den var.
+    if (!renewal) await connections.delete(connectionId).catch(() => undefined);
     const errorCode = error instanceof ProviderError ? classifyProviderFailure(error.code).errorCode : "FAILED";
     logger.warn("connect.failed", { connection_id: connectionId, error_code: errorCode });
     return error instanceof ProviderError ? json({ error: "bank_error" }, 502) : json({ error: "unavailable" }, 503);

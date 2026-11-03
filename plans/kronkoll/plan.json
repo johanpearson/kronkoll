@@ -761,6 +761,7 @@
       "id": "api-conn-renew", "group": "API: bankkoppling", "method": "POST", "path": "/api/connections/{id}/renew",
       "summary": "Koppla om: ny auth för samma ASPSP. Konton matchas via account uid/IBAN-hash och glappet fylls.",
       "responses": { "200": { "body": { "redirect_url": "https://tilisy.enablebanking.com/…" } } },
+      "description": "Byggt i #27. Återhoppet går till samma POST /api/connections/callback, som för en redan aktiv koppling uppdaterar den i stället för att skapa en ny (renewed: true), återkallar den gamla sessionen och aldrig raderar kopplingen vid fel. Landet är SE.",
       "satisfies": ["KK-8-B"]
     },
     {
