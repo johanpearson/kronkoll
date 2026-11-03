@@ -685,6 +685,7 @@
       "summary": "Sätt budget för en period (och valfritt framåt); GET samma path ger utfall vs plan",
       "request": { "lines": [{ "category_id": "cat_mat", "amount_minor": 630000 }], "apply_forward": true, "source": "manual | copy_previous | average_3m" },
       "responses": { "200": { "body": { "period": "2026-11", "lines": [{ "category_id": "cat_mat", "budget_minor": 630000, "actual_minor": 655200, "remaining_minor": -25200, "ratio": 1.04, "over": true }], "excluded": { "internal_transfers_minor": 1500000, "card_payment_minor": 821400 } } } },
+      "description": "GET ger också `groups`: en rad per huvudkategori med budget eller utgifter, där utfallet alltid är huvudkategorin plus underkategorierna. Har huvudkategorin egen budget är den taket; annars är gruppens budget summan av underkategoriernas. `total_budget_minor` räknar varje grupp en gång.",
       "satisfies": ["KK-20-A", "KK-20-B", "KK-20-C"]
     },
     {

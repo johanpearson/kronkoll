@@ -1,8 +1,9 @@
 // Budget per kategori (#33, KK-20, KK-34): GET och PUT /api/budgets/{period}. Utfallet räknas i
-// domänen (`budgetOutcome`): bara utgifter, interna överföringar uteslutna, uppdelningar per del och en
-// huvudkategoris budget täcker underkategorier utan egen budget.
+// domänen: bara utgifter, interna överföringar uteslutna och uppdelningar per del. `lines` är en rad per
+// budgeterad kategori (`budgetOutcome`). `groups` är per huvudkategori med underkategorierna summerade
+// uppåt (`budgetByMainCategory`), och det är dem budgetvyn visar.
 import { budgetRepository, categoryRepository, settingsRepository, type BudgetSource } from "@kronkoll/adapter-d1";
-import { budgetOutcome, budgetPeriodForKey, currentBudgetPeriod, spendingByCategory, type BudgetLineInput, type BudgetPeriod } from "@kronkoll/domain";
+import { budgetByMainCategory, budgetOutcome, budgetPeriodForKey, currentBudgetPeriod, spendingByCategory, type BudgetFigures, type BudgetLineInput, type BudgetPeriod } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
 
 const SOURCES = new Set<string>(["manual", "copy_previous", "average_3m"] satisfies BudgetSource[]);
@@ -32,6 +33,8 @@ export async function getBudget(env: { DB: D1Database }, key: string, sync: Sync
     const [{ transactions, splits }, lines, categories] = await Promise.all([repo.actuals(period), repo.lines(period.key), categoryRepository(env.DB).list()]);
     const input = { period, transactions, splits, categories };
     const outcome = budgetOutcome({ ...input, lines });
+    const byMain = budgetByMainCategory({ ...input, lines });
+    const figures = (f: BudgetFigures) => ({ category_id: f.categoryId, budget_minor: f.budgetMinor, actual_minor: f.actualMinor, remaining_minor: f.remainingMinor, percent: f.percent, over: f.over });
     const spending = [...spendingByCategory(input)]
       .map(([categoryId, actual]) => ({ category_id: categoryId, actual_minor: actual }))
       .sort((a, b) => (a.category_id ?? "").localeCompare(b.category_id ?? ""));
@@ -47,10 +50,14 @@ export async function getBudget(env: { DB: D1Database }, key: string, sync: Sync
           over: l.over,
         })),
         unbudgeted_minor: outcome.unbudgetedMinor,
-        total_budget_minor: outcome.totalBudgetMinor,
+        // Varje huvudkategori räknas en gång, även när både den och underkategorier har budget.
+        total_budget_minor: byMain.totalBudgetMinor,
         total_actual_minor: outcome.totalActualMinor,
         excluded_internal_minor: outcome.excludedInternalMinor,
         spending,
+        // Per huvudkategori, med underkategorierna summerade uppåt (KK-20-A, KK-20-B).
+        groups: byMain.groups.map((g) => ({ ...figures(g), subcategories: g.subcategories.map(figures) })),
+        uncategorized_minor: byMain.uncategorizedMinor,
       },
       200,
     );

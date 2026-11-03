@@ -70,10 +70,14 @@ export {
   type ReminderInput,
 } from "./consent.ts";
 export {
+  budgetByMainCategory,
   budgetOutcome,
   spendingByCategory,
   suggestFromAverage,
   suggestFromPrevious,
+  type BudgetByMainCategory,
+  type BudgetFigures,
+  type BudgetGroup,
   type BudgetLineInput,
   type BudgetLineOutcome,
   type BudgetOutcome,

@@ -4,13 +4,13 @@
 // interna överföringar räknas varken som in eller ut.
 import { budgetRepository, categoryRepository, overviewRepository, settingsRepository } from "@kronkoll/adapter-d1";
 import {
+  budgetByMainCategory,
   budgetPeriodForKey,
   currentBudgetPeriod,
   daysBetween,
   leftToSpend,
   periodTotals,
   recentPeriods,
-  sumMinor,
   todayInStockholm,
   totalBalance,
   trend,
@@ -49,7 +49,8 @@ export async function getOverview(request: Request, env: { DB: D1Database }, syn
     ]);
     const input = { transactions, splits, categories };
     const totals = periodTotals({ ...input, period });
-    const budgetMinor = sumMinor(lines.map((l) => l.amountMinor));
+    // Varje huvudkategori räknas en gång, även när både den och underkategorier har budget.
+    const { totalBudgetMinor: budgetMinor } = budgetByMainCategory({ ...input, period, lines });
     const today = todayInStockholm(sync.clock);
     const left = leftToSpend({ period, today, budgetMinor, actualMinor: totals.expenseMinor });
     // En koppling som aldrig blev klar (avbruten med BankID) är ingen bank att visa.

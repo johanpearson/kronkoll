@@ -154,3 +154,89 @@ export function suggestFromAverage(history: readonly ReadonlyMap<string | null, 
     })
     .filter((line) => line.amountMinor > 0);
 }
+
+export interface BudgetFigures {
+  readonly categoryId: string;
+  /** Budget i öre, eller null om ingen budget är satt. */
+  readonly budgetMinor: number | null;
+  readonly actualMinor: number;
+  /** Kvar i öre, eller null utan budget. */
+  readonly remainingMinor: number | null;
+  /** Utfall i procent av budget, avrundat. Null utan budget eller med budget noll. */
+  readonly percent: number | null;
+  readonly over: boolean;
+}
+
+export interface BudgetGroup extends BudgetFigures {
+  /** Underkategorier med budget eller utgifter, sorterade efter namn. */
+  readonly subcategories: readonly BudgetFigures[];
+}
+
+export interface BudgetByMainCategory {
+  readonly period: string;
+  /** Huvudkategorier med budget eller utgifter, sorterade efter namn. */
+  readonly groups: readonly BudgetGroup[];
+  /** Okategoriserade utgifter, som inte hör till någon huvudkategori. */
+  readonly uncategorizedMinor: number;
+  /** Summan av huvudkategoriernas budget, där varje grupp räknas en gång. */
+  readonly totalBudgetMinor: number;
+  readonly totalActualMinor: number;
+  readonly excludedInternalMinor: number;
+}
+
+function figures(categoryId: string, budgetMinor: number | null, actualMinor: number): BudgetFigures {
+  if (budgetMinor === null) return { categoryId, budgetMinor, actualMinor, remainingMinor: null, percent: null, over: false };
+  return {
+    categoryId,
+    budgetMinor,
+    actualMinor,
+    remainingMinor: budgetMinor - actualMinor,
+    percent: budgetMinor === 0 ? null : Math.round((actualMinor * 100) / budgetMinor),
+    over: actualMinor > budgetMinor,
+  };
+}
+
+/**
+ * Budgeten per huvudkategori (KK-20-A, KK-20-B): utfallet är alltid allt i huvudkategorin och dess
+ * underkategorier. Har huvudkategorin en egen budget är den taket för hela gruppen, och underkategoriernas
+ * budgetar är en fördelning inom det. Annars är gruppens budget summan av underkategoriernas. Varje grupp
+ * räknas en gång i totalen. Grupper utan budget men med utgifter tas med, så att inget försvinner.
+ */
+export function budgetByMainCategory(input: SpendingInput & { readonly lines: readonly BudgetLineInput[] }): BudgetByMainCategory {
+  validateLines(input.lines, input.categories);
+  const spending = spendingByCategory(input);
+  const budget = new Map(input.lines.map((l) => [l.categoryId, l.amountMinor]));
+  const byId = new Map(input.categories.map((c) => [c.id, c]));
+  const name = (id: string) => byId.get(id)?.name ?? id;
+  const byName = (a: { categoryId: string }, b: { categoryId: string }) => name(a.categoryId).localeCompare(name(b.categoryId), "sv");
+  const mainOf = (id: string) => byId.get(id)?.parentId ?? id;
+
+  // Alla huvudkategorier som har budget eller utgifter, på sig själva eller i en underkategori.
+  const mains = new Set([...input.lines.map((l) => mainOf(l.categoryId)), ...[...spending.keys()].flatMap((id) => (id === null ? [] : [mainOf(id)]))]);
+
+  const groups = [...mains].map((mainId): BudgetGroup => {
+    const subIds = input.categories.filter((c) => c.parentId === mainId).map((c) => c.id);
+    const subcategories = subIds
+      .filter((id) => budget.has(id) || (spending.get(id) ?? 0) !== 0)
+      .map((id) => figures(id, budget.get(id) ?? null, spending.get(id) ?? 0))
+      .sort(byName);
+    const actual = sumMinor([spending.get(mainId) ?? 0, ...subIds.map((id) => spending.get(id) ?? 0)]);
+    const subBudgets = subIds.flatMap((id) => (budget.has(id) ? [budget.get(id) ?? 0] : []));
+    const groupBudget = budget.get(mainId) ?? (subBudgets.length > 0 ? sumMinor(subBudgets) : null);
+    return { ...figures(mainId, groupBudget, actual), subcategories };
+  });
+
+  const excludedInternalMinor = sumMinor(
+    input.transactions
+      .filter((t) => t.internal && t.status !== "removed" && t.amountMinor < 0 && inPeriod(t.date, input.period))
+      .map((t) => -t.amountMinor),
+  );
+  return {
+    period: input.period.key,
+    groups: groups.sort(byName),
+    uncategorizedMinor: spending.get(null) ?? 0,
+    totalBudgetMinor: sumMinor(groups.map((g) => g.budgetMinor ?? 0)),
+    totalActualMinor: sumMinor([...spending.values()]),
+    excludedInternalMinor,
+  };
+}
