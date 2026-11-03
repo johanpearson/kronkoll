@@ -463,6 +463,54 @@ main ul > li.tx.sub .tx-name {
   gap: var(--space-3);
 }
 
+/* En huvudkategori i budgetredigeringen, med sina underkategorier indragna när de visas. */
+.budget-groups {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.budget-group {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0 0 var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.budget-group > label {
+  display: grid;
+  gap: var(--space-1);
+  font-weight: 500;
+}
+
+.budget-group > button {
+  justify-self: start;
+}
+
+.budget-group .budget-fields {
+  padding-left: var(--space-4);
+}
+
+.budget-group input,
+.budget-group > label input {
+  width: 100%;
+  text-align: right;
+}
+
+/* Budgetvyn: underkategorier indragna under sin huvudkategori, och en huvudkategori utan budget tonad. */
+main ul > li.budget-line.sub {
+  padding-left: var(--space-6);
+}
+
+.budget-line.none .budget-share {
+  color: var(--muted);
+}
+
+.budget-line > p {
+  margin: 0;
+}
+
 .budget-fields label {
   display: grid;
   gap: var(--space-1);
