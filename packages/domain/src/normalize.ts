@@ -26,14 +26,35 @@ function withoutPlaceAfterComma(text: string): string {
   return head.trim() === "" ? text.slice(comma + 1) : head;
 }
 
+/**
+ * "BUTIK*ORDERNUMMER" → "BUTIK". Näthandel som Amazon lägger ett nytt ordernummer efter stjärnan vid
+ * varje köp. Körs efter att betalförmedlarens prefix ("K*", "PAYPAL *") har tagits bort.
+ */
+function withoutReference(text: string): string {
+  const star = text.indexOf("*");
+  return star > 0 ? text.slice(0, star) : text;
+}
+
+/**
+ * Ord med siffror på flera ställen, t.ex. "BT4W355R4" eller "AB12CD34", är order- eller referenskoder som
+ * är olika varje gång. De tas bort före uppdelningen nedan. Ett namn med ett butiksnummer, som
+ * "WILLYS42ODENPLAN", har bara en sifferföljd och behålls.
+ */
+const withoutCodes = (text: string) =>
+  text
+    .split(" ")
+    .filter((t) => (t.match(/\d+/gu)?.length ?? 0) < 2 || NUMBER_TOKEN.test(t))
+    .join(" ");
+
 export function normalizeCounterparty(raw: string): string {
-  const upper = withoutPlaceAfterComma(raw.toLocaleUpperCase("sv-SE"))
+  // Ordningen spelar roll: betalförmedlarens prefix före stjärnan, och stjärnan före koderna.
+  const upper = withoutPlaceAfterComma(raw.toLocaleUpperCase("sv-SE")).replace(/\s+/gu, " ").trim();
+  const tokens = withoutCodes(withoutReference(upper.replace(PROCESSOR_PREFIX, "")).trim())
     // Butiksnummer som sitter ihop med namnet, t.ex. "WILLYS42ODENPLAN", blir ett eget ord.
     .replace(/(\p{L})(\d)/gu, "$1 $2")
     .replace(/(\d)(\p{L})/gu, "$1 $2")
-    .replace(/\s+/gu, " ")
-    .trim();
-  const tokens = upper.replace(PROCESSOR_PREFIX, "").split(" ").filter((t) => t !== "" && !NUMBER_TOKEN.test(t));
+    .split(" ")
+    .filter((t) => t !== "" && !NUMBER_TOKEN.test(t));
   // Ta bort orter i slutet, men aldrig det första ordet: det är butikens namn.
   while (tokens.length > 1 && TRAILING_PLACES.has(tokens[tokens.length - 1] ?? "")) tokens.pop();
   return tokens.join(" ");

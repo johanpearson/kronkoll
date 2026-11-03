@@ -23,6 +23,13 @@ describe("normalisering av motpart (F-learn)", () => {
     ["butiksnummer ihop med namnet", "WILLYS42ODENPLAN, STOCKHOLM", "WILLYS ODENPLAN"],
     ["bara sista kommatecknet räknas", "PIZZERIA ROMA H, H R", "PIZZERIA ROMA H"],
     ["ett kommatecken först lämnar namnet", ", SOLNA", "SOLNA"],
+    // Näthandel: "BUTIK*ORDERNUMMER, WEBBADRESS". Ordernumret är olika för varje köp.
+    ["ordernummer efter stjärna tas bort", "AmazonMktplc*AB1CD234E5, www.amazon.se", "AMAZONMKTPLC"],
+    ["samma butik, annat ordernummer", "AmazonMktplc*ZZ9XY876W1, www.amazon.se", "AMAZONMKTPLC"],
+    ["stjärna med blanksteg", "WEBBSHOP * 12AB34, WWW.WEBBSHOP.SE", "WEBBSHOP"],
+    ["kortprefix före stjärna gäller fortfarande", "K*ICA NARA*7788", "ICA NARA"],
+    ["en kod med siffror på flera ställen tas bort även utan stjärna", "WEBBSHOP AB12CD34, WWW.WEBBSHOP.SE", "WEBBSHOP"],
+    ["en kod mitt i texten", "BUTIKEN X9Y8Z7 STORGATAN", "BUTIKEN STORGATAN"],
   ])("%s: %j → %j", (_, raw, normalized) => {
     expect(normalizeCounterparty(raw)).toBe(normalized);
   });
