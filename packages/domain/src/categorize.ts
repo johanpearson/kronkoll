@@ -47,14 +47,20 @@ export function ruleKey(tx: Pick<CategorizableTransaction, "counterpartyNorm" | 
   return tx.counterpartyNorm !== "" ? tx.counterpartyNorm : normalizeCounterparty(tx.description);
 }
 
-function matches(rule: CategoryRule, tx: CategorizableTransaction): boolean {
+/** Det en transaktion matchas på, uträknat en gång per transaktion i stället för en gång per regel. */
+interface MatchText {
+  readonly key: string;
+  readonly description: string;
+}
+
+function matches(rule: CategoryRule, text: MatchText): boolean {
   switch (rule.match) {
     case "counterparty_exact":
-      return rule.pattern !== "" && ruleKey(tx) === rule.pattern;
+      return rule.pattern !== "" && text.key === rule.pattern;
     case "counterparty_prefix":
-      return matchesWordPrefix(rule.pattern, ruleKey(tx));
+      return matchesWordPrefix(rule.pattern, text.key);
     case "description_contains":
-      return rule.pattern !== "" && tx.description.toLocaleUpperCase("sv-SE").includes(rule.pattern);
+      return rule.pattern !== "" && text.description.includes(rule.pattern);
   }
 }
 
@@ -72,7 +78,9 @@ export function categorize(tx: CategorizableTransaction, rules: readonly Categor
   if (tx.categorySource === "manual") {
     return { categoryId: tx.categoryId, source: "manual", ruleId: null };
   }
-  const rule = rules.filter((r) => matches(r, tx)).sort(byPriority)[0];
+  // Normaliseringen är det dyra steget, och Workern har lite processortid per anrop. Gör den en gång.
+  const text = { key: ruleKey(tx), description: tx.description.toLocaleUpperCase("sv-SE") };
+  const rule = rules.filter((r) => matches(r, text)).sort(byPriority)[0];
   return rule ? { categoryId: rule.categoryId, source: rule.source, ruleId: rule.id } : null;
 }
 
