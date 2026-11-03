@@ -230,7 +230,12 @@ export function BudgetView() {
               ])}
             </ul>
           )}
-          {budget.uncategorizedMinor > 0 && <p>Okategoriserade utgifter: {formatSek(budget.uncategorizedMinor)}</p>}
+          {budget.uncategorizedMinor > 0 && (
+            <p>
+              <Link to={`/transaktioner?period=${encodeURIComponent(budget.period.key)}&okategoriserade=1`}>Okategoriserade utgifter</Link>:{" "}
+              {formatSek(budget.uncategorizedMinor)}
+            </p>
+          )}
           {budget.excludedInternalMinor > 0 && (
             <p className="note" role="note">
               Överföringar mellan dina egna konton och kortfakturor ({formatSek(budget.excludedInternalMinor)}) räknas inte som utgifter.

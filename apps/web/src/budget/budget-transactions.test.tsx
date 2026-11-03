@@ -22,7 +22,7 @@ const BUDGET = {
   period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
   lines: [{ category_id: "mat", budget_minor: 600000 }],
   groups: [{ ...fig("mat", 600000, 52000), subcategories: [fig("mat-livsmedel", null, 52000)] }],
-  uncategorized_minor: 0,
+  uncategorized_minor: 3000,
   total_budget_minor: 600000,
   total_actual_minor: 52000,
   excluded_internal_minor: 0,
@@ -95,6 +95,15 @@ describe("transaktionerna bakom en budgetrad (#33, KK-20)", () => {
     expect(lists.at(-1)).toBe("?period=2026-11");
     expect(screen.queryByRole("note")).toBeNull();
     expect(window.location.search).toBe("");
+  });
+
+  it("okategoriserade utgifter öppnar periodens okategoriserade transaktioner, så att de går att kategorisera", async () => {
+    const lists = api();
+    await open("/budget");
+    fireEvent.click(screen.getByRole("link", { name: "Okategoriserade utgifter" }));
+    await settle();
+    expect(lists.at(-1)).toBe("?period=2026-11&uncategorized=true");
+    expect(screen.getByRole<HTMLInputElement>("checkbox", { name: "Bara okategoriserade" }).checked).toBe(true);
   });
 
   it("en ogiltig period i adressen ignoreras", async () => {

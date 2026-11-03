@@ -76,7 +76,13 @@ function filtersFromAddress(): Filters {
   const params = new URLSearchParams(window.location.search);
   const period = params.get("period");
   const categoryId = params.get("kategori");
-  return { period: period !== null && /^\d{4}-\d{2}$/u.test(period) ? period : null, q: "", uncategorized: false, categoryId: categoryId === "" ? null : categoryId };
+  return {
+    period: period !== null && /^\d{4}-\d{2}$/u.test(period) ? period : null,
+    q: "",
+    // Från budgetens rad med okategoriserade utgifter, så att de går att kategorisera direkt.
+    uncategorized: params.get("okategoriserade") === "1",
+    categoryId: categoryId === "" ? null : categoryId,
+  };
 }
 
 type ListState =
