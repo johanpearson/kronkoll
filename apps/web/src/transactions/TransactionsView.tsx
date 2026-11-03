@@ -102,9 +102,11 @@ export interface Categories {
   readonly options: readonly CategoryOption[];
   /** Det som går att budgetera: valbara utgiftskategorier, i samma ordning (KK-20-A). */
   readonly budgetable: readonly CategoryOption[];
+  /** Huvudkategorin för varje kategori, eller null för en huvudkategori. */
+  readonly parentOf: ReadonlyMap<string, string | null>;
 }
 
-export const NO_CATEGORIES: Categories = { names: new Map(), options: [], budgetable: [] };
+export const NO_CATEGORIES: Categories = { names: new Map(), options: [], budgetable: [], parentOf: new Map() };
 
 /** Kategorierna, eller inga om de inte går att hämta. Listan fungerar ändå. */
 export async function fetchCategories(): Promise<Categories> {
@@ -130,7 +132,8 @@ export async function fetchCategories(): Promise<Categories> {
     .filter(([, c]) => !c.archived)
     .map(([id]) => ({ id, label: names.get(id) ?? id }))
     .sort((a, b) => a.label.localeCompare(b.label, "sv"));
-  return { names, options, budgetable: options.filter((o) => raw.get(o.id)?.expense === true) };
+  const parentOf = new Map([...raw].map(([id, c]) => [id, c.parent]));
+  return { names, options, budgetable: options.filter((o) => raw.get(o.id)?.expense === true), parentOf };
 }
 
 function Row(props: {

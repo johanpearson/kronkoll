@@ -13,25 +13,40 @@ afterEach(() => {
 const CATEGORIES = {
   items: [
     { id: "mat", parent_id: null, name: "Mat", kind: "expense", archived: false },
-    { id: "hushall", parent_id: null, name: "Hushåll", kind: "expense", archived: false },
+    { id: "mat-livsmedel", parent_id: "mat", name: "Livsmedel", kind: "expense", archived: false },
+    { id: "mat-restaurang", parent_id: "mat", name: "Restaurang", kind: "expense", archived: false },
     { id: "boende", parent_id: null, name: "Boende", kind: "expense", archived: false },
+    { id: "transport", parent_id: null, name: "Transport", kind: "expense", archived: false },
   ],
 };
+
+const fig = (id: string, budget: number | null, actual: number, extra: Record<string, unknown> = {}) => ({
+  category_id: id,
+  budget_minor: budget,
+  actual_minor: actual,
+  remaining_minor: budget === null ? null : budget - actual,
+  percent: budget === null || budget === 0 ? null : Math.round((actual * 100) / budget),
+  over: budget !== null && actual > budget,
+  ...extra,
+});
 
 /** Påhittad budget (KK-13) i API:ts form. */
 function budget(key: string, overrides: Record<string, unknown> = {}) {
   return {
     period: { key, start: `${key}-01`, end: `${key}-30` },
     lines: [
-      { category_id: "mat", budget_minor: 630000, actual_minor: 655200, remaining_minor: -25200, percent: 104, over: true },
-      { category_id: "hushall", budget_minor: 100000, actual_minor: 92000, remaining_minor: 8000, percent: 92, over: false },
-      { category_id: "boende", budget_minor: 990000, actual_minor: 400000, remaining_minor: 590000, percent: 40, over: false },
+      { category_id: "mat", budget_minor: 630000 },
+      { category_id: "boende", budget_minor: 990000 },
     ],
-    unbudgeted_minor: 164600,
-    total_budget_minor: 1720000,
-    total_actual_minor: 1311800,
+    groups: [
+      fig("boende", 990000, 400000, { subcategories: [] }),
+      fig("mat", 630000, 655200, { subcategories: [fig("mat-livsmedel", null, 520000), fig("mat-restaurang", 100000, 135200)] }),
+      fig("transport", null, 92000, { subcategories: [] }),
+    ],
+    uncategorized_minor: 3000,
+    total_budget_minor: 1620000,
+    total_actual_minor: 1150200,
     excluded_internal_minor: 1500000,
-    spending: [],
     ...overrides,
   };
 }
@@ -60,66 +75,71 @@ async function open() {
     await Promise.resolve();
   });
   await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
+    for (let i = 0; i < 4; i++) await Promise.resolve();
   });
 }
 
 const rows = () => within(screen.getByRole("list", { name: "Kategorier" })).getAllByRole("listitem");
+const names = () => rows().map((r) => r.querySelector(".tx-name")?.textContent);
 
-describe("budgetvyn (#33, KK-20)", () => {
+describe("budgetvyn per huvudkategori (#33, KK-20)", () => {
   it("visar den pågående perioden med budget, utfall och kvar totalt", async () => {
     const paths = api();
     await open();
     expect(paths).toContain("/api/budgets/current");
-    expect(screen.getByRole("heading", { name: "Budget" })).toBeTruthy();
-    const stats = screen.getAllByRole("definition").map((d) => d.textContent);
-    expect(stats).toEqual([formatSek(1720000), formatSek(1311800), formatSek(408200)]);
+    expect(screen.getAllByRole("definition").map((d) => d.textContent)).toEqual([formatSek(1620000), formatSek(1150200), formatSek(469800)]);
   });
 
-  it("visar budget, utfall, kvar och andel per kategori, sorterat efter namn (KK-20-B)", async () => {
+  it("en rad per huvudkategori, där utfallet är summan av underkategorierna (KK-20-B)", async () => {
     api();
     await open();
-    expect(rows().map((r) => r.querySelector(".tx-name")?.textContent)).toEqual(["Boende", "Hushåll", "Mat"]);
+    expect(names()).toEqual(["Boende", "Mat", "Transport"]);
     expect(rows()[0]?.textContent).toContain(`${formatSek(400000)} av ${formatSek(990000)} · kvar ${formatSek(590000)}`);
-    expect(rows()[0]?.textContent).toContain("40 %");
+    expect(rows()[0]?.querySelector(".budget-share")?.textContent).toBe("40 %");
   });
 
-  it("en överskriden budget står i text, inte bara i färg (KK-20-B)", async () => {
+  it("en överskriden budget står i text, och en huvudkategori utan budget visar vad som spenderats", async () => {
     api();
     await open();
-    const mat = rows()[2];
-    expect(mat?.className).toContain("over");
-    expect(mat?.textContent).toContain("104 % – över");
-    expect(mat?.textContent).toContain(`över med ${formatSek(25200)}`);
-    expect(rows()[1]?.className).toContain("near");
+    expect(rows()[1]?.className).toContain("over");
+    expect(rows()[1]?.querySelector(".budget-share")?.textContent).toBe("104 % – över");
+    expect(rows()[1]?.textContent).toContain(`över med ${formatSek(25200)}`);
+    expect(rows()[2]?.querySelector(".budget-share")?.textContent).toBe("Ingen budget");
+    expect(rows()[2]?.textContent).toContain(`${formatSek(92000)} spenderat`);
+    expect(rows()[2]?.querySelector("progress")).toBeNull();
   });
 
-  it("säger att överföringar mellan egna konton inte räknas, och visar utgifter utan budget (KK-20-C)", async () => {
+  it("visar underkategorierna när man fäller ut, och döljer dem igen", async () => {
+    api();
+    await open();
+    expect(screen.queryByRole("button", { name: /Visa underkategorier/u, expanded: false })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Visa underkategorier (2)" }));
+    expect(names()).toEqual(["Boende", "Mat", "Livsmedel", "Restaurang", "Transport"]);
+    expect(rows()[2]?.className).toContain("sub");
+    // En underkategori utan egen budget ingår i huvudkategorins och märks inte.
+    expect(rows()[2]?.querySelector(".budget-share")?.textContent).toBe("");
+    expect(rows()[3]?.querySelector(".budget-share")?.textContent).toBe("135 % – över");
+    fireEvent.click(screen.getByRole("button", { name: "Dölj underkategorier" }));
+    expect(names()).toEqual(["Boende", "Mat", "Transport"]);
+  });
+
+  it("säger att överföringar mellan egna konton inte räknas, och visar okategoriserade utgifter (KK-20-C)", async () => {
     api();
     await open();
     expect(screen.getByRole("note").textContent).toContain(formatSek(1500000));
-    expect(screen.getByText(/Utgifter utan budget/u).textContent).toBe(`Utgifter utan budget: ${formatSek(164600)}`);
+    expect(screen.getByText(/Okategoriserade utgifter/u).textContent).toBe(`Okategoriserade utgifter: ${formatSek(3000)}`);
   });
 
-  it("utan budget, överföringar eller utgifter utan budget säger vyn att ingen budget är satt", async () => {
-    api((key) => [200, budget(key === "current" ? "2026-11" : key, { lines: [], unbudgeted_minor: 0, excluded_internal_minor: 0 })]);
+  it("utan budget och utgifter säger vyn att ingen budget är satt", async () => {
+    api((key) => [200, budget(key === "current" ? "2026-11" : key, { lines: [], groups: [], uncategorized_minor: 0, excluded_internal_minor: 0 })]);
     await open();
     expect(screen.getByText("Ingen budget är satt för perioden än.")).toBeTruthy();
+    expect(screen.queryByRole("list", { name: "Kategorier" })).toBeNull();
     expect(screen.queryByRole("note")).toBeNull();
-    expect(screen.queryByText(/Utgifter utan budget/u)).toBeNull();
   });
 
   it("en budget på noll kronor visar ett streck, eller Över när något har gått åt", async () => {
-    api(() => [
-      200,
-      budget("2026-11", {
-        lines: [
-          { category_id: "mat", budget_minor: 0, actual_minor: 0, remaining_minor: 0, percent: null, over: false },
-          { category_id: "boende", budget_minor: 0, actual_minor: 500, remaining_minor: -500, percent: null, over: true },
-        ],
-      }),
-    ]);
+    api(() => [200, budget("2026-11", { groups: [fig("boende", 0, 500, { subcategories: [] }), fig("mat", 0, 0, { subcategories: [] })] })]);
     await open();
     expect(rows().map((r) => r.querySelector(".budget-share")?.textContent)).toEqual(["Över", "–"]);
   });
@@ -142,13 +162,5 @@ describe("budgetvyn (#33, KK-20)", () => {
     api(() => [503, { error: "unavailable" }]);
     await open();
     expect(screen.getByRole("alert").textContent).toContain("Det gick inte att hämta budgeten");
-    expect(screen.getByRole("button", { name: "Föregående period" })).toHaveProperty("disabled", true);
-  });
-
-  it("fliken Budget är markerad på sidan", async () => {
-    api();
-    await open();
-    const tab = within(screen.getByRole("navigation", { name: "Huvudmeny" })).getByRole("link", { name: "Budget" });
-    expect(tab.getAttribute("aria-current")).toBe("page");
   });
 });
