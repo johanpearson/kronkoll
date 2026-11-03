@@ -105,7 +105,7 @@ describe("POST /api/connections/callback (KK-5-C, KK-29-A, F-koppla)", () => {
   it("skapar sessionen, sparar kontona maskerade och startar första hämtningen för den nya kopplingen", async () => {
     const { response } = await call();
     expect(response.status).toBe(201);
-    expect(await response.json()).toEqual({ connection_id: "pending", accounts: 2, initial_sync: "started" });
+    expect(await response.json()).toEqual({ connection_id: "pending", accounts: 2, initial_sync: "started", renewed: false });
 
     expect(await connection()).toEqual({ status: "active", expires: "2027-05-19" });
     expect(await connectionRepository(db, keys).sessionId("pending")).toBe(SESSION_ID);

@@ -17,7 +17,7 @@ import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule 
 import { applyRule, setCategory } from "./set-category.ts";
 import { getSplits, putSplits } from "./splits.ts";
 import { putTransfer } from "./transfers.ts";
-import { completeConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
+import { completeConnection, renewConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
 import { getTransaction, listTransactions } from "./transactions.ts";
 
@@ -93,6 +93,12 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   const { pathname } = new URL(request.url);
 
   if (pathname === "/api/connections" && request.method === "GET") return listConnections(env, context.sync);
+
+  const renewMatch = /^\/api\/connections\/([A-Za-z0-9_-]{1,64})\/renew$/u.exec(pathname);
+  if (renewMatch?.[1]) {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return renewConnection(env, context, email, renewMatch[1]);
+  }
 
   const connectionMatch = /^\/api\/connections\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
   if (connectionMatch?.[1] && connectionMatch[1] !== "callback") {
