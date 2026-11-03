@@ -28,7 +28,7 @@ describe("saldo (KK-17-A)", () => {
 
   it("ger noll utan konton och avvisar belopp som inte är heltal öre", () => {
     expect(totalBalance([])).toBe(0);
-    expect(() => totalBalance([{ balanceMinor: 1.5, included: true }])).toThrow(RangeError);
+    expect(() => totalBalance([{ balanceMinor: 1.5, included: true }])).toThrow("Belopp måste vara ett heltal i öre");
   });
 });
 
@@ -158,7 +158,7 @@ describe("trend de senaste 12 perioderna (KK-17-C)", () => {
   });
 
   it("avvisar ett antal under ett", () => {
-    expect(() => recentPeriods(NOVEMBER, 1, 0)).toThrow(RangeError);
+    expect(() => recentPeriods(NOVEMBER, 1, 0)).toThrow("Antalet perioder måste vara minst 1");
   });
 
   it("räknar in, ut och netto per period", () => {

@@ -23,6 +23,50 @@ describe("svensk startmall (KK-18-A, V-u-template)", () => {
     expect(mains(CATEGORY_TEMPLATE).filter((c) => c.kind === "income").map((c) => c.name)).toEqual(["Inkomst"]);
   });
 
+  it("har underkategorierna som planen anger, i den ordningen", () => {
+    const tree = Object.fromEntries(
+      mains(CATEGORY_TEMPLATE).map((m) => [m.name, CATEGORY_TEMPLATE.filter((c) => c.parentId === m.id).map((c) => c.name)]),
+    );
+    expect(tree).toEqual({
+      Boende: ["Hyra & avgift", "Låneränta", "El", "Bredband", "Hemförsäkring", "Underhåll"],
+      Mat: ["Livsmedel", "Restaurang & café", "Systembolaget"],
+      Transport: ["Kollektivtrafik", "Bil & bränsle", "Parkering", "Taxi"],
+      Barn: ["Mat & blöjor", "Kläder", "Förskola", "Aktiviteter"],
+      Hushåll: ["Förbrukning", "Möbler & inredning", "Elektronik"],
+      Hälsa: ["Apotek", "Vård", "Träning"],
+      Kläder: ["Vuxenkläder", "Skor", "Accessoarer"],
+      Nöje: ["Bio & evenemang", "Bar & uteliv", "Spel"],
+      Fritid: ["Hobby", "Sport", "Resor"],
+      Abonnemang: ["Streaming", "Mobil", "Tidningar", "Programvara"],
+      "Sparande & överföringar": ["Sparande", "Amortering", "Överföringar", "Kortfaktura"],
+      Övrigt: ["Avgifter", "Gåvor", "Övrigt"],
+      Inkomst: ["Lön", "Föräldrapenning", "Övrigt"],
+    });
+  });
+
+  it.each([
+    ["ICA KVANTUM", "mat-livsmedel"],
+    ["COOP KONSUM", "mat-livsmedel"],
+    ["WILLYS ODENPLAN", "mat-livsmedel"],
+    ["HEMKOP CITY", "mat-livsmedel"],
+    ["LIDL", "mat-livsmedel"],
+    ["SYSTEMBOLAGET", "mat-systembolaget"],
+    ["APOTEKET HJARTAT", "halsa-apotek"],
+    ["APOTEK GRUNDEN", "halsa-apotek"],
+    ["NETFLIX", "abonnemang-streaming"],
+    ["NETFLIX.COM", "abonnemang-streaming"],
+    ["SPOTIFY", "abonnemang-streaming"],
+    ["FORSAKRINGSKASSAN", "inkomst-foraldrapenning"],
+  ])("mallregeln känner igen %s", (counterpartyNorm, categoryId) => {
+    const tx = { id: "t", counterpartyNorm, description: "", categoryId: null, categorySource: "none" as const };
+    expect(categorize(tx, TEMPLATE_RULES)?.categoryId).toBe(categoryId);
+  });
+
+  it("mallreglerna har stabila id:n av mönstret", () => {
+    expect(TEMPLATE_RULES.map((r) => r.id)).toContain("mall-netflix-com");
+    expect(TEMPLATE_RULES.find((r) => r.pattern === "ICA")?.id).toBe("mall-ica");
+  });
+
   it("varje huvudkategori har underkategorier, och allt är på högst två nivåer", () => {
     for (const main of mains(CATEGORY_TEMPLATE)) {
       expect(CATEGORY_TEMPLATE.filter((c) => c.parentId === main.id).length).toBeGreaterThan(0);
@@ -69,9 +113,11 @@ describe("byt namn", () => {
   });
 
   it("avvisar tomt namn, okänd kategori och dubblett bland syskonen", () => {
-    expect(() => renameCategory(CATEGORY_TEMPLATE, "mat", "  ")).toThrow(RangeError);
-    expect(() => renameCategory(CATEGORY_TEMPLATE, "finns-inte", "X")).toThrow(RangeError);
-    expect(() => renameCategory(CATEGORY_TEMPLATE, "mat-livsmedel", "systembolaget")).toThrow(RangeError);
+    expect(() => renameCategory(CATEGORY_TEMPLATE, "mat", "  ")).toThrow("Kategorin måste ha ett namn");
+    expect(() => renameCategory(CATEGORY_TEMPLATE, "finns-inte", "X")).toThrow("Okänd kategori: finns-inte");
+    expect(() => renameCategory(CATEGORY_TEMPLATE, "mat-livsmedel", "systembolaget")).toThrow(
+      "Det finns redan en kategori som heter systembolaget",
+    );
   });
 
   it("samma namn under olika huvudkategorier är tillåtet", () => {
@@ -91,10 +137,10 @@ describe("lägg till", () => {
   });
 
   it("tillåter bara två nivåer och bara under en aktiv huvudkategori", () => {
-    expect(() => addCategory(CATEGORY_TEMPLATE, { parentId: "mat-livsmedel", name: "Frukt", newId: () => "ny" })).toThrow(RangeError);
+    expect(() => addCategory(CATEGORY_TEMPLATE, { parentId: "mat-livsmedel", name: "Frukt", newId: () => "ny" })).toThrow("Kategorier kan bara ha två nivåer");
     expect(() => addCategory(CATEGORY_TEMPLATE, { parentId: "finns-inte", name: "X", newId: () => "ny" })).toThrow(RangeError);
     const archived = archiveCategory(CATEGORY_TEMPLATE, "barn");
-    expect(() => addCategory(archived, { parentId: "barn", name: "X", newId: () => "ny" })).toThrow(RangeError);
+    expect(() => addCategory(archived, { parentId: "barn", name: "X", newId: () => "ny" })).toThrow("Huvudkategorin är arkiverad");
   });
 });
 
@@ -139,15 +185,17 @@ describe("slå ihop (V-u-template)", () => {
 
   it("avvisar ihopslagning med en arkiverad kategori", () => {
     const archived = archiveCategory(CATEGORY_TEMPLATE, "mat-livsmedel");
-    expect(() => mergeCategories({ categories: archived, fromId: "mat-systembolaget", intoId: "mat-livsmedel", transactions, rules })).toThrow(RangeError);
+    expect(() => mergeCategories({ categories: archived, fromId: "mat-systembolaget", intoId: "mat-livsmedel", transactions, rules })).toThrow(
+      "Det går inte att slå ihop med en arkiverad kategori",
+    );
   });
 
   it.each([
-    ["samma kategori", "mat", "mat"],
-    ["olika nivåer", "mat", "mat-livsmedel"],
-    ["olika typer", "boende", "inkomst"],
-    ["okänd kategori", "finns-inte", "mat"],
-  ])("avvisar %s", (_, fromId, intoId) => {
-    expect(() => mergeCategories({ categories: CATEGORY_TEMPLATE, fromId, intoId, transactions, rules })).toThrow(RangeError);
+    ["samma kategori", "mat", "mat", "En kategori kan inte slås ihop med sig själv"],
+    ["olika nivåer", "mat", "mat-livsmedel", "Kategorierna måste ligga på samma nivå"],
+    ["olika typer", "boende", "inkomst", "Kategorierna måste vara av samma typ"],
+    ["okänd kategori", "finns-inte", "mat", "Okänd kategori"],
+  ])("avvisar %s", (_, fromId, intoId, message) => {
+    expect(() => mergeCategories({ categories: CATEGORY_TEMPLATE, fromId, intoId, transactions, rules })).toThrow(message);
   });
 });

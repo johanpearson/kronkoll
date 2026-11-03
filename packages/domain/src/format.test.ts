@@ -19,8 +19,8 @@ describe("formatSek (KK-4-A)", () => {
   });
 
   it("avvisar belopp som inte är heltal öre", () => {
-    expect(() => formatSek(12.5)).toThrow(RangeError);
-    expect(() => formatSek(Number.MAX_SAFE_INTEGER + 1)).toThrow(RangeError);
+    expect(() => formatSek(12.5)).toThrow("Belopp måste vara ett heltal i öre");
+    expect(() => formatSek(Number.MAX_SAFE_INTEGER + 1)).toThrow("Belopp måste vara ett heltal i öre");
   });
 });
 
@@ -34,7 +34,7 @@ describe("datumformat (KK-4-B)", () => {
   });
 
   it("avvisar ogiltiga datum", () => {
-    expect(() => formatDateShort("2026-02-30")).toThrow(RangeError);
-    expect(() => formatDateIso("3/11/2026")).toThrow(RangeError);
+    expect(() => formatDateShort("2026-02-30")).toThrow("Ogiltigt datum: 2026-02-30");
+    expect(() => formatDateIso("3/11/2026")).toThrow("Ogiltigt datum: 3/11/2026");
   });
 });

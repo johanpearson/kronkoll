@@ -19,6 +19,6 @@ describe("svensk kalenderdag för ett UTC-ögonblick (KK-33)", () => {
   });
 
   it("avvisar ett ogiltigt ögonblick", () => {
-    expect(() => stockholmDate(new Date("inte ett datum"))).toThrow(RangeError);
+    expect(() => stockholmDate(new Date("inte ett datum"))).toThrow("Ogiltigt ögonblick");
   });
 });

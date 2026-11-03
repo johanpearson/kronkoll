@@ -1,0 +1,62 @@
+# Fullt mutationstest av domänlagret (KK-16-A, D-mutation, V-ci-mutation).
+# PR:er och main kör Stryker inkrementellt i ci.yml. Den inkrementella körningen testar inte om
+# statiska mutanter (t.ex. kategorimallen) när bara testerna ändras, så här körs allt varje natt
+# när packages/domain har ändrats det senaste dygnet (R-7). Resultatet sparas i cachen och blir
+# startpunkten för nästa inkrementella körning.
+name: mutation-nightly
+
+on:
+  schedule:
+    - cron: "41 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-nightly
+  cancel-in-progress: false
+
+jobs:
+  mutation:
+    name: mutation (full)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Har domain ändrats det senaste dygnet?
+        id: changed
+        env:
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ] || [ -n "$(git log --since='25 hours ago' --format=%H -- packages/domain pnpm-lock.yaml)" ]; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Inga ändringar i packages/domain, hoppar över." >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: steps.changed.outputs.run == 'true'
+        with:
+          node-version-file: .nvmrc
+      - if: steps.changed.outputs.run == 'true'
+        run: corepack enable
+      - if: steps.changed.outputs.run == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Alla mutanter, minst 85 %
+        if: steps.changed.outputs.run == 'true'
+        run: pnpm --filter @kronkoll/domain test:mutation --incremental --force
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && hashFiles('packages/domain/reports/stryker-incremental.json') != ''
+        with:
+          path: packages/domain/reports/stryker-incremental.json
+          key: stryker-${{ github.run_id }}-${{ github.run_attempt }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always() && steps.changed.outputs.run == 'true'
+        with:
+          name: mutation-report
+          path: packages/domain/reports/mutation/
+          retention-days: 14
+          if-no-files-found: ignore
