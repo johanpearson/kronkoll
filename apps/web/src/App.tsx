@@ -6,6 +6,7 @@ import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
 import { Link, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
+import { ConnectionView } from "./settings/ConnectionView.tsx";
 import { RulesView } from "./settings/RulesView.tsx";
 import { SettingsView } from "./settings/SettingsView.tsx";
 import { TransactionDetail } from "./transactions/TransactionDetail.tsx";
@@ -44,14 +45,23 @@ const TABS = [
 
 /** /transaktioner/{id}: detaljsidan för en transaktion. */
 const DETAIL = /^\/transaktioner\/([^/]+)$/u;
+/** /installningar/koppling/{id}: sidan om en bankkoppling. */
+const CONNECTION = /^\/installningar\/koppling\/([^/]+)$/u;
+
+function page(path: string): React.JSX.Element {
+  const detailId = DETAIL.exec(path)?.[1];
+  if (detailId !== undefined) return <TransactionDetail key={detailId} id={decodeURIComponent(detailId)} />;
+  const connectionId = CONNECTION.exec(path)?.[1];
+  if (connectionId !== undefined) return <ConnectionView key={connectionId} id={decodeURIComponent(connectionId)} />;
+  const Page = ROUTES[path] ?? NotFound;
+  return <Page />;
+}
 
 export function App() {
   const path = usePath();
-  const detailId = DETAIL.exec(path)?.[1];
-  const Page = ROUTES[path] ?? NotFound;
   return (
     <>
-      {detailId === undefined ? <Page /> : <TransactionDetail key={detailId} id={decodeURIComponent(detailId)} />}
+      {page(path)}
       <nav className="tabbar" aria-label="Huvudmeny">
         <ul>
           {TABS.map((tab) => (
