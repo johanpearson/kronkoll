@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { formatSek } from "@kronkoll/domain";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App.tsx";
-import { REFRESH_AFTER_MS } from "./OverviewView.tsx";
+import { MAX_WAIT_MS, POLL_MS } from "../sync/SyncButton.tsx";
 
 afterEach(() => {
   cleanup();
@@ -35,7 +35,9 @@ function overview(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function api(responses: { overview?: () => [number, unknown]; sync?: [number, unknown] } = {}) {
+const STARTED = "2026-11-15T10:00:00.000Z";
+
+function api(responses: { overview?: () => [number, unknown]; sync?: [number, unknown]; progress?: () => [number, unknown] } = {}) {
   const calls: { method: string; path: string; csrf: string | null }[] = [];
   vi.stubGlobal(
     "fetch",
@@ -44,7 +46,8 @@ function api(responses: { overview?: () => [number, unknown]; sync?: [number, un
       calls.push({ method: init?.method ?? "GET", path: url.pathname, csrf: new Headers(init?.headers).get("x-kronkoll") });
       const json = (status: number, body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status }));
       if (url.pathname === "/api/overview") return json(...(responses.overview?.() ?? [200, overview()]));
-      if (url.pathname === "/api/sync") return json(...(responses.sync ?? [202, { status: "started" }]));
+      if (url.pathname === "/api/sync" && init?.method === "POST") return json(...(responses.sync ?? [202, { status: "started", started_at: STARTED }]));
+      if (url.pathname === "/api/sync") return json(...(responses.progress?.() ?? [200, { started: 1, running: 0, done: true }]));
       return json(404, { error: "not_found" });
     }),
   );
@@ -103,21 +106,44 @@ describe("översikten (#31, KK-17)", () => {
     expect(text()).toContain(`oktober: in ${formatSek(3300000)}, ut ${formatSek(2900000)}`);
   });
 
-  it("visar senaste synk och startar en synk med Synka nu, och hämtar sedan siffrorna igen (KK-7-C)", async () => {
+  it("Synka nu snurrar tills synken är klar och hämtar sedan siffrorna igen (KK-7-C)", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     let fetched = 0;
-    const calls = api({ overview: () => [200, overview({ balance_minor: ++fetched === 1 ? 4831240 : 5000000 })] });
+    let polls = 0;
+    const calls = api({
+      overview: () => [200, overview({ balance_minor: ++fetched === 1 ? 4831240 : 5000000 })],
+      // Första frågan: pågår. Andra: klar.
+      progress: () => [200, ++polls === 1 ? { started: 1, running: 1, done: false } : { started: 1, running: 0, done: true }],
+    });
     await open();
     expect(text()).toContain("Senast synkad 15 nov. 06:02");
     fireEvent.click(screen.getByRole("button", { name: "Synka nu" }));
     await settle();
-    expect(calls.find((c) => c.path === "/api/sync")).toEqual({ method: "POST", path: "/api/sync", csrf: "1" });
-    expect(screen.getByRole("status").textContent).toBe("Synken är startad. Siffrorna uppdateras om en stund.");
+    expect(calls.find((c) => c.method === "POST")).toEqual({ method: "POST", path: "/api/sync", csrf: "1" });
+    const button = screen.getByRole("button", { name: "Synkar…" });
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect(button.querySelector("svg")?.getAttribute("class")).toContain("spin");
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(REFRESH_AFTER_MS);
+      await vi.advanceTimersByTimeAsync(POLL_MS * 3);
     });
     await settle();
+    expect(calls.filter((c) => c.method === "GET" && c.path === "/api/sync")).toHaveLength(2);
+    expect(screen.getByRole("status").textContent).toBe("Synken är klar.");
+    expect(screen.getByRole("button", { name: "Synka nu" }).querySelector("svg")?.getAttribute("class")).not.toContain("spin");
     expect(screen.getAllByRole("definition")[0]?.textContent).toBe(formatSek(5000000));
+  });
+
+  it("hämtar om ändå när synken tar för lång tid, och säger det", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    api({ progress: () => [200, { started: 1, running: 1, done: false }] });
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Synka nu" }));
+    await settle();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(MAX_WAIT_MS + POLL_MS);
+    });
+    await settle();
+    expect(screen.getByRole("status").textContent).toContain("Synken tar längre tid än vanligt");
   });
 
   it.each([

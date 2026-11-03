@@ -3,12 +3,11 @@
 // Siffrorna räknas i API:t (GET /api/overview); vyn visar dem bara.
 import { formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
-import { field, getJson, postJson } from "../api.ts";
+import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
+import { SyncButton } from "../sync/SyncButton.tsx";
 import { toPeriod, type Period } from "../transactions/TransactionsView.tsx";
 
-/** Hur länge vyn väntar efter Synka nu innan den hämtar siffrorna igen. */
-export const REFRESH_AFTER_MS = 8000;
 /** Varning när samtycket har så här många dagar kvar eller färre (KK-8-A). */
 const CONSENT_WARNING_DAYS = 14;
 
@@ -108,32 +107,11 @@ function TrendChart({ trend }: { trend: readonly TrendPoint[] }) {
   );
 }
 
-function SyncNow({ lastSyncAt, onStarted }: { lastSyncAt: string | null; onStarted: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const start = async () => {
-    setBusy(true);
-    const { status, body } = await postJson("/api/sync", {});
-    setBusy(false);
-    if (status === 202) {
-      setMessage("Synken är startad. Siffrorna uppdateras om en stund.");
-      onStarted();
-    } else if (status === 429) {
-      const minutes = Math.max(1, Math.ceil(minor(field(body, "retry_after_s")) / 60));
-      setMessage(`Du kan synka igen om ${String(minutes)} min.`);
-    } else {
-      setMessage("Det gick inte att starta synken. Försök igen om en stund.");
-    }
-  };
-
+function SyncRow({ lastSyncAt, onDone }: { lastSyncAt: string | null; onDone: () => void }) {
   return (
     <div className="sync">
       <p>{lastSyncAt === null ? "Inte synkad än" : `Senast synkad ${syncTime.format(new Date(lastSyncAt))}`}</p>
-      <button type="button" disabled={busy} onClick={() => void start()}>
-        {busy ? "Startar…" : "Synka nu"}
-      </button>
-      {message && <p role="status">{message}</p>}
+      <SyncButton onDone={onDone} />
     </div>
   );
 }
@@ -166,12 +144,6 @@ export function OverviewView() {
     };
   }, [reload]);
 
-  const refreshLater = () => {
-    setTimeout(() => {
-      setReload((n) => n + 1);
-    }, REFRESH_AFTER_MS);
-  };
-
   if (state.kind === "loading") return <main><h1>Översikt</h1><p>Hämtar…</p></main>;
   if (state.kind === "error") return <main><h1>Översikt</h1><p role="alert">Det gick inte att hämta översikten. Försök igen om en stund.</p></main>;
   const o = state.overview;
@@ -184,7 +156,7 @@ export function OverviewView() {
     <main>
       <h1>Översikt</h1>
       <p>{monthOf(o.period.key, monthName).replace(/^./u, (c) => c.toUpperCase())}</p>
-      <SyncNow lastSyncAt={o.lastSyncAt} onStarted={refreshLater} />
+      <SyncRow lastSyncAt={o.lastSyncAt} onDone={() => { setReload((n) => n + 1); }} />
       {expiring.map((c) => (
         <p key={c.bank} role="alert">
           Kopplingen till {c.bank} går ut om {String(c.consentDaysLeft)} dagar. Förnya den med BankID så fortsätter hämtningen.
