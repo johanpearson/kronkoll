@@ -638,7 +638,7 @@
         "201": { "body": { "rule": { "id": "…", "match": "counterparty_prefix", "pattern": "IKEA", "category_id": "hushall-forbrukning", "source": "learned" }, "retroactive_candidates": 12, "protected_manual": 1 } },
         "400": { "body": { "error": "invalid_request | unknown_category" } }
       },
-      "description": "Byggt i #34. Mönstret normaliseras som en motpart. Regeln gäller direkt för nya transaktioner; svaret säger vad den skulle ändra bakåt, och appen frågar innan POST /api/rules/{id}/apply. GET ger också `hits` och `category_archived`.",
+      "description": "Byggt i #34. Mönstret normaliseras som en motpart. Regeln gäller direkt för nya transaktioner; svaret säger vad den skulle ändra bakåt, och appen frågar innan POST /api/rules/{id}/apply. GET ger också `hits` och `category_archived`. GET /api/rules/{id}/matches förhandsvisar vilka transaktioner regeln gäller (ändras, oförändrad eller manuell); POST /api/rules/apply-all kör alla regler över historiken, med { preview: true } för att bara räkna. Ingen kategori tas bort och manuella rörs aldrig.",
       "satisfies": ["KK-18-B", "KK-18-C"]
     },
     {

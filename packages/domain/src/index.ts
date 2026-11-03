@@ -25,18 +25,21 @@ export {
 } from "./transfers.ts";
 export { learnPattern, matchesWordPrefix, normalizeCounterparty } from "./normalize.ts";
 export {
+  applyAllRules,
   applyRules,
   ruleReach,
   categorize,
   learnFromManualChoice,
   patternChoices,
   ruleHits,
+  ruleMatches,
   ruleKey,
   type CategorizableTransaction,
   type Categorization,
   type CategoryChange,
   type CategoryRule,
   type CategorySource,
+  type RuleMatch,
   type RuleReach,
   type LearnInput,
   type LearnResult,
