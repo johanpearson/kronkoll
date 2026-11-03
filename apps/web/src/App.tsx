@@ -6,6 +6,7 @@ import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
 import { Link, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
+import { RulesView } from "./settings/RulesView.tsx";
 import { SettingsView } from "./settings/SettingsView.tsx";
 import { TransactionDetail } from "./transactions/TransactionDetail.tsx";
 import { TransactionsView } from "./transactions/TransactionsView.tsx";
@@ -27,6 +28,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/budget": BudgetView,
   "/installningar": SettingsView,
   "/installningar/kategorier": CategoriesView,
+  "/installningar/regler": RulesView,
   "/koppla": ConnectBank,
   "/koppla/samtycke": Consent,
   "/koppla/klar": ConnectDone,

@@ -285,6 +285,11 @@ main ul > li.budget-line {
   white-space: nowrap;
 }
 
+/* En status under en rads text ska inte sträckas ut över hela raden. */
+li.tx > .badge {
+  justify-self: start;
+}
+
 .badge.ok {
   color: var(--success);
 }

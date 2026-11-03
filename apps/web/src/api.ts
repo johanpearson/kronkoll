@@ -24,7 +24,12 @@ export function putJson(path: string, body: unknown, timeoutMs = TIMEOUT_MS): Pr
   return sendJson("PUT", path, body, timeoutMs);
 }
 
-async function sendJson(method: "POST" | "PATCH" | "PUT", path: string, body: unknown, timeoutMs: number): Promise<ApiResult> {
+/** DELETE utan innehåll, likadant som postJson. Ett 204-svar ger body null. */
+export function deleteJson(path: string, timeoutMs = TIMEOUT_MS): Promise<ApiResult> {
+  return sendJson("DELETE", path, undefined, timeoutMs);
+}
+
+async function sendJson(method: "POST" | "PATCH" | "PUT" | "DELETE", path: string, body: unknown, timeoutMs: number): Promise<ApiResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
@@ -34,7 +39,7 @@ async function sendJson(method: "POST" | "PATCH" | "PUT", path: string, body: un
       method,
       credentials: "same-origin",
       headers: { "content-type": "application/json", "x-kronkoll": "1" },
-      body: JSON.stringify(body),
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       signal: controller.signal,
     });
     return { status: response.status, body: await response.json().catch(() => null) };
