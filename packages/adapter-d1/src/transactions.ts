@@ -19,7 +19,7 @@ import {
   type OwnAccount,
   type TransferInput,
 } from "@kronkoll/domain";
-import { and, desc, eq, gte, inArray, isNull, lt, lte, max, ne, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNull, lt, max, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { accounts, transactions } from "./schema.ts";
 
@@ -187,8 +187,8 @@ export function transactionRepository(d1: D1Database) {
       const q = query.q?.trim() ?? "";
       const conditions = [
         ne(transactions.status, "removed"),
-        gte(transactions.transactionDate, query.from),
-        lte(transactions.transactionDate, query.to),
+        // Perioden räknas som i budgeten: bokföringsdagen, annars köpdagen (KK-20, KK-34).
+        sql`coalesce(${transactions.bookingDate}, ${transactions.transactionDate}) BETWEEN ${query.from} AND ${query.to}`,
         query.uncategorized ? isNull(transactions.categoryId) : undefined,
         query.categoryId === undefined ? undefined : inCategory(query.categoryId),
         q === ""

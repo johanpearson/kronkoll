@@ -115,3 +115,20 @@ describe("lista transaktioner (KK-9, KK-18, #32)", () => {
     await expect(transactionRepository(db).list({ ...NOVEMBER, cursor })).rejects.toThrow(RangeError);
   });
 });
+
+describe("perioden räknas som i budgeten (KK-20, KK-34)", () => {
+  it("ett köp hör till perioden då det bokfördes, eller köptes om det inte är bokfört än", async () => {
+    await db.batch([
+      db.prepare(
+        `INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, booking_date, amount_minor, counterparty, counterparty_norm, description, category_source)
+         VALUES ('b-okt', 'acc_1', 'fp', 'booked', '2026-11-01', '2026-10-31', '2026-11-01', -100, 'KÖPT I OKTOBER', 'KÖPT I OKTOBER', '', 'none'),
+                ('b-dec', 'acc_1', 'fp', 'booked', '2026-12-01', '2026-11-30', '2026-12-01', -100, 'BOKAD I DECEMBER', 'BOKAD I DECEMBER', '', 'none')`,
+      ),
+    ]);
+    const november = await ids();
+    expect(november).toContain("b-okt");
+    expect(november).not.toContain("b-dec");
+    expect(await ids({ from: "2026-12-01", to: "2026-12-31" })).toContain("b-dec");
+    await db.prepare(`DELETE FROM transactions WHERE id IN ('b-okt', 'b-dec')`).run();
+  });
+});
