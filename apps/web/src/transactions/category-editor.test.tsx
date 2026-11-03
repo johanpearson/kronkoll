@@ -112,7 +112,8 @@ describe("byta kategori (KK-18-B, KK-18-C, #32)", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Gör alltid så för ICA Nära Sofo" }));
     fireEvent.click(screen.getByRole("button", { name: "Spara" }));
     await settle();
-    expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ category_id: "hushall-forbrukning", learn_rule: true });
+    // Hela namnet är förvalt.
+    expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ category_id: "hushall-forbrukning", learn_rule: true, rule_pattern: "ICA NÄRA SOFO" });
     expect(screen.getByText("Regeln matchar 23 tidigare transaktioner. 2 manuellt valda ändras inte.")).toBeDefined();
     const listBefore = calls.filter((c) => c.path === "/api/transactions").length;
     fireEvent.click(screen.getByRole("button", { name: "Applicera på dem" }));
@@ -120,6 +121,24 @@ describe("byta kategori (KK-18-B, KK-18-C, #32)", () => {
     expect(calls.find((c) => c.path === "/api/rules/r-1/apply")).toMatchObject({ method: "POST", csrf: "1" });
     expect(screen.getByRole("status").textContent).toBe("23 transaktioner fick den nya kategorin.");
     expect(calls.filter((c) => c.path === "/api/transactions").length).toBeGreaterThan(listBefore);
+  });
+
+  it("med Gör alltid så går det att välja en kortare början av namnet, så att regeln gäller hela kedjan", async () => {
+    const calls = api({ patch: saved({ ...RULE, pattern: "ICA" }, 0, 0) });
+    await openEditor();
+    expect(screen.queryByRole("group", { name: "Gäller" })).toBeNull();
+    fireEvent.change(screen.getByRole("combobox", { name: "Kategori" }), { target: { value: "mat-livsmedel" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Gör alltid så för ICA Nära Sofo" }));
+    const group = screen.getByRole("group", { name: "Gäller" });
+    expect([...group.querySelectorAll("label")].map((l) => l.textContent)).toEqual([
+      "Allt som börjar med ICA NÄRA SOFO",
+      "Allt som börjar med ICA NÄRA",
+      "Allt som börjar med ICA",
+    ]);
+    fireEvent.click(screen.getByRole("radio", { name: "Allt som börjar med ICA" }));
+    fireEvent.click(screen.getByRole("button", { name: "Spara" }));
+    await settle();
+    expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ category_id: "mat-livsmedel", learn_rule: true, rule_pattern: "ICA" });
   });
 
   it("\"Inte nu\" stänger frågan utan att ändra historiken", async () => {

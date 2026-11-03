@@ -164,7 +164,12 @@ export function TransactionDetail({ id }: { id: string }) {
       )}
       {mode === "category" && (
         <section className="card tx-editor">
-          <CategoryEditor transactionId={d.id} name={d.counterparty || "motparten"} options={categories.options} onSaved={() => undefined} onApplied={close} onClose={close} />
+          <CategoryEditor
+            transactionId={d.id}
+            name={d.counterparty || d.description || "motparten"}
+            counterparty={d.counterparty}
+            description={d.description}
+            options={categories.options} onSaved={() => undefined} onApplied={close} onClose={close} />
         </section>
       )}
       {mode === "split" && (
