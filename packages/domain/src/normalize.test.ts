@@ -34,6 +34,19 @@ describe("normalisering av motpart (F-learn)", () => {
     expect(normalizeCounterparty(raw)).toBe(normalized);
   });
 
+  it.each([
+    "SE", "SWE", "SVERIGE", "STHLM", "STOCKHOLM", "GBG", "GOTEBORG", "GÖTEBORG", "MALMO", "MALMÖ",
+    "UPPSALA", "LINKOPING", "LINKÖPING", "OREBRO", "ÖREBRO", "VASTERAS", "VÄSTERÅS",
+    "HELSINGBORG", "NORRKOPING", "NORRKÖPING", "JONKOPING", "JÖNKÖPING", "UMEA", "UMEÅ", "LUND",
+    "SOLNA", "SUNDBYBERG", "NACKA", "HUDDINGE",
+  ])("orten %s sist tas bort", (place) => {
+    expect(normalizeCounterparty(`BAGERIET ${place}`)).toBe("BAGERIET");
+  });
+
+  it("andra ord sist behålls", () => {
+    expect(normalizeCounterparty("BAGERIET HORNSTULL")).toBe("BAGERIET HORNSTULL");
+  });
+
   it("är idempotent: att normalisera två gånger ger samma resultat", () => {
     for (const raw of ["K*ICA KVANTUM 12 STHLM", "SQ *KAFFEBAREN 123", "  ica  nära  sofo ", "WILLYS42ODENPLAN, STOCKHOLM"]) {
       const once = normalizeCounterparty(raw);

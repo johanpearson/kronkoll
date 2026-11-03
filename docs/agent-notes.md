@@ -28,6 +28,17 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Planen kontrolleras och byggs med reqplan: `check`, `build` och `build --mode prototype` på
   `plans/kronkoll/plan.json`. HTML-filerna räknas inte i PR-storleken.
 
+## Mutationstest (Stryker)
+
+- `pnpm --filter @kronkoll/domain test:mutation` kör allt (cirka 4 minuter). Lägg till `--incremental` för att
+  bara köra om det som ändrats sedan förra körningen (`reports/stryker-incremental.json`).
+- Stryker 10 kräver Node `^22.18` eller `>=24.11`, och `.npmrc` har `engine-strict`. Äldre Node 24 lokalt
+  stoppar `pnpm install`. Använd Node enligt `.nvmrc`.
+- Inkrementellt läge testar inte om **statiska mutanter** (data på modulnivå, t.ex. kategorimallen) när bara
+  testerna ändras. Kör med `--incremental --force` för det riktiga värdet. Det gör den nattliga körningen.
+- Överlevande mutanter dödas med tester, inte med `// Stryker disable`. Felmeddelanden testas med texten,
+  t.ex. `toThrow("Ogiltigt belopp")`, inte bara `toThrow(RangeError)`.
+
 ## Cloudflare och D1: gränser som har orsakat riktiga fel
 
 - **CPU-tid:** Workern får runt 10 ms CPU per anrop på gratisnivån. Gör dyra steg (normalisering av
@@ -69,4 +80,5 @@ pnpm --filter @kronkoll/<paket> test:coverage
   nytt konto. Matcha på namn och typ inom kopplingen om det händer.
 - "Bara okategoriserade" i Transaktioner visar även okategoriserade insättningar, medan budgetens belopp bara
   räknar utbetalningar (#153).
-- Kvar i M1: #35 (E2E och mutationstest i CI), #29 (CSV-import, kanske stryks) och #24 (avsluta spiken).
+- Kvar i M1: #35 (mutationstest klart, kvar: integrationstester i Workers-miljö och E2E), #29 (CSV-import,
+  kanske stryks) och #24 (avsluta spiken).

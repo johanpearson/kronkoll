@@ -119,12 +119,12 @@ describe("budget på huvud- eller underkategori (KK-20-A)", () => {
   });
 
   it.each([
-    ["okänd kategori", [{ categoryId: "finns-inte", amountMinor: 100 }]],
-    ["en inkomstkategori", [{ categoryId: "inkomst-lon", amountMinor: 100 }]],
-    ["ett negativt belopp", [{ categoryId: "mat", amountMinor: -100 }]],
-    ["samma kategori två gånger", [{ categoryId: "mat", amountMinor: 100 }, { categoryId: "mat", amountMinor: 200 }]],
-  ])("avvisar en budgetrad med %s", (_, lines) => {
-    expect(() => outcome([], lines)).toThrow(RangeError);
+    ["okänd kategori", [{ categoryId: "finns-inte", amountMinor: 100 }], "Okänd kategori i budgeten: finns-inte"],
+    ["en inkomstkategori", [{ categoryId: "inkomst-lon", amountMinor: 100 }], "Budget kan bara sättas på utgiftskategorier"],
+    ["ett negativt belopp", [{ categoryId: "mat", amountMinor: -100 }], "Budgeten kan inte vara negativ"],
+    ["samma kategori två gånger", [{ categoryId: "mat", amountMinor: 100 }, { categoryId: "mat", amountMinor: 200 }], "Kategorin finns två gånger i budgeten: mat"],
+  ])("avvisar en budgetrad med %s", (_, lines, message) => {
+    expect(() => outcome([], lines)).toThrow(message);
   });
 });
 

@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "testRunner": "vitest",
+  "plugins": ["@stryker-mutator/vitest-runner"],
+  "vitest": { "configFile": "vitest.config.ts" },
+  "mutate": ["src/**/*.ts", "!src/**/*.test.ts", "!src/index.ts"],
+  "thresholds": { "high": 90, "low": 85, "break": 85 },
+  "incrementalFile": "reports/stryker-incremental.json",
+  "reporters": ["clear-text", "progress", "html"],
+  "htmlReporter": { "fileName": "reports/mutation/index.html" },
+  "tempDirName": ".stryker-tmp"
+}

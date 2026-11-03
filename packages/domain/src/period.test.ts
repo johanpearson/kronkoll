@@ -58,11 +58,11 @@ describe("period från lön till lön (KK-34)", () => {
   });
 
   it.each([0, 29, 31, 2.5])("avvisar startdag %s", (day) => {
-    expect(() => budgetPeriodOf("2026-11-10", day)).toThrow(RangeError);
+    expect(() => budgetPeriodOf("2026-11-10", day)).toThrow("Periodens startdag måste vara ett heltal 1–28");
   });
 
   it("avvisar ett ogiltigt datum", () => {
-    expect(() => budgetPeriodOf("2026-02-30", 1)).toThrow(RangeError);
+    expect(() => budgetPeriodOf("2026-02-30", 1)).toThrow("Ogiltigt datum: 2026-02-30");
   });
 });
 
@@ -86,7 +86,7 @@ describe("period från nyckel (för /api/budgets/{period})", () => {
   });
 
   it.each(["2026-13", "2026-1", "26-01", ""])("avvisar nyckeln %j", (key) => {
-    expect(() => budgetPeriodForKey(key, 1)).toThrow(RangeError);
+    expect(() => budgetPeriodForKey(key, 1)).toThrow(`Ogiltig periodnyckel: ${key}`);
   });
 });
 

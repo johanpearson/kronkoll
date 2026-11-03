@@ -3,11 +3,11 @@ import { addDays, addMonths, daysBetween, parseDate, weekday } from "./calendar.
 
 describe("kalenderdagar utan klockslag", () => {
   it.each(["2026-1-01", "26-01-01", "2026/01/01", "", "2026-01-01T00:00"])("avvisar formatet %j", (text) => {
-    expect(() => parseDate(text)).toThrow(RangeError);
+    expect(() => parseDate(text)).toThrow(`Ogiltigt datum: ${text}`);
   });
 
   it.each(["2026-02-29", "2026-04-31", "2026-13-01", "2026-00-10"])("avvisar datumet %s som inte finns", (text) => {
-    expect(() => parseDate(text)).toThrow(RangeError);
+    expect(() => parseDate(text)).toThrow(`Ogiltigt datum: ${text}`);
   });
 
   it("räknar dagar över månads- och årsskiften utan att påverkas av sommartid", () => {

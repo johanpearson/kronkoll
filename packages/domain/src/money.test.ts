@@ -30,12 +30,12 @@ describe("parseAmount: bankens decimalsträng till heltal öre (D-money)", () =>
   it.each(["", "abc", "1.234", "1,50", "1.", ".5", "--1", "1e3", "12 345.00", "NaN", "Infinity"])(
     "avvisar %j",
     (text) => {
-      expect(() => parseAmount(text)).toThrow(RangeError);
+      expect(() => parseAmount(text)).toThrow("Ogiltigt belopp");
     },
   );
 
   it("avvisar belopp som inte ryms som säkert heltal", () => {
-    expect(() => parseAmount("90071992547409.92")).toThrow(RangeError);
+    expect(() => parseAmount("90071992547409.92")).toThrow(/belopp/iu);
   });
 
   it("returnerar aldrig minus noll", () => {
@@ -50,10 +50,10 @@ describe("sumMinor", () => {
   });
 
   it("avvisar belopp som inte är heltal öre", () => {
-    expect(() => sumMinor([1, 2.5])).toThrow(RangeError);
+    expect(() => sumMinor([1, 2.5])).toThrow("Belopp måste vara ett heltal i öre");
   });
 
   it("avvisar en summa som slår över säkert heltal", () => {
-    expect(() => sumMinor([Number.MAX_SAFE_INTEGER, 1])).toThrow(RangeError);
+    expect(() => sumMinor([Number.MAX_SAFE_INTEGER, 1])).toThrow("Belopp måste vara ett heltal i öre");
   });
 });

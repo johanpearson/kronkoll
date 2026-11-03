@@ -3,7 +3,7 @@ import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  { ignores: ["**/node_modules/**", "**/dist/**", "**/coverage/**", "**/.wrangler/**", "plans/**"] },
+  { ignores: ["**/node_modules/**", "**/dist/**", "**/coverage/**", "**/.wrangler/**", "**/.stryker-tmp/**", "**/reports/**", "plans/**"] },
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
   {

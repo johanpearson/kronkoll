@@ -166,9 +166,9 @@ describe("inlärning: \"Gör alltid så\" (KK-18-B)", () => {
   it("avvisar ett mönster som inte är en början av transaktionens namn", () => {
     const learn = (pattern: string) => () =>
       learnFromManualChoice({ transaction: tx({ id: "t1", counterpartyNorm: "IKEA KUNGENS KURVA" }), categoryId: "hushall", alwaysDoThis: true, pattern, rules: [], newId: counter() });
-    expect(learn("IKE")).toThrow(RangeError);
-    expect(learn("KUNGENS")).toThrow(RangeError);
-    expect(learn("")).toThrow(RangeError);
+    expect(learn("IKE")).toThrow("Regeln måste gälla början av namnet, hela ord");
+    expect(learn("KUNGENS")).toThrow("Regeln måste gälla början av namnet, hela ord");
+    expect(learn("")).toThrow("Regeln måste gälla början av namnet, hela ord");
   });
 
   it("lär in hela motparten för ett vanligt första ord som SWISH", () => {
