@@ -1,11 +1,15 @@
 // Regler (#34, KK-18-B, KK-18-C): alla kategoriseringsregler, med hur många transaktioner varje regel
 // träffar. Lägg till en regel direkt ("allt som börjar med IKEA → Hushåll"), ändra eller ta bort. En ny
 // eller ändrad regel gäller nya transaktioner direkt; för tidigare frågar vyn först. Manuellt valda
-// ändras aldrig. En regel vars kategori är arkiverad markeras med text.
+// ändras aldrig. En regel vars kategori är arkiverad markeras med text. "Visa träffar" och frågan efter
+// att en regel sparats visar vilka transaktioner den gäller. "Applicera alla regler" kör alla regler över
+// historiken efter en fråga, och Synka nu hämtar nytt från banken och kategoriserar.
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { deleteJson, field, getJson, patchJson, postJson, type ApiResult } from "../api.ts";
 import { Link } from "../router.tsx";
+import { SyncButton } from "../sync/SyncButton.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "../transactions/TransactionsView.tsx";
+import { RuleMatches } from "./RuleMatches.tsx";
 
 interface Rule {
   readonly id: string;
@@ -90,7 +94,11 @@ function RuleForm(props: { title: string; rule?: Rule; categories: Categories; o
   );
 }
 
-type Mode = { readonly kind: "add" } | { readonly kind: "menu" | "edit" | "delete"; readonly id: string } | { readonly kind: "ask"; readonly ask: Ask };
+type Mode =
+  | { readonly kind: "add" }
+  | { readonly kind: "menu" | "matches" | "edit" | "delete"; readonly id: string }
+  | { readonly kind: "ask"; readonly ask: Ask }
+  | { readonly kind: "all"; readonly count: number };
 
 export function RulesView() {
   const [rules, setRules] = useState<Rule[] | null | "error">(null);
@@ -127,6 +135,19 @@ export function RulesView() {
     const updated = field(body, "updated");
     refresh(status === 200 && typeof updated === "number" ? `${String(updated)} transaktioner fick den nya kategorin.` : "Det gick inte att applicera regeln. Försök igen.");
   };
+  /** "Applicera alla regler": räkna först, fråga, applicera sedan (KK-18-C). */
+  const previewAll = async () => {
+    const { status, body } = await postJson("/api/rules/apply-all", { preview: true });
+    const count = field(body, "would_update");
+    if (status !== 200 || typeof count !== "number") setNotice("Det gick inte att räkna. Försök igen.");
+    else if (count === 0) refresh("Alla transaktioner har redan kategorin som reglerna ger.");
+    else setMode({ kind: "all", count });
+  };
+  const applyAllRules = async () => {
+    const { status, body } = await postJson("/api/rules/apply-all", {});
+    const updated = field(body, "updated");
+    refresh(status === 200 && typeof updated === "number" ? `${String(updated)} transaktioner fick ny kategori.` : "Det gick inte att applicera reglerna. Försök igen.");
+  };
   const remove = async (ruleId: string) => {
     const { status } = await deleteJson(`/api/rules/${encodeURIComponent(ruleId)}`);
     refresh(status === 204 ? "Regeln är borttagen." : "Det gick inte att ta bort regeln. Försök igen.");
@@ -151,13 +172,35 @@ export function RulesView() {
     <main>
       {header}
       <p>En regel ger en kategori åt allt som börjar med ett visst namn. Den används vid varje synk. Manuellt valda kategorier ändras aldrig.</p>
+      <div className="sync">
+        <SyncButton onDone={() => { setReload((n) => n + 1); }} />
+        <button type="button" onClick={() => void previewAll()}>
+          Applicera alla regler
+        </button>
+      </div>
       {notice && <p role="status">{notice}</p>}
+      {mode?.kind === "all" && (
+        <section className="card">
+          <p>
+            {mode.count} transaktioner får ny kategori enligt reglerna. Manuellt valda ändras aldrig, och ingen kategori tas bort.
+          </p>
+          <p className="actions">
+            <button type="button" className="primary" onClick={() => void applyAllRules()}>
+              Applicera
+            </button>
+            <button type="button" onClick={() => { setMode(null); }}>
+              Avbryt
+            </button>
+          </p>
+        </section>
+      )}
       {mode?.kind === "ask" && (
         <section className="card">
           <p>
             Regeln matchar {mode.ask.candidates} tidigare transaktioner.
             {mode.ask.protectedManual > 0 ? ` ${String(mode.ask.protectedManual)} manuellt valda ändras inte.` : ""}
           </p>
+          <RuleMatches ruleId={mode.ask.ruleId} />
           <p className="actions">
             <button type="button" className="primary" onClick={() => void apply(mode.ask.ruleId)}>
               Applicera på dem
@@ -204,6 +247,9 @@ export function RulesView() {
                 {r.archived && <span className="badge warn">Kategorin är arkiverad</span>}
                 {open === "menu" && (
                   <div className="tx-actions">
+                    <button type="button" className="small" onClick={() => { setMode({ kind: "matches", id: r.id }); }}>
+                      Visa träffar
+                    </button>
                     <button type="button" className="small" onClick={() => { setMode({ kind: "edit", id: r.id }); }}>
                       Ändra namn eller kategori
                     </button>
@@ -213,6 +259,16 @@ export function RulesView() {
                     <button type="button" className="small" onClick={() => { setMode(null); }}>
                       Stäng
                     </button>
+                  </div>
+                )}
+                {open === "matches" && (
+                  <div className="tx-editor">
+                    <RuleMatches ruleId={r.id} />
+                    <p>
+                      <button type="button" className="small" onClick={() => { setMode(null); }}>
+                        Stäng
+                      </button>
+                    </p>
                   </div>
                 )}
                 {open === "edit" && <RuleForm title={`Ändra regeln ${r.pattern}`} rule={r} categories={categories} onSaved={saved} onClose={() => { setMode(null); }} />}
