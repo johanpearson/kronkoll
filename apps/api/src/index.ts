@@ -9,6 +9,7 @@ import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.
 import { listAccounts, patchAccount } from "./accounts.ts";
 import { getBudget, putBudget } from "./budget.ts";
 import { createCategory, listCategories, mergeCategory, patchCategory } from "./categories.ts";
+import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
 import { getOverview } from "./overview.ts";
 import { getSettings, patchSettings } from "./settings.ts";
@@ -95,8 +96,9 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
 
   const connectionMatch = /^\/api\/connections\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
   if (connectionMatch?.[1] && connectionMatch[1] !== "callback") {
-    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
-    return getConnection(env, context.sync, connectionMatch[1]);
+    if (request.method === "GET") return getConnection(env, context.sync, connectionMatch[1]);
+    if (request.method === "DELETE") return deleteConnection(request, env, context, connectionMatch[1]);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, DELETE" });
   }
 
   if (pathname === "/api/connections" || pathname === "/api/connections/callback") {

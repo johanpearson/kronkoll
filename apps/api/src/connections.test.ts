@@ -40,6 +40,7 @@ const newId = () => `conn-${String(++seq)}`;
 function fakeConnector(error?: ProviderError) {
   const requests: AuthorizationRequest[] = [];
   const connector: BankConnector = {
+    revokeSession: () => Promise.reject(new Error("används inte här")),
     startAuthorization(request) {
       requests.push(request);
       return error ? Promise.reject(error) : Promise.resolve({ url: "https://tilisy.enablebanking.com/welcome?x=1" });

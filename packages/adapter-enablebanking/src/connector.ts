@@ -2,7 +2,7 @@
  * Enable Banking som BankConnector (KK-5, KK-8, flödet F-koppla).
  *
  * - Bara samtyckesanropen för kontoinformation (AIS): `GET /aspsps`, `POST /auth` och
- *   `POST /sessions`. Inga betalningar (KK-5-A).
+ *   `POST /sessions`, och `DELETE /sessions/{id}` när en koppling raderas (KK-11-A). Inga betalningar (KK-5-A).
  * - Samtycket begärs med bankens längsta giltighetstid (`maximum_consent_validity`), eller 90
  *   dagar om banken inte anger någon, och alltid minus en timmes marginal.
  * - Ett fel innehåller bara en felkod, aldrig bankens svarstext, koden från banken eller state (KK-13).
@@ -87,6 +87,18 @@ export function createEnableBankingConnector(options: EnableBankingConnectorOpti
       if (validUntil === null) return { sessionId, consentExpiresOn: null };
       const instant = new Date(validUntil);
       return { sessionId, consentExpiresOn: Number.isNaN(instant.getTime()) ? bad() : stockholmDate(instant) };
+    },
+
+    async revokeSession(sessionId: string): Promise<void> {
+      const url = new URL(`/sessions/${encodeURIComponent(sessionId)}`, base);
+      let res: Response;
+      try {
+        res = await options.fetch(url, { method: "DELETE", headers: { authorization: `Bearer ${await options.signer.sign()}` } });
+      } catch {
+        throw new ProviderError("UNAVAILABLE");
+      }
+      // 404: sessionen finns inte längre hos banken, och det är just det vi vill.
+      if (!res.ok && res.status !== 404) throw errorFor(res.status);
     },
   };
 }

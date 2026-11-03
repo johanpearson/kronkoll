@@ -42,6 +42,30 @@ export interface Connection {
   readonly consentExpiresOn: string | null;
 }
 
+export interface HistoryCounts {
+  readonly accounts: number;
+  readonly transactions: number;
+  readonly splits: number;
+}
+
+/**
+ * Hur mycket historik som raderas med en koppling, för frågan och kvittensen (KK-11-B). Behöver inga
+ * nycklar, så sidan om kopplingen kan visa det.
+ */
+export async function connectionHistoryCounts(d1: D1Database, id: string): Promise<HistoryCounts> {
+  const row = await d1
+    .prepare(
+      `SELECT
+         (SELECT count(*) FROM accounts WHERE connection_id = ?1) AS accounts,
+         (SELECT count(*) FROM transactions WHERE account_id IN (SELECT id FROM accounts WHERE connection_id = ?1)) AS transactions,
+         (SELECT count(*) FROM transaction_splits WHERE transaction_id IN
+           (SELECT t.id FROM transactions t JOIN accounts a ON a.id = t.account_id WHERE a.connection_id = ?1)) AS splits`,
+    )
+    .bind(id)
+    .first<HistoryCounts>();
+  return { accounts: row?.accounts ?? 0, transactions: row?.transactions ?? 0, splits: row?.splits ?? 0 };
+}
+
 export function connectionRepository(d1: D1Database, keys: Keys) {
   const db = drizzle(d1);
   const toConnection = (row: typeof bankConnections.$inferSelect): Connection => ({
@@ -103,9 +127,18 @@ export function connectionRepository(d1: D1Database, keys: Keys) {
       return consecutiveFailures;
     },
     /** Raderar kopplingen med dess konton och transaktioner (KK-11). */
+    /**
+     * Raderar kopplingen. Konton, transaktioner, uppdelningar och saldon följer med via ON DELETE CASCADE,
+     * och motposter i andra konton tappar sin koppling (SET NULL) (KK-11-B).
+     */
     async delete(id: string): Promise<void> {
       await db.delete(bankConnections).where(eq(bankConnections.id, id));
     },
+    /** Sessionen är återkallad hos banken: session-id raderas, men konton och historik finns kvar (KK-11-A). */
+    async revoke(id: string): Promise<void> {
+      await db.update(bankConnections).set({ status: "revoked", sessionIdEnc: null }).where(eq(bankConnections.id, id));
+    },
+    historyCounts: (id: string) => connectionHistoryCounts(d1, id),
   };
 }
 

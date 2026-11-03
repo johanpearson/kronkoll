@@ -256,6 +256,46 @@ describe("kopplingens synkstatus (KK-7-A, KK-7-B)", () => {
   });
 });
 
+describe("radera en koppling (KK-11-A, KK-11-B)", () => {
+  async function seedConnection(id: string) {
+    const connections = connectionRepository(db, keys);
+    await connections.create({ id, provider: "enablebanking", aspspName: "Skandia" });
+    await connections.activate(id, { sessionId: SESSION_ID, consentExpiresOn: "2027-05-01" });
+    const accounts = accountRepository(db, keys);
+    await accounts.upsertFromBank({ connectionId: id, providerUid: `${id}-a`, iban: null, name: "Privatkonto", type: "checking", balanceMinor: 100 }, () => `${id}-acc1`);
+    await accounts.upsertFromBank({ connectionId: id, providerUid: `${id}-b`, iban: null, name: "Spar", type: "savings", balanceMinor: 200 }, () => `${id}-acc2`);
+    await db.batch([
+      db.prepare(
+        `INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor) VALUES
+         ('${id}-t1', '${id}-acc1', 'fp', 'booked', '2026-11-02', '2026-11-02', -100),
+         ('${id}-t2', '${id}-acc1', 'fp', 'booked', '2026-11-02', '2026-11-02', -200),
+         ('${id}-t3', '${id}-acc2', 'fp', 'booked', '2026-11-02', '2026-11-02', 300)`,
+      ),
+      db.prepare(`INSERT INTO transaction_splits (id, transaction_id, category_id, amount_minor) VALUES ('${id}-s1', '${id}-t2', 'mat', -200)`),
+    ]);
+  }
+
+  it("återkallar: tar bort session-id och sätter status, men behåller konton och historik", async () => {
+    await seedConnection("del1");
+    const connections = connectionRepository(db, keys);
+    await connections.revoke("del1");
+    expect(await connections.sessionId("del1")).toBeNull();
+    expect((await connections.get("del1"))?.status).toBe("revoked");
+    expect(await connections.historyCounts("del1")).toEqual({ accounts: 2, transactions: 3, splits: 1 });
+  });
+
+  it("räknar historiken och raderar sedan konton, transaktioner och uppdelningar med kopplingen", async () => {
+    await seedConnection("del2");
+    const connections = connectionRepository(db, keys);
+    expect(await connections.historyCounts("del2")).toEqual({ accounts: 2, transactions: 3, splits: 1 });
+    await connections.delete("del2");
+    expect(await connections.get("del2")).toBeNull();
+    expect(await connections.historyCounts("del2")).toEqual({ accounts: 0, transactions: 0, splits: 0 });
+    const left = await db.prepare(`SELECT (SELECT count(*) FROM transactions WHERE id LIKE 'del2-%') AS t, (SELECT count(*) FROM transaction_splits WHERE id LIKE 'del2-%') AS s`).first();
+    expect(left).toEqual({ t: 0, s: 0 });
+  });
+});
+
 describe("lagringsminimering (KK-11-C, V-i-storage)", () => {
   it("efter en koppling finns varken session-id, IBAN eller kontonummer i klartext någonstans i databasen", async () => {
     const tables = await db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite%' AND name NOT LIKE '\\_%' ESCAPE '\\'`).all<{ name: string }>();

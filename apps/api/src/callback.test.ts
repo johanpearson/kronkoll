@@ -52,6 +52,7 @@ function fakeBank(options: { sessionError?: ProviderError; accountsError?: Provi
   const codes: string[] = [];
   const connector: BankConnector = {
     startAuthorization: () => Promise.reject(new Error("används inte här")),
+    revokeSession: () => Promise.reject(new Error("används inte här")),
     createSession(code) {
       codes.push(code);
       if (options.sessionError) return Promise.reject(options.sessionError);
