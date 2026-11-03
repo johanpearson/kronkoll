@@ -5,6 +5,7 @@
  */
 import type { D1Database } from "@cloudflare/workers-types";
 import type { CategoryRule } from "@kronkoll/domain";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { categoryRules } from "./schema.ts";
 
@@ -25,6 +26,20 @@ export function ruleRepository(d1: D1Database) {
     async save(rule: CategoryRule): Promise<void> {
       const values = { id: rule.id, match: rule.match, pattern: rule.pattern, categoryId: rule.categoryId, source: rule.source };
       await db.insert(categoryRules).values(values).onConflictDoUpdate({ target: categoryRules.id, set: { categoryId: rule.categoryId } });
+    },
+    /** Byter mönster och kategori på en regel. Falskt om den inte finns. */
+    async update(rule: Pick<CategoryRule, "id" | "pattern" | "categoryId">): Promise<boolean> {
+      const updated = await db
+        .update(categoryRules)
+        .set({ pattern: rule.pattern, categoryId: rule.categoryId })
+        .where(eq(categoryRules.id, rule.id))
+        .returning({ id: categoryRules.id })
+        .all();
+      return updated.length > 0;
+    },
+    /** Tar bort en regel. Transaktioner den har kategoriserat behåller sin kategori. Falskt om den inte finns. */
+    async remove(id: string): Promise<boolean> {
+      return (await db.delete(categoryRules).where(eq(categoryRules.id, id)).returning({ id: categoryRules.id }).all()).length > 0;
     },
   };
 }

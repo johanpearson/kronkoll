@@ -631,6 +631,17 @@
       "satisfies": ["KK-18-A"]
     },
     {
+      "id": "api-rules", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "POST", "path": "/api/rules",
+      "summary": "Ny regel \"allt som börjar med …\"; GET listar alla med träffar, PATCH/DELETE /api/rules/{id} ändrar och tar bort",
+      "request": { "pattern": "ikea", "category_id": "hushall-forbrukning" },
+      "responses": {
+        "201": { "body": { "rule": { "id": "…", "match": "counterparty_prefix", "pattern": "IKEA", "category_id": "hushall-forbrukning", "source": "learned" }, "retroactive_candidates": 12, "protected_manual": 1 } },
+        "400": { "body": { "error": "invalid_request | unknown_category" } }
+      },
+      "description": "Byggt i #34. Mönstret normaliseras som en motpart. Regeln gäller direkt för nya transaktioner; svaret säger vad den skulle ändra bakåt, och appen frågar innan POST /api/rules/{id}/apply. GET ger också `hits` och `category_archived`.",
+      "satisfies": ["KK-18-B", "KK-18-C"]
+    },
+    {
       "id": "api-category-add", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "POST", "path": "/api/categories",
       "summary": "Ny huvud- eller underkategori; PATCH /api/categories/{id} byter namn ({ name }) eller arkiverar ({ archived: true })",
       "request": { "parent_id": "fritid", "name": "Simskola" },
