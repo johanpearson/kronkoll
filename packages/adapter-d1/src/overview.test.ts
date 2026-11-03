@@ -44,3 +44,30 @@ describe("översikten i D1 (KK-17)", () => {
     ]);
   });
 });
+
+describe("sidan om en koppling (#34, KK-7-A, KK-37)", () => {
+  it("ger kopplingens konton med eget namn när det finns, sorterade efter bankens namn", async () => {
+    await db.prepare(`UPDATE accounts SET nickname = 'Gemensamt kort' WHERE id = 'acc_2'`).run();
+    expect(await overviewRepository(db).connectionAccounts("c1")).toEqual([
+      { id: "acc_2", name: "Gemensamt kort", type: "credit_card", balanceMinor: null },
+      { id: "acc_3", name: "Lån", type: "loan", balanceMinor: -200000000 },
+      { id: "acc_1", name: "Privatkonto", type: "checking", balanceMinor: 4831240 },
+    ]);
+    expect(await overviewRepository(db).connectionAccounts("c2")).toEqual([]);
+  });
+
+  it("ger de senaste synkkörningarna, nyast först och högst så många som efterfrågas", async () => {
+    await db.batch(
+      ["2026-11-01T04:07:00.000Z", "2026-11-02T04:07:00.000Z", "2026-11-03T04:07:00.000Z"].map((at, i) =>
+        db
+          .prepare(`INSERT INTO sync_runs (id, connection_id, kind, started_at, finished_at, status, new_count, updated_count, error_code) VALUES (?, 'c1', 'cron', ?, ?, ?, ?, 0, ?)`)
+          .bind(`run-${String(i)}`, at, at, i === 1 ? "failed" : "ok", i, i === 1 ? "UNAVAILABLE" : null),
+      ),
+    );
+    const runs = await overviewRepository(db).syncRuns("c1", 2);
+    expect(runs).toEqual([
+      { kind: "cron", status: "ok", startedAt: "2026-11-03T04:07:00.000Z", finishedAt: "2026-11-03T04:07:00.000Z", newCount: 2, updatedCount: 0, errorCode: null },
+      { kind: "cron", status: "failed", startedAt: "2026-11-02T04:07:00.000Z", finishedAt: "2026-11-02T04:07:00.000Z", newCount: 1, updatedCount: 0, errorCode: "UNAVAILABLE" },
+    ]);
+  });
+});

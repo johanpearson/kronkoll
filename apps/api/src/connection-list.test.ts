@@ -73,3 +73,51 @@ describe("GET /api/connections (#34, KK-7-A, KK-8-A)", () => {
     expect(await res.json()).toEqual({ error: "unavailable" });
   });
 });
+
+async function get(path: string, method = "GET", env: Partial<Env> = {}) {
+  const context: RouteContext = {
+    waitUntil: () => undefined,
+    sync: { logger: captureLogs().logger, clock: fixedClock("2026-11-15T10:00:00.000Z"), newId: () => "x", providerFor: () => null },
+    connectorFor: () => null,
+  };
+  const headers = new Headers({ "cf-access-jwt-assertion": await signToken(key), origin: ORIGIN, "x-kronkoll": "1" });
+  return handle(new Request(`${ORIGIN}${path}`, { method, headers }), configuredEnv({ DB: db, ...env }), guardDeps, context);
+}
+
+describe("GET /api/connections/{id} (#34, KK-7-A)", () => {
+  it("ger kopplingen med konton och de senaste synkkörningarna, utan bankdata", async () => {
+    await db
+      .prepare(`INSERT INTO sync_runs (id, connection_id, kind, started_at, finished_at, status, new_count, updated_count, error_code) VALUES ('run-1', 'c1', 'manual', '2026-11-15T09:00:00.000Z', '2026-11-15T09:00:04.000Z', 'ok', 3, 1, NULL)`)
+      .run();
+    const res = await get("/api/connections/c1");
+    expect(res.status).toBe(200);
+    const body = await res.json<Record<string, unknown>>();
+    expect(body).toMatchObject({ id: "c1", bank: "Skandia", status: "active", consent_days_left: 167, account_count: 2 });
+    expect(body.accounts).toEqual([
+      { id: "acc_1", name: "Privatkonto", type: "checking", balance_minor: 0 },
+      { id: "acc_2", name: "Spar", type: "savings", balance_minor: 0 },
+    ]);
+    expect(body.sync_runs).toEqual([
+      { kind: "manual", status: "ok", started_at: "2026-11-15T09:00:00.000Z", finished_at: "2026-11-15T09:00:04.000Z", new_count: 3, updated_count: 1, error_code: null },
+    ]);
+    expect(JSON.stringify(body)).not.toContain(SESSION_ID);
+  });
+
+  it.each(["/api/connections/c3", "/api/connections/finns-inte"])("%s (avbruten eller okänd) ger 404", async (path) => {
+    const res = await get(path);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toEqual({ error: "not_found" });
+  });
+
+  it("andra metoder ger 405, och callback-adressen är orörd", async () => {
+    const res = await get("/api/connections/c1", "DELETE");
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("GET");
+    expect((await get("/api/connections/callback")).headers.get("allow")).toBe("POST");
+  });
+
+  it("svarar 503 utan detaljer när databasen inte går att läsa", async () => {
+    const broken = { prepare: () => { throw new Error("D1 nere"); } } as unknown as D1Database;
+    expect((await get("/api/connections/c1", "GET", { DB: broken })).status).toBe(503);
+  });
+});

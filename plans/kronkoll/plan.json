@@ -732,6 +732,13 @@
       "satisfies": ["KK-7-A", "KK-8-A", "KK-11"]
     },
     {
+      "id": "api-conn-detail", "group": "API: bankkoppling", "method": "GET", "path": "/api/connections/{id}",
+      "summary": "En koppling med konton och de senaste 20 synkkörningarna, för sidan om kopplingen",
+      "responses": { "200": { "body": { "id": "c1", "bank": "Skandia", "status": "active", "consent_days_left": 179, "accounts": [{ "id": "acc_1", "name": "Privat kort", "type": "checking", "balance_minor": 4831240 }], "sync_runs": [{ "kind": "cron", "status": "ok", "started_at": "2026-11-03T04:07:33Z", "finished_at": "2026-11-03T04:07:36Z", "new_count": 3, "updated_count": 1, "error_code": null }] } }, "404": { "body": { "error": "not_found" } } },
+      "description": "Byggt i #34. Körningarna har bara status, antal och felkod, aldrig bankens text (KK-13).",
+      "satisfies": ["KK-7-A", "KK-8-A"]
+    },
+    {
       "id": "api-conn-start", "group": "API: bankkoppling", "method": "POST", "path": "/api/connections",
       "summary": "Starta en koppling: anropar Enable Banking POST /auth och returnerar bankens URL",
       "request": { "aspsp": { "name": "Skandia", "country": "SE" } },

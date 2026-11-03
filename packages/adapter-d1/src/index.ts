@@ -19,4 +19,4 @@ export { categoryRepository, type CategoryRow } from "./categories.ts";
 export { ruleRepository } from "./rules.ts";
 export { splitRepository } from "./splits.ts";
 export { budgetRepository, type BudgetSource } from "./budget.ts";
-export { overviewRepository, type OverviewConnection } from "./overview.ts";
+export { overviewRepository, type ConnectionAccount, type OverviewConnection, type SyncRunRow } from "./overview.ts";

@@ -5,9 +5,9 @@
  */
 import type { D1Database } from "@cloudflare/workers-types";
 import type { OverviewAccount } from "@kronkoll/domain";
-import { asc, sql } from "drizzle-orm";
+import { asc, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { accounts, bankConnections } from "./schema.ts";
+import { accounts, bankConnections, syncRuns } from "./schema.ts";
 
 export interface OverviewConnection {
   readonly id: string;
@@ -46,5 +46,52 @@ export function overviewRepository(d1: D1Database) {
         .orderBy(asc(bankConnections.id))
         .all();
     },
+
+    /** En kopplings konton med namn som de visas, typ och saldo, för sidan om kopplingen. */
+    async connectionAccounts(connectionId: string): Promise<ConnectionAccount[]> {
+      return db
+        .select({
+          id: accounts.id,
+          name: sql<string>`coalesce(${accounts.nickname}, ${accounts.displayName})`,
+          type: accounts.type,
+          balanceMinor: accounts.balanceMinor,
+        })
+        .from(accounts)
+        .where(eq(accounts.connectionId, connectionId))
+        .orderBy(asc(accounts.displayName), asc(accounts.id))
+        .all();
+    },
+
+    /** De senaste synkkörningarna för en koppling, nyast först (KK-7-A). Bara status och antal, ingen bankdata. */
+    async syncRuns(connectionId: string, limit: number): Promise<SyncRunRow[]> {
+      return db
+        .select({
+          kind: syncRuns.kind,
+          status: syncRuns.status,
+          startedAt: syncRuns.startedAt,
+          finishedAt: syncRuns.finishedAt,
+          newCount: syncRuns.newCount,
+          updatedCount: syncRuns.updatedCount,
+          errorCode: syncRuns.errorCode,
+        })
+        .from(syncRuns)
+        .where(eq(syncRuns.connectionId, connectionId))
+        .orderBy(desc(syncRuns.startedAt))
+        .limit(limit)
+        .all();
+    },
   };
 }
+
+export interface ConnectionAccount {
+  readonly id: string;
+  /** Eget namn om det finns, annars bankens maskerade (KK-37). */
+  readonly name: string;
+  readonly type: (typeof accounts.$inferSelect)["type"];
+  readonly balanceMinor: number | null;
+}
+
+export type SyncRunRow = Pick<
+  typeof syncRuns.$inferSelect,
+  "kind" | "status" | "startedAt" | "finishedAt" | "newCount" | "updatedCount" | "errorCode"
+>;
