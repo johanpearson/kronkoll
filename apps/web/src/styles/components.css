@@ -297,6 +297,15 @@ main ul > li.budget-line {
   color: var(--danger);
 }
 
+/* Kategorier: underkategorier dras in under sin huvudkategori. */
+main ul > li.tx.sub {
+  padding-left: var(--space-6);
+}
+
+main ul > li.tx.sub .tx-name {
+  font-weight: 400;
+}
+
 /* Inställningar: budgetperiodens startdag. */
 .period-start {
   display: grid;
