@@ -58,6 +58,9 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Första gången: `pnpm --filter @kronkoll/web exec playwright install chromium`. `pnpm` måste finnas i PATH,
   eftersom webbservern startas med `pnpm preview` (`corepack enable` räcker).
 - Transaktionslistan är grupperad per dag med nästlade `<li>`. Filtrera bort dagens rubrik för att få en rad.
+- `e2e/a11y.spec.ts` kör axe (WCAG 2.1 A och AA) på huvudvyerna i ljust och mörkt läge via
+  `emulateMedia({ colorScheme })`. En ny vy läggs till i `VIEWS`, och fake-API:t måste svara på alla dess
+  anrop: testet kräver att ingen `role="alert"` syns, så att axe granskar riktigt innehåll.
 
 ## Cloudflare och D1: gränser som har orsakat riktiga fel
 
@@ -102,5 +105,5 @@ pnpm --filter @kronkoll/<paket> test:coverage
   nytt konto. Matcha på namn och typ inom kopplingen om det händer.
 - "Bara okategoriserade" i Transaktioner visar även okategoriserade insättningar, medan budgetens belopp bara
   räknar utbetalningar (#153).
-- Kvar i M1: #35 (mutationstest, integrationstester och E2E klara, kvar: axe och Lighthouse), #29
+- Kvar i M1: #35 (mutationstest, integrationstester, E2E och axe klara, kvar: Lighthouse), #29
   (CSV-import, kanske stryks) och #24 (avsluta spiken).

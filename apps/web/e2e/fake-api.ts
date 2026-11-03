@@ -48,6 +48,22 @@ const OVERVIEW = {
   ],
 };
 
+const CONNECTION = {
+  id: "c1",
+  bank: "Exempelbanken",
+  status: "active",
+  consent_expires_on: "2027-05-01",
+  consent_days_left: 167,
+  last_success_at: "2026-11-15T05:02:11.000Z",
+  consecutive_failures: 0,
+  account_count: 2,
+};
+
+const ACCOUNTS = [
+  { id: "acc_1", name: "Vardag", nickname: "Vardag", bank_name: "Privatkonto ••1234", bank: "Exempelbanken", type: "checking" },
+  { id: "acc_2", name: "Sparkonto ••5678", nickname: null, bank_name: "Sparkonto ••5678", bank: "Exempelbanken", type: "savings" },
+];
+
 /** Utfall per huvudkategori och period. November saknar budget tills ett test sparar en. */
 const ACTUALS: Record<string, Record<string, number>> = {
   "2026-08": { mat: 590000, boende: 980000 },
@@ -101,6 +117,9 @@ export async function useFakeApi(page: Page): Promise<FakeApi> {
     if (path === "/api/overview") return [200, OVERVIEW];
     if (path === "/api/categories") return [200, { items: CATEGORIES }];
     if (path === "/api/rules") return [200, { items: state.rules }];
+    if (path === "/api/connections") return [200, { items: [CONNECTION] }];
+    if (path === "/api/accounts") return [200, { items: ACCOUNTS }];
+    if (path === "/api/settings") return [200, { budget_period_start_day: 1, current_period: NOVEMBER }];
     if (path === "/api/transactions") return [200, { period: NOVEMBER, items: transactions, next_cursor: null }];
     const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
     const found = transactions.find((t) => t.id === tx?.[1]);
