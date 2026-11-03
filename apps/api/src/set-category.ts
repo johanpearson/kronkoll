@@ -9,13 +9,19 @@ function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 }
 
-async function readBody(request: Request): Promise<{ categoryId: string; learn: boolean } | null> {
+/**
+ * Kategorin, om en regel ska läras in, och hur mycket av namnet regeln gäller (`rule_pattern`, valfritt,
+ * bara med `learn_rule`). Null om formen är fel. Att mönstret är en början av namnet avgör domänen.
+ */
+async function readBody(request: Request): Promise<{ categoryId: string; learn: boolean; pattern: string | undefined } | null> {
   const body: unknown = await request.json().catch(() => null);
   if (typeof body !== "object" || body === null || !("category_id" in body)) return null;
   const { category_id: categoryId } = body;
   const learn = "learn_rule" in body ? body.learn_rule : false;
+  const pattern = "rule_pattern" in body ? body.rule_pattern : undefined;
   if (typeof categoryId !== "string" || categoryId === "" || typeof learn !== "boolean") return null;
-  return { categoryId, learn };
+  if (pattern !== undefined && (typeof pattern !== "string" || !learn)) return null;
+  return { categoryId, learn, pattern };
 }
 
 export async function setCategory(request: Request, env: { DB: D1Database }, sync: SyncDeps, id: string): Promise<Response> {
@@ -28,7 +34,19 @@ export async function setCategory(request: Request, env: { DB: D1Database }, syn
     if (!transaction) return json({ error: "not_found" }, 404);
     const rulesRepo = ruleRepository(env.DB);
     const rules = await rulesRepo.list();
-    const { rule } = learnFromManualChoice({ transaction, categoryId: input.categoryId, alwaysDoThis: input.learn, rules, newId: sync.newId });
+    let rule;
+    try {
+      ({ rule } = learnFromManualChoice({
+        transaction,
+        categoryId: input.categoryId,
+        alwaysDoThis: input.learn,
+        ...(input.pattern === undefined ? {} : { pattern: input.pattern }),
+        rules,
+        newId: sync.newId,
+      }));
+    } catch {
+      return json({ error: "invalid_pattern" }, 400);
+    }
     await store.setManualCategory(id, input.categoryId);
     let reach: RuleReach = { changes: [], protectedManual: 0 };
     if (rule) {

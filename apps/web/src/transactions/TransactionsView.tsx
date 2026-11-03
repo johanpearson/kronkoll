@@ -183,6 +183,8 @@ function Row(props: {
           <CategoryEditor
             transactionId={t.id}
             name={name}
+            counterparty={t.counterparty}
+            description={t.description}
             options={categories.options}
             onSaved={props.onSaved}
             onApplied={props.onApplied}

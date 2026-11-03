@@ -1,6 +1,8 @@
 // Byta kategori på en transaktion (#32, KK-18-B, KK-18-C). Valet blir manuellt och rörs sedan aldrig
 // av regler. Med "Gör alltid så" lärs en regel in, och om den matchar tidigare transaktioner frågar
-// vyn om den ska gälla dem också. Manuellt valda ändras aldrig.
+// vyn om den ska gälla dem också. Manuellt valda ändras aldrig. Har namnet flera ord kan regeln gälla en
+// kortare början, t.ex. "IKEA" för alla varuhus i kedjan. Standard är hela namnet.
+import { normalizeCounterparty, patternChoices } from "@kronkoll/domain";
 import { useState } from "react";
 import { field, patchJson, postJson } from "../api.ts";
 
@@ -14,6 +16,9 @@ type Step = { readonly kind: "choose" } | { readonly kind: "ask"; readonly ruleI
 export function CategoryEditor(props: {
   readonly transactionId: string;
   readonly name: string;
+  /** Bankens text, som regeln byggs av. Samma normalisering som servern använder. */
+  readonly counterparty: string;
+  readonly description: string;
   readonly options: readonly CategoryOption[];
   /** Kategorin är sparad på transaktionen. */
   readonly onSaved: (categoryId: string) => void;
@@ -26,11 +31,14 @@ export function CategoryEditor(props: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>({ kind: "choose" });
+  const choices = patternChoices({ counterpartyNorm: normalizeCounterparty(props.counterparty), description: props.description });
+  const [pattern, setPattern] = useState(choices[0] ?? "");
 
   const save = async () => {
     setBusy(true);
     setError(null);
-    const { status, body } = await patchJson(`/api/transactions/${encodeURIComponent(props.transactionId)}`, { category_id: categoryId, learn_rule: learn });
+    const request = { category_id: categoryId, learn_rule: learn, ...(learn && choices.length > 1 ? { rule_pattern: pattern } : {}) };
+    const { status, body } = await patchJson(`/api/transactions/${encodeURIComponent(props.transactionId)}`, request);
     setBusy(false);
     if (status !== 200) {
       setError("Det gick inte att spara kategorin. Försök igen.");
@@ -94,6 +102,17 @@ export function CategoryEditor(props: {
       <label>
         <input type="checkbox" checked={learn} onChange={(e) => { setLearn(e.target.checked); }} /> Gör alltid så för {props.name}
       </label>
+      {learn && choices.length > 1 && (
+        <fieldset className="choices">
+          <legend>Gäller</legend>
+          {choices.map((c) => (
+            <label key={c}>
+              <input type="radio" name={`pattern-${props.transactionId}`} value={c} checked={pattern === c} onChange={() => { setPattern(c); }} />
+              Allt som börjar med {c}
+            </label>
+          ))}
+        </fieldset>
+      )}
       {error && <p role="alert">{error}</p>}
       <p>
         <button type="button" className="primary" disabled={busy || categoryId === ""} onClick={() => void save()}>

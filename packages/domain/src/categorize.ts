@@ -108,6 +108,11 @@ export interface LearnInput {
   readonly categoryId: string;
   /** Användaren kryssade i "Gör alltid så". */
   readonly alwaysDoThis: boolean;
+  /**
+   * Hur mycket av namnet regeln gäller, ett av `patternChoices`. Utan val blir det hela namnet. Ett
+   * kortare val, t.ex. "IKEA", träffar alla varuhus i kedjan.
+   */
+  readonly pattern?: string;
   readonly rules: readonly CategoryRule[];
   readonly newId: () => string;
 }
@@ -118,10 +123,25 @@ export interface LearnResult {
   readonly rule: CategoryRule | null;
 }
 
+/**
+ * Vad en inlärd regel kan gälla för en transaktion: hela namnet först, sedan allt kortare som börjar på
+ * ett helt ord, t.ex. "IKEA KUNGENS KURVA", "IKEA KUNGENS", "IKEA". Användaren väljer; standard är
+ * hela namnet, eftersom första ordet ofta är för brett ("SWISH").
+ */
+export function patternChoices(tx: Pick<CategorizableTransaction, "counterpartyNorm" | "description">): string[] {
+  const words = (learnPattern(ruleKey(tx)) ?? "").split(" ").filter((w) => w !== "");
+  return words.map((_, i) => words.slice(0, words.length - i).join(" "));
+}
+
 /** Användaren väljer en kategori för en transaktion, och kanske "Gör alltid så". */
 export function learnFromManualChoice(input: LearnInput): LearnResult {
   const transaction = { ...input.transaction, categoryId: input.categoryId, categorySource: "manual" as const };
-  const pattern = input.alwaysDoThis ? learnPattern(ruleKey(input.transaction)) : null;
+  if (!input.alwaysDoThis) return { transaction, rule: null };
+  const choices = patternChoices(input.transaction);
+  if (input.pattern !== undefined && !choices.includes(input.pattern)) {
+    throw new RangeError("Regeln måste gälla början av namnet, hela ord");
+  }
+  const pattern = input.pattern ?? choices[0] ?? null;
   if (pattern === null) return { transaction, rule: null };
 
   const existing = input.rules.find(

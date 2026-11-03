@@ -4,6 +4,7 @@ import {
   ruleReach,
   categorize,
   learnFromManualChoice,
+  patternChoices,
   type CategorizableTransaction,
   type CategoryRule,
 } from "./categorize.ts";
@@ -137,6 +138,34 @@ describe("inlärning: \"Gör alltid så\" (KK-18-B)", () => {
     const rules = rule ? [rule] : [];
     expect(categorize(tx({ id: "t2", counterpartyNorm: "ICA NARA SOFO" }), rules)?.categoryId).toBe("livsmedel");
     expect(categorize(tx({ id: "t3", counterpartyNorm: "ICA KVANTUM" }), rules)).toBeNull();
+  });
+
+  it("valen för hur mycket av namnet regeln gäller är namnets ordprefix, hela namnet först", () => {
+    expect(patternChoices(tx({ id: "t1", counterpartyNorm: "IKEA KUNGENS KURVA" }))).toEqual(["IKEA KUNGENS KURVA", "IKEA KUNGENS", "IKEA"]);
+    expect(patternChoices(tx({ id: "t1", counterpartyNorm: "", description: "IKEA KARLSTAD, KARLSTAD" }))).toEqual(["IKEA KARLSTAD", "IKEA"]);
+    expect(patternChoices(tx({ id: "t1", counterpartyNorm: "", description: "" }))).toEqual([]);
+  });
+
+  it("lär in en kortare början av namnet när användaren väljer det, och regeln träffar hela kedjan", () => {
+    const { rule } = learnFromManualChoice({
+      transaction: tx({ id: "t1", counterpartyNorm: "IKEA KUNGENS KURVA" }),
+      categoryId: "hushall",
+      alwaysDoThis: true,
+      pattern: "IKEA",
+      rules: [],
+      newId: counter(),
+    });
+    expect(rule).toMatchObject({ pattern: "IKEA", source: "learned" });
+    expect(categorize(tx({ id: "t2", counterpartyNorm: "IKEA KARLSTAD" }), rule ? [rule] : [])?.categoryId).toBe("hushall");
+    expect(categorize(tx({ id: "t3", counterpartyNorm: "IKEANO" }), rule ? [rule] : [])).toBeNull();
+  });
+
+  it("avvisar ett mönster som inte är en början av transaktionens namn", () => {
+    const learn = (pattern: string) => () =>
+      learnFromManualChoice({ transaction: tx({ id: "t1", counterpartyNorm: "IKEA KUNGENS KURVA" }), categoryId: "hushall", alwaysDoThis: true, pattern, rules: [], newId: counter() });
+    expect(learn("IKE")).toThrow(RangeError);
+    expect(learn("KUNGENS")).toThrow(RangeError);
+    expect(learn("")).toThrow(RangeError);
   });
 
   it("lär in hela motparten för ett vanligt första ord som SWISH", () => {

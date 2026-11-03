@@ -29,6 +29,7 @@ export {
   ruleReach,
   categorize,
   learnFromManualChoice,
+  patternChoices,
   ruleKey,
   type CategorizableTransaction,
   type Categorization,

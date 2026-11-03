@@ -595,10 +595,10 @@
     {
       "id": "api-tx-patch", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PATCH", "path": "/api/transactions/{id}",
       "summary": "Sätt kategori manuellt, eventuellt med inlärning av regel",
-      "request": { "category_id": "cat_mat_livs", "learn_rule": true },
+      "request": { "category_id": "cat_mat_livs", "learn_rule": true, "rule_pattern": "ICA (valfritt: en början av namnet, hela ord; standard hela namnet)" },
       "responses": {
         "200": { "body": { "transaction": { "id": "tx_01J…", "category_id": "mat-livsmedel", "category_source": "manual" }, "rule": { "id": "rule_ica", "pattern": "ICA NARA SOFO", "match": "counterparty_prefix", "category_id": "mat-livsmedel" }, "retroactive_candidates": 23, "protected_manual": 2 } },
-        "400": { "body": { "error": "unknown_category | invalid_request" } },
+        "400": { "body": { "error": "unknown_category | invalid_request | invalid_pattern" } },
         "403": { "description": "CSRF-skydd: fel Origin eller saknad X-Kronkoll-header", "body": { "error": "forbidden" } },
         "404": { "body": { "error": "not_found" } }
       },

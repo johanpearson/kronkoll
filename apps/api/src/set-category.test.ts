@@ -101,11 +101,21 @@ describe("PATCH /api/transactions/{id} (KK-18-B, KK-18-C)", () => {
     expect(learned?.n).toBe(1);
   });
 
+  it("lär in en kortare början av namnet när användaren väljer det, och den träffar fler", async () => {
+    const res = await call("PATCH", "/api/transactions/t1", { category_id: "mat-livsmedel", learn_rule: true, rule_pattern: "ICA" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ rule: { match: "counterparty_prefix", pattern: "ICA", category_id: "mat-livsmedel" } });
+  });
+
   it.each([
     ["en kategori som inte finns", { category_id: "finns-inte" }, 400, "unknown_category"],
     ["ingen kategori", { learn_rule: true }, 400, "invalid_request"],
     ["learn_rule som inte är sant eller falskt", { category_id: "hushall-forbrukning", learn_rule: "ja" }, 400, "invalid_request"],
     ["inte JSON", "{", 400, "invalid_request"],
+    ["ett mönster utan Gör alltid så", { category_id: "mat-livsmedel", rule_pattern: "ICA" }, 400, "invalid_request"],
+    ["ett mönster som inte är text", { category_id: "mat-livsmedel", learn_rule: true, rule_pattern: 3 }, 400, "invalid_request"],
+    ["ett mönster som inte är en början av namnet", { category_id: "mat-livsmedel", learn_rule: true, rule_pattern: "NARA" }, 400, "invalid_pattern"],
+    ["ett halvt ord", { category_id: "mat-livsmedel", learn_rule: true, rule_pattern: "IC" }, 400, "invalid_pattern"],
   ])("%s ger %i och ändrar ingenting", async (_, body, status, error) => {
     const res = await call("PATCH", "/api/transactions/t1", body);
     expect(res.status).toBe(status);
