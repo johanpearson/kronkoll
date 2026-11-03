@@ -7,6 +7,7 @@ import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { SyncButton } from "../sync/SyncButton.tsx";
 import { DeleteConnection, type HistoryCounts } from "./DeleteConnection.tsx";
+import { RenewConnection } from "./RenewConnection.tsx";
 
 interface Run {
   readonly kind: string;
@@ -138,6 +139,8 @@ export function ConnectionView({ id }: { id: string }) {
           </p>
         )}
         {c.failures > 0 && <p role="alert">De senaste {c.failures} synkarna har misslyckats.</p>}
+        {/* Förnya är framträdande när samtycket har 14 dagar eller mindre kvar, eller har gått ut (KK-8). */}
+        <RenewConnection id={id} urgent={c.consentDaysLeft !== null && c.consentDaysLeft <= 14} />
         <div className="sync">
           <SyncButton onDone={() => { setReload((n) => n + 1); }} />
         </div>
