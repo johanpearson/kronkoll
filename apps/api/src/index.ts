@@ -9,7 +9,7 @@ import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.
 import { listAccounts, patchAccount } from "./accounts.ts";
 import { getBudget, putBudget } from "./budget.ts";
 import { createCategory, listCategories, mergeCategory, patchCategory } from "./categories.ts";
-import { listConnections } from "./connection-list.ts";
+import { getConnection, listConnections } from "./connection-list.ts";
 import { getOverview } from "./overview.ts";
 import { getSettings, patchSettings } from "./settings.ts";
 import { createRule, deleteRule, listRules, patchRule } from "./rules.ts";
@@ -74,6 +74,12 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   const { pathname } = new URL(request.url);
 
   if (pathname === "/api/connections" && request.method === "GET") return listConnections(env, context.sync);
+
+  const connectionMatch = /^\/api\/connections\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (connectionMatch?.[1] && connectionMatch[1] !== "callback") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return getConnection(env, context.sync, connectionMatch[1]);
+  }
 
   if (pathname === "/api/connections" || pathname === "/api/connections/callback") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: pathname === "/api/connections" ? "GET, POST" : "POST" });
