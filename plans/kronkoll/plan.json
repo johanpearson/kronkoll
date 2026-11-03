@@ -631,6 +631,14 @@
       "satisfies": ["KK-18-A"]
     },
     {
+      "id": "api-settings", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PATCH", "path": "/api/settings",
+      "summary": "Budgetperiodens startdag; GET samma path ger nuvarande värde",
+      "request": { "budget_period_start_day": 25 },
+      "responses": { "200": { "body": { "budget_period_start_day": 25, "current_period": { "key": "2027-01", "start": "2026-12-23", "end": "2027-01-24" } } }, "400": { "body": { "error": "invalid_request" } } },
+      "description": "Byggt i #34. Startdagen är ett heltal 1–28. Svaret har perioden som pågår med valet, så att Inställningar kan visa vad det betyder.",
+      "satisfies": ["KK-34", "KK-34-A"]
+    },
+    {
       "id": "api-accounts", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/accounts",
       "summary": "Kontona med eget namn, bankens maskerade namn och bank, för Inställningar",
       "responses": { "200": { "body": { "items": [{ "id": "acc_1", "name": "Privat kort", "nickname": "Privat kort", "bank_name": "Privatkonto ••4821", "bank": "Skandia", "type": "checking" }] } } },

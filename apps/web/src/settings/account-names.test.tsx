@@ -33,6 +33,7 @@ function api(list: [number, unknown] = [200, ACCOUNTS], patch: (body: unknown) =
         return json(...patch(body));
       }
       if (url.pathname === "/api/accounts") return json(...list);
+      if (url.pathname === "/api/settings") return json(200, { budget_period_start_day: 1, current_period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" } });
       return json(404, { error: "not_found" });
     }),
   );
