@@ -3,11 +3,13 @@
 //   POST   /api/rules        { pattern, category_id } ny regel: "allt som börjar med …"
 //   PATCH  /api/rules/{id}   { pattern?, category_id? }
 //   DELETE /api/rules/{id}
+//   GET    /api/rules/{id}/matches  förhandsvisning: transaktionerna regeln gäller och vad som händer
+//   POST   /api/rules/apply-all     alla regler över hela historiken ({ preview: true } räknar bara)
 // En ny eller ändrad regel gäller direkt för nya transaktioner (synken kategoriserar med den). Svaret
 // säger hur många tidigare den skulle ändra; appen frågar och använder POST /api/rules/{id}/apply.
 // Manuellt valda rörs aldrig.
 import { categoryRepository, ruleRepository, transactionRepository } from "@kronkoll/adapter-d1";
-import { normalizeCounterparty, ruleHits, ruleReach, type CategoryRule } from "@kronkoll/domain";
+import { applyAllRules, normalizeCounterparty, ruleHits, ruleMatches, ruleReach, type CategoryRule } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
 
 const MAX_PATTERN_LENGTH = 60;
@@ -103,6 +105,58 @@ export async function patchRule(request: Request, env: { DB: D1Database }, id: s
 export async function deleteRule(env: { DB: D1Database }, id: string): Promise<Response> {
   try {
     return (await ruleRepository(env.DB).remove(id)) ? new Response(null, { status: 204 }) : json({ error: "not_found" }, 404);
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
+}
+
+/** Så många transaktioner som förhandsvisningen listar. Antalen räknas alltid på alla. */
+export const PREVIEW_LIMIT = 100;
+
+/**
+ * GET /api/rules/{id}/matches: transaktionerna regeln gäller, nyast först, med vad som händer med var och
+ * en om regeln appliceras (KK-18-C). Bankens text skickas som den är och visas som text i appen (KK-30).
+ */
+export async function getRuleMatches(env: { DB: D1Database }, id: string): Promise<Response> {
+  try {
+    const [rules, transactions] = await Promise.all([ruleRepository(env.DB).list(), transactionRepository(env.DB).forRulePreview()]);
+    if (!rules.some((r) => r.id === id)) return json({ error: "not_found" }, 404);
+    const byId = new Map(transactions.map((t) => [t.id, t]));
+    const matches = ruleMatches(transactions, rules, id);
+    const count = (effect: string) => matches.filter((m) => m.effect === effect).length;
+    return json(
+      {
+        total: matches.length,
+        change: count("change"),
+        unchanged: count("unchanged"),
+        manual: count("manual"),
+        items: matches.slice(0, PREVIEW_LIMIT).flatMap((m) => {
+          const t = byId.get(m.id);
+          return t
+            ? [{ id: t.id, transaction_date: t.transactionDate, name: t.counterparty || t.description, amount_minor: t.amountMinor, category_id: t.categoryId, effect: m.effect }]
+            : [];
+        }),
+      },
+      200,
+    );
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
+}
+
+/**
+ * POST /api/rules/apply-all: alla regler över hela historiken. Med `{ preview: true }` sägs bara hur många
+ * som skulle få ny kategori. Manuellt valda rörs aldrig, och ingen kategori tas bort (KK-18-C).
+ */
+export async function applyAll(request: Request, env: { DB: D1Database }): Promise<Response> {
+  const input = await body(request);
+  if (input === null || ("preview" in input && typeof input.preview !== "boolean")) return invalid();
+  try {
+    const store = transactionRepository(env.DB);
+    const changes = applyAllRules(await store.categorizable(), await ruleRepository(env.DB).list());
+    if (input.preview === true) return json({ would_update: changes.length }, 200);
+    await store.setCategories(changes);
+    return json({ updated: changes.length }, 200);
   } catch {
     return json({ error: "unavailable" }, 503);
   }

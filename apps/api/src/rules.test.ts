@@ -31,7 +31,13 @@ afterAll(async () => {
 
 /** Påhittade kortköp (KK-13) i Skandias form: ingen motpart, butiken i meddelandet. */
 beforeEach(async () => {
-  await db.batch([db.prepare(`DELETE FROM transactions`), db.prepare(`DELETE FROM category_rules WHERE source = 'learned'`), db.prepare(`UPDATE categories SET archived = 0`)]);
+  await db.batch([
+    db.prepare(`DELETE FROM transactions`),
+    db.prepare(`DELETE FROM category_rules WHERE source = 'learned'`),
+    db.prepare(`UPDATE categories SET archived = 0`),
+    // Ett test ändrar mallregeln för ICA. Återställ den så att testerna inte beror på ordningen.
+    db.prepare(`UPDATE category_rules SET pattern = 'ICA', category_id = 'mat-livsmedel' WHERE id = 'mall-ica'`),
+  ]);
   const rows: [string, string, string | null, string][] = [
     ["k1", "IKEA KARLSTAD, KARLSTAD", null, "none"],
     ["k2", "IKEA KUNGENS KURVA, STOCKHOLM", null, "none"],
@@ -155,5 +161,50 @@ describe("PATCH och DELETE /api/rules/{id} (KK-18)", () => {
     const res = await call("GET", "/api/rules/mall-ica");
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toBe("PATCH, DELETE");
+  });
+});
+
+describe("GET /api/rules/{id}/matches (KK-18-C)", () => {
+  it("listar transaktionerna regeln gäller, med vad som händer med var och en", async () => {
+    const { rule } = await (await call("POST", undefined, { pattern: "IKEA", category_id: "hushall-forbrukning" })).json<{ rule: { id: string } }>();
+    const res = await call("GET", `/api/rules/${rule.id}/matches`);
+    expect(res.status).toBe(200);
+    const body = await res.json<{ total: number; change: number; unchanged: number; manual: number; items: { id: string; name: string; effect: string }[] }>();
+    expect({ total: body.total, change: body.change, unchanged: body.unchanged, manual: body.manual }).toEqual({ total: 3, change: 2, unchanged: 0, manual: 1 });
+    expect(body.items.find((i) => i.id === "k3")).toEqual({
+      id: "k3",
+      transaction_date: "2026-11-02",
+      name: "IKEA BARKARBY, JARFALLA",
+      amount_minor: -100,
+      category_id: "fritid-hobby",
+      effect: "manual",
+    });
+  });
+
+  it("en regel som saknas ger 404, andra metoder 405 och en trasig databas 503", async () => {
+    expect((await call("GET", "/api/rules/finns-inte/matches")).status).toBe(404);
+    expect((await call("POST", "/api/rules/mall-ica/matches", {})).status).toBe(405);
+    expect((await call("GET", "/api/rules/mall-ica/matches", undefined, { DB: broken })).status).toBe(503);
+  });
+});
+
+describe("POST /api/rules/apply-all (KK-18-C)", () => {
+  it("räknar först, applicerar sedan alla regler, och rör aldrig manuellt valda", async () => {
+    await call("POST", undefined, { pattern: "IKEA", category_id: "hushall-forbrukning" });
+    const preview = await call("POST", "/api/rules/apply-all", { preview: true });
+    expect(await preview.json()).toEqual({ would_update: 2 });
+    const category = async (id: string) => db.prepare(`SELECT category_id AS c FROM transactions WHERE id = ?`).bind(id).first();
+    expect(await category("k1")).toEqual({ c: null });
+    const res = await call("POST", "/api/rules/apply-all", {});
+    expect(await res.json()).toEqual({ updated: 2 });
+    expect(await category("k1")).toEqual({ c: "hushall-forbrukning" });
+    expect(await category("k3")).toEqual({ c: "fritid-hobby" });
+  });
+
+  it("ogiltig begäran ger 400, andra metoder 405 och en trasig databas 503", async () => {
+    expect((await call("POST", "/api/rules/apply-all", { preview: "ja" })).status).toBe(400);
+    expect((await call("POST", "/api/rules/apply-all", "{")).status).toBe(400);
+    expect((await call("GET", "/api/rules/apply-all")).status).toBe(405);
+    expect((await call("POST", "/api/rules/apply-all", {}, { DB: broken })).status).toBe(503);
   });
 });

@@ -202,3 +202,31 @@ export function ruleHits(transactions: readonly CategorizableTransaction[], rule
   }
   return hits;
 }
+
+export interface RuleMatch {
+  readonly id: string;
+  /** "change" får regelns kategori om den appliceras, "unchanged" har den redan, "manual" ändras aldrig. */
+  readonly effect: "change" | "unchanged" | "manual";
+}
+
+/**
+ * Transaktionerna en regel gäller, för förhandsvisningen innan den appliceras: där just den regeln vinner,
+ * med manuellt valda inräknade men märkta (KK-18-C).
+ */
+export function ruleMatches(transactions: readonly CategorizableTransaction[], rules: readonly CategoryRule[], ruleId: string): RuleMatch[] {
+  return transactions.flatMap((tx): RuleMatch[] => {
+    const result = categorize({ ...tx, categorySource: "none" }, rules);
+    if (result?.ruleId !== ruleId) return [];
+    if (tx.categorySource === "manual") return [{ id: tx.id, effect: "manual" }];
+    const same = result.categoryId === tx.categoryId && result.source === tx.categorySource;
+    return [{ id: tx.id, effect: same ? "unchanged" : "change" }];
+  });
+}
+
+/**
+ * Alla regler över hela historiken, för "Applicera alla regler". Som `applyRules`, men en transaktion
+ * som ingen regel träffar behåller sin kategori, så att en borttagen regel inte tömmer något.
+ */
+export function applyAllRules(transactions: readonly CategorizableTransaction[], rules: readonly CategoryRule[]): CategoryChange[] {
+  return applyRules(transactions, rules).filter((c) => c.categoryId !== null);
+}
