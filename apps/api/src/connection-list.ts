@@ -1,7 +1,7 @@
 // Bankkopplingarna för Inställningar (#34, KK-7-A, KK-8-A): GET /api/connections. Status, hur länge
 // samtycket gäller, senaste lyckade synk, misslyckade synkar i rad och antal konton. Avbrutna
 // kopplingar (BankID som aldrig blev klart) visas inte. Session-id och kontonummer lämnar aldrig servern.
-import { overviewRepository, type OverviewConnection } from "@kronkoll/adapter-d1";
+import { connectionHistoryCounts, overviewRepository, type OverviewConnection } from "@kronkoll/adapter-d1";
 import { daysBetween, todayInStockholm } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
 
@@ -37,18 +37,20 @@ export async function listConnections(env: { DB: D1Database }, sync: SyncDeps): 
 
 /**
  * GET /api/connections/{id}: samma uppgifter som i listan, plus kopplingens konton och de senaste
- * synkkörningarna (KK-7-A). Körningarna har bara status, antal och felkod, aldrig bankens text (KK-13).
+ * synkkörningarna (KK-7-A), och hur mycket historik som raderas med kopplingen (KK-11-B). Körningarna har bara status, antal och felkod, aldrig bankens text (KK-13).
  */
 export async function getConnection(env: { DB: D1Database }, sync: SyncDeps, id: string): Promise<Response> {
   try {
     const repo = overviewRepository(env.DB);
     const connection = (await repo.connections()).find((c) => c.id === id && c.status !== "pending_auth");
     if (!connection) return json({ error: "not_found" }, 404);
-    const [accounts, runs] = await Promise.all([repo.connectionAccounts(id), repo.syncRuns(id, SYNC_LOG_LENGTH)]);
+    const [accounts, runs, history] = await Promise.all([repo.connectionAccounts(id), repo.syncRuns(id, SYNC_LOG_LENGTH), connectionHistoryCounts(env.DB, id)]);
     return json(
       {
         ...toItem(connection, todayInStockholm(sync.clock)),
         accounts: accounts.map((a) => ({ id: a.id, name: a.name, type: a.type, balance_minor: a.balanceMinor })),
+        // Vad som raderas om kopplingen raderas med historik (KK-11-B).
+        history,
         sync_runs: runs.map((r) => ({
           kind: r.kind,
           status: r.status,

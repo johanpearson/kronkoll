@@ -110,9 +110,9 @@ describe("GET /api/connections/{id} (#34, KK-7-A)", () => {
   });
 
   it("andra metoder ger 405, och callback-adressen är orörd", async () => {
-    const res = await get("/api/connections/c1", "DELETE");
+    const res = await get("/api/connections/c1", "PUT");
     expect(res.status).toBe(405);
-    expect(res.headers.get("allow")).toBe("GET");
+    expect(res.headers.get("allow")).toBe("GET, DELETE");
     expect((await get("/api/connections/callback")).headers.get("allow")).toBe("POST");
   });
 

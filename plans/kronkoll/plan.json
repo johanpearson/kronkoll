@@ -766,7 +766,8 @@
       "id": "api-conn-delete", "group": "API: bankkoppling", "method": "DELETE", "path": "/api/connections/{id}",
       "summary": "Radera koppling: DELETE /sessions/{id} hos Enable Banking och, med purge, all data för kopplingen",
       "params": [{ "name": "purge", "in": "query", "type": "bool", "description": "true = radera konton, transaktioner, uppdelningar och saldon" }],
-      "responses": { "200": { "body": { "revoked": true, "deleted": { "accounts": 3, "transactions": 1842, "splits": 37 }, "backup_expiry_days": 7 } } },
+      "responses": { "200": { "body": { "revoked": true, "deleted": { "accounts": 3, "transactions": 1842, "splits": 37 }, "backup_expiry_days": 7 } }, "400": { "body": { "error": "invalid_request" } }, "502": { "description": "Sessionen gick inte att återkalla hos Enable Banking; ingenting ändras", "body": { "error": "revoke_failed", "code": "UNAVAILABLE" } } },
+      "description": "Byggt i #28. purge är obligatoriskt (true eller false). Utan purge raderas session-id och kopplingen blir återkallad, men konton och historik behålls (deleted: null). GET /api/connections/{id} ger history med antalen.",
       "satisfies": ["KK-11-A", "KK-11-B", "KK-32-A"]
     },
     {

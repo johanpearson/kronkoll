@@ -140,3 +140,27 @@ describe("fel utan svarstext (KK-13)", () => {
     await expect(down.createSession("k")).rejects.toEqual(new ProviderError("UNAVAILABLE"));
   });
 });
+
+describe("återkalla en session (KK-11-A)", () => {
+  it("anropar DELETE /sessions/{id} hos Enable Banking", async () => {
+    const { connector, calls } = fakeApi({ "DELETE /sessions/3f1d2c4b-0000-4000-8000-00000000abcd": { body: { message: "OK" } } });
+    await connector.revokeSession("3f1d2c4b-0000-4000-8000-00000000abcd");
+    expect(calls.map((c) => `${c.method} ${c.path}`)).toEqual(["DELETE /sessions/3f1d2c4b-0000-4000-8000-00000000abcd"]);
+    expect(calls[0]).toMatchObject({ auth: "Bearer jwt-test" });
+  });
+
+  it("en session som redan är borta räknas som återkallad", async () => {
+    const { connector } = fakeApi({});
+    await expect(connector.revokeSession("redan-borta")).resolves.toBeUndefined();
+  });
+
+  it("ett svar utan innehåll räknas som återkallad", async () => {
+    const { connector } = fakeApi({ "DELETE /sessions/s1": { status: 202, body: "" } });
+    await expect(connector.revokeSession("s1")).resolves.toBeUndefined();
+  });
+
+  it("andra fel ger en felkod utan svarstext", async () => {
+    const { connector } = fakeApi({ "DELETE /sessions/s1": { status: 503, body: "Skandia: underhåll" } });
+    await expect(connector.revokeSession("s1")).rejects.toEqual(new ProviderError("UNAVAILABLE"));
+  });
+});

@@ -73,6 +73,8 @@ export interface BankConnector {
   startAuthorization(request: AuthorizationRequest): Promise<{ url: string }>;
   /** Byter koden från banken mot en session. */
   createSession(code: string): Promise<BankSession>;
+  /** Återkallar sessionen, så att Kronkoll inte längre kan läsa kontona (KK-11-A). En redan borttagen räknas som återkallad. */
+  revokeSession(sessionId: string): Promise<void>;
 }
 
 export interface BankDataProvider {
