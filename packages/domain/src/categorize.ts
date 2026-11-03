@@ -5,7 +5,7 @@
  * över en mallregel, sedan exakt matchning före prefix före text i beskrivningen, sedan längre
  * mönster. "Gör alltid så" lär in en regel på hela den normaliserade motparten (KK-18-B).
  */
-import { learnPattern, matchesWordPrefix } from "./normalize.ts";
+import { learnPattern, matchesWordPrefix, normalizeCounterparty } from "./normalize.ts";
 
 export type CategorySource = "manual" | "learned" | "template" | "none";
 
@@ -38,12 +38,21 @@ const MATCH_RANK: Record<CategoryRule["match"], number> = {
   description_contains: 2,
 };
 
+/**
+ * Det motpartsreglerna matchar och lär sig på: den normaliserade motparten, eller beskrivningen
+ * normaliserad på samma sätt när banken inte skickar någon motpart. Skandia gör så för kortköp och
+ * lägger butiken i beskrivningen. Avstämningen mot banken använder fortfarande bara motparten.
+ */
+export function ruleKey(tx: Pick<CategorizableTransaction, "counterpartyNorm" | "description">): string {
+  return tx.counterpartyNorm !== "" ? tx.counterpartyNorm : normalizeCounterparty(tx.description);
+}
+
 function matches(rule: CategoryRule, tx: CategorizableTransaction): boolean {
   switch (rule.match) {
     case "counterparty_exact":
-      return rule.pattern !== "" && tx.counterpartyNorm === rule.pattern;
+      return rule.pattern !== "" && ruleKey(tx) === rule.pattern;
     case "counterparty_prefix":
-      return matchesWordPrefix(rule.pattern, tx.counterpartyNorm);
+      return matchesWordPrefix(rule.pattern, ruleKey(tx));
     case "description_contains":
       return rule.pattern !== "" && tx.description.toLocaleUpperCase("sv-SE").includes(rule.pattern);
   }
@@ -112,7 +121,7 @@ export interface LearnResult {
 /** Användaren väljer en kategori för en transaktion, och kanske "Gör alltid så". */
 export function learnFromManualChoice(input: LearnInput): LearnResult {
   const transaction = { ...input.transaction, categoryId: input.categoryId, categorySource: "manual" as const };
-  const pattern = input.alwaysDoThis ? learnPattern(input.transaction.counterpartyNorm) : null;
+  const pattern = input.alwaysDoThis ? learnPattern(ruleKey(input.transaction)) : null;
   if (pattern === null) return { transaction, rule: null };
 
   const existing = input.rules.find(

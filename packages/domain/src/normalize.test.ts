@@ -18,12 +18,17 @@ describe("normalisering av motpart (F-learn)", () => {
     ["Klarna-prefix", "KLARNA *ZALANDO", "ZALANDO"],
     ["SumUp-prefix", "SUMUP *LOPPIS", "LOPPIS"],
     ["Zettle med understreck", "ZETTLE_*GLASSKIOSKEN", "GLASSKIOSKEN"],
+    // Skandias kortköp: "BUTIK, ORT", ibland med butiksnumret ihopskrivet med namnet.
+    ["ort efter kommatecken tas bort", "VASTTRAFIK APP, GOTEBORG", "VASTTRAFIK APP"],
+    ["butiksnummer ihop med namnet", "WILLYS42ODENPLAN, STOCKHOLM", "WILLYS ODENPLAN"],
+    ["bara sista kommatecknet räknas", "PIZZERIA ROMA H, H R", "PIZZERIA ROMA H"],
+    ["ett kommatecken först lämnar namnet", ", SOLNA", "SOLNA"],
   ])("%s: %j → %j", (_, raw, normalized) => {
     expect(normalizeCounterparty(raw)).toBe(normalized);
   });
 
   it("är idempotent: att normalisera två gånger ger samma resultat", () => {
-    for (const raw of ["K*ICA KVANTUM 12 STHLM", "SQ *KAFFEBAREN 123", "  ica  nära  sofo "]) {
+    for (const raw of ["K*ICA KVANTUM 12 STHLM", "SQ *KAFFEBAREN 123", "  ica  nära  sofo ", "WILLYS42ODENPLAN, STOCKHOLM"]) {
       const once = normalizeCounterparty(raw);
       expect(normalizeCounterparty(once)).toBe(once);
     }

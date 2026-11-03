@@ -2,7 +2,7 @@
 // Perioden följer startdagen i inställningarna (t.ex. lönedagen) och svensk tid. Bankens text
 // skickas som den kom och renderas alltid som text i appen (KK-30).
 import { settingsRepository, splitRepository, transactionRepository, type TransactionListItem } from "@kronkoll/adapter-d1";
-import { budgetPeriodForKey, currentBudgetPeriod, type BudgetPeriod } from "@kronkoll/domain";
+import { budgetPeriodForKey, currentBudgetPeriod, ruleKey, type BudgetPeriod } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
 
 const DEFAULT_LIMIT = 50;
@@ -103,7 +103,8 @@ export async function getTransaction(env: { DB: D1Database }, id: string): Promi
         booking_date: detail.bookingDate,
         amount_minor: detail.amountMinor,
         counterparty: detail.counterparty,
-        counterparty_norm: detail.counterpartyNorm,
+        // Det reglerna matchar på, även när banken inte skickar någon motpart.
+        counterparty_norm: ruleKey(detail),
         description: detail.description,
         category_id: detail.categoryId,
         category_source: detail.categorySource,

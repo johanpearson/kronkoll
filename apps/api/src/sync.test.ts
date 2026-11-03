@@ -136,6 +136,14 @@ describe("kategorisering efter synken (KK-18, F-dataflode)", () => {
     expect(logs.lines.at(-1)).toEqual({ level: "info", event: "sync.categorized", fields: { count: 1 } });
   });
 
+  it("kategoriserar ett kortköp där banken bara skickar butiken i beskrivningen", async () => {
+    await seedConnection("c1");
+    const { deps } = setup(fakeBank({ transactions: [bankTx({ providerTxId: "kort", counterparty: "", description: "K*ICA NARA SOFO 4711 STHLM" })] }));
+    await runSync(env(), "cron", deps);
+    // Motparten är fortfarande tom, så avstämningen mot banken fungerar som förut.
+    expect(await db.prepare(`SELECT counterparty_norm AS norm, category_id AS c, category_source AS s FROM transactions`).first()).toEqual({ norm: "", c: "mat-livsmedel", s: "template" });
+  });
+
   it("rör aldrig en manuellt satt kategori, och inte heller en som redan har kategori (KK-18-C)", async () => {
     await seedConnection("c1");
     const { deps } = setup(fakeBank({ transactions: [bankTx({ providerTxId: "ica", counterparty: "ICA NARA SOFO" })] }));
