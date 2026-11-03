@@ -274,6 +274,29 @@ main ul > li.budget-line {
   background: var(--danger);
 }
 
+/* En kort status i en rad, t.ex. "Aktiv" eller "Går snart ut". Texten bär betydelsen, färgen förstärker. */
+.badge {
+  flex: none;
+  padding: 2px var(--space-2);
+  border: 1px solid currentcolor;
+  border-radius: var(--radius-pill);
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge.ok {
+  color: var(--success);
+}
+
+.badge.warn {
+  color: var(--warning);
+}
+
+.badge.bad {
+  color: var(--danger);
+}
+
 /* Inställningar: budgetperiodens startdag. */
 .period-start {
   display: grid;

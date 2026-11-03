@@ -149,9 +149,9 @@ describe("POST /api/connections (KK-5, KK-29-A, F-koppla)", () => {
   });
 
   it("andra metoder ger 405", async () => {
-    const { response } = await call({ method: "GET" });
+    const { response } = await call({ method: "DELETE" });
     expect(response.status).toBe(405);
-    expect(response.headers.get("allow")).toBe("POST");
+    expect(response.headers.get("allow")).toBe("GET, POST");
   });
 
   it("kräver CSRF-skydd: utan header skapas ingenting (KK-29-B)", async () => {

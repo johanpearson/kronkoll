@@ -9,6 +9,7 @@ import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.
 import { listAccounts, patchAccount } from "./accounts.ts";
 import { getBudget, putBudget } from "./budget.ts";
 import { listCategories } from "./categories.ts";
+import { listConnections } from "./connection-list.ts";
 import { getOverview } from "./overview.ts";
 import { getSettings, patchSettings } from "./settings.ts";
 import { applyRule, setCategory } from "./set-category.ts";
@@ -71,8 +72,10 @@ async function manualSync(env: Env, context: RouteContext): Promise<Response> {
 async function route(request: Request, env: Env, context: RouteContext, email: string): Promise<Response> {
   const { pathname } = new URL(request.url);
 
+  if (pathname === "/api/connections" && request.method === "GET") return listConnections(env, context.sync);
+
   if (pathname === "/api/connections" || pathname === "/api/connections/callback") {
-    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: pathname === "/api/connections" ? "GET, POST" : "POST" });
     return pathname === "/api/connections" ? startConnection(request, env, context, email) : completeConnection(request, env, context, email);
   }
 

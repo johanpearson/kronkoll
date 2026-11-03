@@ -698,6 +698,13 @@
       "satisfies": ["KK-24-A", "KK-24-B", "KK-24-C"]
     },
     {
+      "id": "api-conn-list", "group": "API: bankkoppling", "method": "GET", "path": "/api/connections",
+      "summary": "Bankkopplingarna med status, samtycke, senaste synk, fel i rad och antal konton, för Inställningar",
+      "responses": { "200": { "body": { "items": [{ "id": "c1", "bank": "Skandia", "status": "active", "consent_expires_on": "2027-05-01", "consent_days_left": 179, "last_success_at": "2026-11-03T04:07:33Z", "consecutive_failures": 0, "account_count": 4 }] } } },
+      "description": "Byggt i #34. Avbrutna kopplingar (pending_auth) visas inte. Session-id lämnar aldrig servern.",
+      "satisfies": ["KK-7-A", "KK-8-A", "KK-11"]
+    },
+    {
       "id": "api-conn-start", "group": "API: bankkoppling", "method": "POST", "path": "/api/connections",
       "summary": "Starta en koppling: anropar Enable Banking POST /auth och returnerar bankens URL",
       "request": { "aspsp": { "name": "Skandia", "country": "SE" } },
