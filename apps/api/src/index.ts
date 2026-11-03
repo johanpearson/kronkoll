@@ -66,8 +66,26 @@ async function manualSync(env: Env, context: RouteContext): Promise<Response> {
   if (!gate.allowed) {
     return json({ error: "too_soon", retry_after_s: gate.retryAfterSeconds }, 429, { "retry-after": String(gate.retryAfterSeconds) });
   }
+  // Tiden tas före synken startar, så att alla dess körningar har startat då eller senare.
+  const startedAt = context.sync.clock.now().toISOString();
   context.waitUntil(runSync(env, "manual", context.sync));
-  return json({ status: "started" }, 202);
+  return json({ status: "started", started_at: startedAt }, 202);
+}
+
+/**
+ * GET /api/sync?since=…: hur det går för körningarna som startat sedan dess, så att appen kan visa att
+ * synken pågår och hämta om när den är klar. `done` blir sant när minst en körning har startat och ingen
+ * pågår längre.
+ */
+async function syncProgress(request: Request, env: Env): Promise<Response> {
+  const since = new URL(request.url).searchParams.get("since") ?? "";
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/u.test(since)) return json({ error: "invalid_request" }, 400);
+  try {
+    const { started, running } = await syncRunRepository(env.DB).progressSince(since);
+    return json({ started, running, done: started > 0 && running === 0 }, 200);
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
 }
 
 async function route(request: Request, env: Env, context: RouteContext, email: string): Promise<Response> {
@@ -189,8 +207,9 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   }
 
   if (pathname === "/api/sync") {
-    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
-    return manualSync(env, context);
+    if (request.method === "GET") return syncProgress(request, env);
+    if (request.method === "POST") return manualSync(env, context);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
   }
 
   if (pathname === "/api/health") {

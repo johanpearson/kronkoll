@@ -127,6 +127,17 @@ export function syncRunRepository(d1: D1Database) {
     async get(id: string): Promise<SyncRun | null> {
       return (await db.select().from(syncRuns).where(eq(syncRuns.id, id)).get()) ?? null;
     },
+    /**
+     * Hur det går för körningarna som startat från och med en tidpunkt: hur många som startat och hur
+     * många som fortfarande pågår. Appen frågar efter Synka nu tills alla är klara (KK-7-C).
+     */
+    async progressSince(since: string): Promise<{ started: number; running: number }> {
+      const row = await d1
+        .prepare(`SELECT count(*) AS started, coalesce(sum(status = 'running'), 0) AS running FROM sync_runs WHERE started_at >= ?`)
+        .bind(since)
+        .first<{ started: number; running: number }>();
+      return { started: row?.started ?? 0, running: row?.running ?? 0 };
+    },
     /** När startades den senaste manuella synken? Underlag för gränsen en gång per 15 minuter (KK-7-C). */
     async lastManualStartedAt(): Promise<Date | null> {
       const row = await db.select({ at: max(syncRuns.startedAt) }).from(syncRuns).where(eq(syncRuns.kind, "manual")).get();

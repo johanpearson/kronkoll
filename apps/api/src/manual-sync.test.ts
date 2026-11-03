@@ -79,7 +79,7 @@ describe("POST /api/sync (KK-7-C)", () => {
   it("startar en synk i bakgrunden och svarar 202", async () => {
     const res = await call("/api/sync");
     expect(res.status).toBe(202);
-    expect(await res.json()).toEqual({ status: "started" });
+    expect(await res.json()).toEqual({ status: "started", started_at: START });
     expect(await manualRuns()).toEqual([START]);
     expect(await db.prepare(`SELECT status FROM sync_runs`).first()).toEqual({ status: "ok" });
   });
@@ -121,14 +121,40 @@ describe("POST /api/sync (KK-7-C)", () => {
   });
 
   it("andra metoder ger 405", async () => {
-    const res = await call("/api/sync", { method: "GET" });
+    const res = await call("/api/sync", { method: "DELETE" });
     expect(res.status).toBe(405);
-    expect(res.headers.get("allow")).toBe("POST");
+    expect(res.headers.get("allow")).toBe("GET, POST");
   });
 
   it("kräver CSRF-skydd: utan header startas ingen synk", async () => {
     const res = await call("/api/sync", { csrf: false });
     expect(res.status).toBe(403);
     expect(await manualRuns()).toEqual([]);
+  });
+});
+
+describe("GET /api/sync?since=… (KK-7-C)", () => {
+  const progress = async (since: string, env: Partial<Env> = {}) => call(`/api/sync?since=${encodeURIComponent(since)}`, { method: "GET", env });
+
+  it("är inte klar innan någon körning har startat, pågår medan en körning pågår, och är klar efteråt", async () => {
+    expect(await (await progress(START)).json()).toEqual({ started: 0, running: 0, done: false });
+    await db.prepare(`INSERT INTO sync_runs (id, connection_id, kind, started_at, status) VALUES ('m-1', 'c1', 'manual', ?, 'running')`).bind(START).run();
+    expect(await (await progress(START)).json()).toEqual({ started: 1, running: 1, done: false });
+    await db.prepare(`UPDATE sync_runs SET status = 'ok', finished_at = ? WHERE id = 'm-1'`).bind(minutesAfter(1)).run();
+    expect(await (await progress(START)).json()).toEqual({ started: 1, running: 0, done: true });
+  });
+
+  it("räknar bara körningar från tidpunkten och framåt", async () => {
+    await db.prepare(`INSERT INTO sync_runs (id, connection_id, kind, started_at, status) VALUES ('gammal', 'c1', 'cron', ?, 'running')`).bind(minutesAfter(-30)).run();
+    expect(await (await progress(START)).json()).toEqual({ started: 0, running: 0, done: false });
+  });
+
+  it.each(["", "igår", "2026-11-02"])("en ogiltig tidpunkt %j ger 400", async (since) => {
+    expect((await progress(since)).status).toBe(400);
+  });
+
+  it("svarar 503 utan detaljer när databasen inte går att läsa", async () => {
+    const broken = { prepare: () => { throw new Error("D1 nere"); } } as unknown as D1Database;
+    expect((await progress(START, { DB: broken })).status).toBe(503);
   });
 });

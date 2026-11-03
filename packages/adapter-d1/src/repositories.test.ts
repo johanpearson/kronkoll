@@ -207,6 +207,17 @@ describe("körningslogg (KK-7-A, KK-7-B)", () => {
     await repo.start({ id: "run-c3", connectionId: "c1", kind: "cron", startedAt: "2026-11-02T15:07:00.000Z" });
     expect(await repo.lastManualStartedAt()).toEqual(new Date("2026-11-02T09:30:00.000Z"));
   });
+
+  it("säger hur många körningar som startat från en tidpunkt och hur många som pågår", async () => {
+    const repo = syncRunRepository(db);
+    expect(await repo.progressSince("2030-01-01T00:00:00.000Z")).toEqual({ started: 0, running: 0 });
+    await repo.start({ id: "run-p1", connectionId: "c1", kind: "manual", startedAt: "2029-06-01T10:00:01.000Z" });
+    await repo.start({ id: "run-p2", connectionId: "c1", kind: "manual", startedAt: "2029-06-01T10:00:02.000Z" });
+    expect(await repo.progressSince("2029-06-01T10:00:00.000Z")).toEqual({ started: 2, running: 2 });
+    await repo.finish("run-p1", "2029-06-01T10:00:05.000Z", { status: "ok", newCount: 1, updatedCount: 0, errorCode: null });
+    await repo.finish("run-p2", "2029-06-01T10:00:06.000Z", { status: "failed", newCount: 0, updatedCount: 0, errorCode: "UNAVAILABLE" });
+    expect(await repo.progressSince("2029-06-01T10:00:00.000Z")).toEqual({ started: 2, running: 0 });
+  });
 });
 
 describe("kopplingens synkstatus (KK-7-A, KK-7-B)", () => {
