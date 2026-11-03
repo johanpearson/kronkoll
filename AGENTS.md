@@ -68,3 +68,5 @@ Undvik upprepade fillistor och kodutdrag som går att se i diffen. Förklara i s
 - Skapa aldrig en PR som ägaren inte bett om. Merga aldrig själv.
 - Kör repots egna kontroller lokalt innan push. Inaktivera aldrig tester eller grindar för att få CI grön.
 - Markera antaganden som **Assumption:** i PR-texten.
+- Läs [`docs/agent-notes.md`](docs/agent-notes.md) innan du börjar. Där står praktiska lärdomar: hur
+  kontrollerna körs, Cloudflares gränser, Skandias dataformat och öppna trådar. Uppdatera den när du lär dig något nytt.
