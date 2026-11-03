@@ -49,6 +49,16 @@ pnpm --filter @kronkoll/<paket> test:coverage
   `.dependency-cruiser.json`, annars faller `pnpm architecture`.
 - Workern körs i samma isolat som testerna, så `vi.spyOn(globalThis, "fetch")` stubbar även workerns anrop.
 
+## E2E (Playwright)
+
+- `pnpm --filter @kronkoll/web test:e2e` bygger webben, startar `wrangler pages dev` (samma `_headers` och CSP
+  som i drift) och kör `apps/web/e2e/` i Chromium med Pixel 7-viewport (R-7). Är en egen grind i CI (`e2e`).
+- Access och banken går inte att nå lokalt, så `/api/*` besvaras av `e2e/fake-api.ts` med påhittad data och
+  ett litet tillstånd per test. Nya vyer behöver nya svar där, i samma form som det riktiga API:t.
+- Första gången: `pnpm --filter @kronkoll/web exec playwright install chromium`. `pnpm` måste finnas i PATH,
+  eftersom webbservern startas med `pnpm preview` (`corepack enable` räcker).
+- Transaktionslistan är grupperad per dag med nästlade `<li>`. Filtrera bort dagens rubrik för att få en rad.
+
 ## Cloudflare och D1: gränser som har orsakat riktiga fel
 
 - **CPU-tid:** Workern får runt 10 ms CPU per anrop på gratisnivån. Gör dyra steg (normalisering av
@@ -92,5 +102,5 @@ pnpm --filter @kronkoll/<paket> test:coverage
   nytt konto. Matcha på namn och typ inom kopplingen om det händer.
 - "Bara okategoriserade" i Transaktioner visar även okategoriserade insättningar, medan budgetens belopp bara
   räknar utbetalningar (#153).
-- Kvar i M1: #35 (mutationstest och integrationstester klara, kvar: E2E), #29 (CSV-import,
-  kanske stryks) och #24 (avsluta spiken).
+- Kvar i M1: #35 (mutationstest, integrationstester och E2E klara, kvar: axe och Lighthouse), #29
+  (CSV-import, kanske stryks) och #24 (avsluta spiken).
