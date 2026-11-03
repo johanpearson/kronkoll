@@ -72,9 +72,15 @@ describe("lista transaktioner (KK-9, KK-18, #32)", () => {
     expect(items.find((t) => t.id === "t03")).toMatchObject({ split: true });
   });
 
-  it("filtrerar på okategoriserade och på en kategori", async () => {
+  it("filtrerar på okategoriserade och på en kategori, där en uppdelning med en del i kategorin räknas", async () => {
     expect(await ids({ uncategorized: true })).toEqual(["t07", "t05", "t04", "t03"]);
-    expect(await ids({ categoryId })).toEqual(["t02"]);
+    expect(await ids({ categoryId })).toEqual(["t03", "t02"]);
+  });
+
+  it("en huvudkategori tar med sina underkategorier, så att budgetens utgifter går att se (KK-20)", async () => {
+    const parent = (await db.prepare(`SELECT parent_id AS p FROM categories WHERE id = ?`).bind(categoryId).first<{ p: string }>())?.p ?? "";
+    expect(await ids({ categoryId: parent })).toEqual(["t03", "t02"]);
+    expect(await ids({ categoryId: "finns-inte" })).toEqual([]);
   });
 
   it("söker i motpart och beskrivning utan att bry sig om stora och små bokstäver", async () => {

@@ -2,10 +2,12 @@
 // underkategorierna summeras alltid uppåt, och underkategorierna visas när man fäller ut en rad. Varje
 // rad visar budget, utfall, kvar och andel, och en överskriden budget syns med både färg och text
 // (KK-20-B). Huvudkategorier med utgifter men utan budget visas också. Överföringar mellan egna konton
-// räknas inte (KK-20-C). Budgeten sätts i BudgetEditor (KK-20-A).
+// räknas inte (KK-20-C). Budgeten sätts i BudgetEditor (KK-20-A). Ett tryck på en kategori visar
+// transaktionerna bakom utgifterna.
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
+import { Link } from "../router.tsx";
 import { BudgetEditor } from "./BudgetEditor.tsx";
 import { fetchCategories, NO_CATEGORIES, shiftPeriodKey, toPeriod, type Categories, type Period } from "../transactions/TransactionsView.tsx";
 
@@ -87,14 +89,17 @@ function details(f: Figures): string {
   return `${formatSek(f.actualMinor)} av ${formatSek(f.budgetMinor)} · ${left}`;
 }
 
-function BudgetRow(props: { figures: Figures; name: string; sub?: boolean; toggle?: { open: boolean; count: number; onToggle: () => void } }) {
+function BudgetRow(props: { figures: Figures; name: string; periodKey: string; sub?: boolean; toggle?: { open: boolean; count: number; onToggle: () => void } }) {
   const f = props.figures;
   const near = !f.over && f.percent !== null && f.percent >= 90;
   const tone = f.over ? " over" : near ? " near" : f.budgetMinor === null ? " none" : "";
   return (
     <li className={`budget-line${tone}${props.sub ? " sub" : ""}`}>
       <div className="tx-main">
-        <span className="tx-name">{props.name}</span>
+        <span className="tx-name">
+          {/* Raden leder till transaktionerna bakom utgifterna, med underkategorier och uppdelningar. */}
+          <Link to={`/transaktioner?period=${encodeURIComponent(props.periodKey)}&kategori=${encodeURIComponent(f.categoryId)}`}>{props.name}</Link>
+        </span>
         <span className="budget-share">{share(f, props.sub === true)}</span>
       </div>
       {f.budgetMinor !== null && (
@@ -216,11 +221,12 @@ export function BudgetView() {
                   key={g.categoryId}
                   figures={g}
                   name={nameOf(g.categoryId)}
+                  periodKey={budget.period.key}
                   {...(g.subcategories.length > 0
                     ? { toggle: { open: open.has(g.categoryId), count: g.subcategories.length, onToggle: () => { toggle(g.categoryId); } } }
                     : {})}
                 />,
-                ...(open.has(g.categoryId) ? g.subcategories.map((s) => <BudgetRow key={s.categoryId} figures={s} name={shortName(s.categoryId)} sub />) : []),
+                ...(open.has(g.categoryId) ? g.subcategories.map((s) => <BudgetRow key={s.categoryId} figures={s} name={shortName(s.categoryId)} periodKey={budget.period.key} sub />) : []),
               ])}
             </ul>
           )}
