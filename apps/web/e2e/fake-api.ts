@@ -1,0 +1,142 @@
+// Ett påhittat API för E2E (KK-13: ingen riktig bankdata). Det håller ett litet tillstånd per test,
+// så att ett flöde kan spara något och se resultatet efter omladdning, som mot det riktiga API:t.
+import type { Page, Route } from "@playwright/test";
+
+const NOVEMBER = { key: "2026-11", start: "2026-11-01", end: "2026-11-30" };
+
+const CATEGORIES = [
+  { id: "mat", parent_id: null, name: "Mat", kind: "expense", archived: false },
+  { id: "mat-livsmedel", parent_id: "mat", name: "Livsmedel", kind: "expense", archived: false },
+  { id: "hushall", parent_id: null, name: "Hushåll", kind: "expense", archived: false },
+  { id: "hushall-forbrukning", parent_id: "hushall", name: "Förbrukning", kind: "expense", archived: false },
+  { id: "boende", parent_id: null, name: "Boende", kind: "expense", archived: false },
+];
+
+function transaction(id: string, date: string, amountMinor: number, counterparty: string) {
+  return {
+    id,
+    account_id: "acc_1",
+    status: "booked",
+    transaction_date: date,
+    booking_date: date,
+    amount_minor: amountMinor,
+    counterparty,
+    description: "",
+    category_id: null as string | null,
+    category_source: "none",
+    is_internal_transfer: false,
+    split: false,
+  };
+}
+
+const OVERVIEW = {
+  period: NOVEMBER,
+  balance_minor: 4831240,
+  income_minor: 4125000,
+  expense_minor: 2341800,
+  net_minor: 1783200,
+  budget_minor: 3200000,
+  left_to_spend_minor: 858200,
+  left_per_day_minor: 53637,
+  days_left: 16,
+  over: false,
+  last_sync_at: "2026-11-15T05:02:11.000Z",
+  connections: [{ bank: "Exempelbanken", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
+  trend: [
+    { period: "2026-10", income_minor: 3300000, expense_minor: 2900000, net_minor: 400000 },
+    { period: "2026-11", income_minor: 4125000, expense_minor: 2341800, net_minor: 1783200 },
+  ],
+};
+
+/** Utfall per huvudkategori och period. November saknar budget tills ett test sparar en. */
+const ACTUALS: Record<string, Record<string, number>> = {
+  "2026-08": { mat: 590000, boende: 980000 },
+  "2026-09": { mat: 610000, boende: 980000 },
+  "2026-10": { mat: 620000, boende: 980000 },
+  "2026-11": { mat: 655200, boende: 980000 },
+};
+
+export interface FakeApi {
+  readonly rules: { id: string; pattern: string; category_id: string; source: string; hits: number }[];
+  readonly budgetPuts: unknown[];
+}
+
+/** Svarar på alla /api/*-anrop från sidan med påhittad data. */
+export async function useFakeApi(page: Page): Promise<FakeApi> {
+  const transactions = [
+    transaction("t1", "2026-11-12", -41250, "Hörnbutiken Exempelvägen"),
+    transaction("t2", "2026-11-05", -18900, "Hörnbutiken Exempelvägen"),
+    transaction("t3", "2026-11-03", -129900, "Påhittade Möbler AB"),
+  ];
+  const budgets = new Map<string, { category_id: string; budget_minor: number }[]>();
+  const state: FakeApi = { rules: [], budgetPuts: [] };
+
+  const budget = (key: string) => {
+    const lines = budgets.get(key) ?? [];
+    const groups = Object.entries(ACTUALS[key] ?? {}).map(([categoryId, actual]) => {
+      const planned = lines.find((l) => l.category_id === categoryId)?.budget_minor ?? null;
+      return {
+        category_id: categoryId,
+        actual_minor: actual,
+        budget_minor: planned,
+        remaining_minor: planned === null ? null : planned - actual,
+        percent: planned === null ? null : Math.round((actual / planned) * 100),
+        over: planned !== null && actual > planned,
+        subcategories: [],
+      };
+    });
+    const total = (pick: (g: (typeof groups)[number]) => number | null) => groups.reduce((sum, g) => sum + (pick(g) ?? 0), 0);
+    return {
+      period: { key, start: `${key}-01`, end: `${key}-28` },
+      lines,
+      groups,
+      uncategorized_minor: 0,
+      total_budget_minor: total((g) => g.budget_minor),
+      total_actual_minor: total((g) => g.actual_minor),
+      excluded_internal_minor: 0,
+    };
+  };
+
+  const handle = (method: string, path: string, body: Record<string, unknown>): [number, unknown] => {
+    if (path === "/api/overview") return [200, OVERVIEW];
+    if (path === "/api/categories") return [200, { items: CATEGORIES }];
+    if (path === "/api/rules") return [200, { items: state.rules }];
+    if (path === "/api/transactions") return [200, { period: NOVEMBER, items: transactions, next_cursor: null }];
+    const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
+    const found = transactions.find((t) => t.id === tx?.[1]);
+    if (found && method === "PATCH") {
+      found.category_id = String(body["category_id"]);
+      found.category_source = "manual";
+      if (body["learn_rule"] !== true) return [200, { transaction: found, rule: null, retroactive_candidates: 0, protected_manual: 0 }];
+      const pattern = body["rule_pattern"];
+      const rule = { id: "r-1", pattern: typeof pattern === "string" ? pattern : found.counterparty.toUpperCase(), category_id: found.category_id, source: "learned", hits: 1 };
+      state.rules.push(rule);
+      const candidates = transactions.filter((t) => t.counterparty === found.counterparty && t.category_id === null).length;
+      return [200, { transaction: found, rule, retroactive_candidates: candidates, protected_manual: 0 }];
+    }
+    if (path === "/api/rules/r-1/apply" && method === "POST") {
+      const rule = state.rules[0];
+      const matching = transactions.filter((t) => t.category_id === null && t.counterparty.toUpperCase().startsWith(rule?.pattern ?? "\u0000"));
+      for (const t of matching) Object.assign(t, { category_id: rule?.category_id ?? null, category_source: "rule" });
+      if (rule) rule.hits += matching.length;
+      return [200, { updated: matching.length, skipped_manual: 0 }];
+    }
+    const key = /^\/api\/budgets\/(.+)$/u.exec(path)?.[1]?.replace("current", NOVEMBER.key);
+    if (key !== undefined && method === "PUT") {
+      state.budgetPuts.push(body);
+      const lines = Array.isArray(body["lines"]) ? (body["lines"] as { category_id: string; amount_minor: number }[]) : [];
+      budgets.set(key, lines.map((l) => ({ category_id: l.category_id, budget_minor: l.amount_minor })));
+      return [200, { period: key, lines: lines.length }];
+    }
+    if (key !== undefined && key in ACTUALS) return [200, budget(key)];
+    return [404, { error: "not_found" }];
+  };
+
+  await page.route("**/api/**", async (route: Route) => {
+    const request = route.request();
+    const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
+    const [status, json] = handle(request.method(), new URL(request.url()).pathname, body);
+    await route.fulfill({ status, json });
+  });
+  return state;
+}

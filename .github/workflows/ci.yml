@@ -244,10 +244,39 @@ jobs:
       - name: Integrationstester i Workers-miljön (vitest-plugin, Worker + D1)
         run: pnpm --filter @kronkoll/api test:integration
 
+  # De kritiska flödena i Playwright mot produktionsbygget i Pages lokala runtime, med påhittat API.
+  # Bara Chromium i mobil viewport (R-7, KK-15-B).
+  e2e:
+    name: e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - name: Installera Chromium
+        run: pnpm --filter @kronkoll/web exec playwright install --with-deps chromium
+      - name: E2E i mobil viewport
+        run: pnpm --filter @kronkoll/web test:e2e
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: e2e-report
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [secret-scan, workflow-lint, pr-size, pr-description, lint, typecheck, unit, architecture, mutation, integration]
+    needs: [secret-scan, workflow-lint, pr-size, pr-description, lint, typecheck, unit, architecture, mutation, integration, e2e]
     runs-on: ubuntu-latest
     steps:
       - name: Alla grindar gröna?
