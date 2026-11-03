@@ -127,7 +127,9 @@ describe("budgetvyn per huvudkategori (#33, KK-20)", () => {
     api();
     await open();
     expect(screen.getByRole("note").textContent).toContain(formatSek(1500000));
-    expect(screen.getByText(/Okategoriserade utgifter/u).textContent).toBe(`Okategoriserade utgifter: ${formatSek(3000)}`);
+    const link = screen.getByRole("link", { name: "Okategoriserade utgifter" });
+    expect(link.closest("p")?.textContent).toBe(`Okategoriserade utgifter: ${formatSek(3000)}`);
+    expect(link.getAttribute("href")).toBe("/transaktioner?period=2026-11&okategoriserade=1");
   });
 
   it("utan budget och utgifter säger vyn att ingen budget är satt", async () => {
