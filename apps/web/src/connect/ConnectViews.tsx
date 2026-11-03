@@ -78,7 +78,7 @@ export function Consent() {
   );
 }
 
-type DoneState = { kind: "working" } | { kind: "done"; accounts: number } | { kind: "error"; message: string };
+type DoneState = { kind: "working" } | { kind: "done"; accounts: number; renewed: boolean } | { kind: "error"; message: string };
 
 const ABORTED = "Kopplingen avbröts hos banken. Inget sparades.";
 
@@ -101,7 +101,7 @@ export function ConnectDone() {
     }
     void postJson("/api/connections/callback", { code, state: stateParam }).then(({ status, body }) => {
       const accounts = field(body, "accounts");
-      if (status === 201) setState({ kind: "done", accounts: typeof accounts === "number" ? accounts : 0 });
+      if (status === 201) setState({ kind: "done", accounts: typeof accounts === "number" ? accounts : 0, renewed: field(body, "renewed") === true });
       else if (status === 400 && field(body, "error") === "invalid_state")
         setState({ kind: "error", message: "Länken har gått ut eller redan använts. Börja om från början." });
       else setState({ kind: "error", message: "Det gick inte att göra klart kopplingen. Försök igen." });
@@ -126,9 +126,13 @@ export function ConnectDone() {
   }
   return (
     <main>
-      <h1>Kopplat! Hämtar historik…</h1>
+      <h1>{state.renewed ? "Förnyat! Hämtar det som hänt sedan sist…" : "Kopplat! Hämtar historik…"}</h1>
       <p>{state.accounts === 1 ? "1 konto hittades." : `${String(state.accounts)} konton hittades.`}</p>
-      <p>Transaktionerna hämtas i bakgrunden och syns om en liten stund.</p>
+      <p>
+        {state.renewed
+          ? "Samtycket är förnyat. Dina konton, kategorier och historik finns kvar, och det som saknas hämtas i bakgrunden."
+          : "Transaktionerna hämtas i bakgrunden och syns om en liten stund."}
+      </p>
       <Link to="/">Till start</Link>
     </main>
   );

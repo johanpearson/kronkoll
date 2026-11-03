@@ -18,6 +18,7 @@ interface TrendPoint {
 }
 
 interface Connection {
+  readonly id: string;
   readonly bank: string;
   readonly consentDaysLeft: number | null;
 }
@@ -58,7 +59,8 @@ async function fetchOverview(): Promise<Overview | null> {
     connections: list(field(body, "connections")).map((c) => {
       const days = field(c, "consent_days_left");
       const bank = field(c, "bank");
-      return { bank: typeof bank === "string" ? bank : "Banken", consentDaysLeft: typeof days === "number" ? days : null };
+      const id = field(c, "id");
+      return { id: typeof id === "string" ? id : "", bank: typeof bank === "string" ? bank : "Banken", consentDaysLeft: typeof days === "number" ? days : null };
     }),
     trend: list(field(body, "trend")).map((t) => {
       const period = field(t, "period");
@@ -158,8 +160,11 @@ export function OverviewView() {
       <p>{monthOf(o.period.key, monthName).replace(/^./u, (c) => c.toUpperCase())}</p>
       <SyncRow lastSyncAt={o.lastSyncAt} onDone={() => { setReload((n) => n + 1); }} />
       {expiring.map((c) => (
-        <p key={c.bank} role="alert">
-          Kopplingen till {c.bank} går ut om {String(c.consentDaysLeft)} dagar. Förnya den med BankID så fortsätter hämtningen.
+        <p key={c.id} role="alert">
+          {(c.consentDaysLeft ?? 0) < 0
+            ? `Samtycket för ${c.bank} har gått ut, så inget nytt hämtas. `
+            : `Kopplingen till ${c.bank} går ut om ${String(c.consentDaysLeft)} dagar. `}
+          <Link to={`/installningar/koppling/${encodeURIComponent(c.id)}`}>Förnya med BankID</Link>
         </p>
       ))}
       <section className="card">

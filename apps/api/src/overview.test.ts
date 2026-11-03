@@ -87,7 +87,7 @@ describe("GET /api/overview (KK-17)", () => {
       days_left: 16,
       over: false,
       last_sync_at: "2026-11-15T05:02:11.000Z",
-      connections: [{ bank: "Skandia", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
+      connections: [{ id: "c1", bank: "Skandia", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
       trend: undefined,
     });
   });

@@ -70,6 +70,7 @@ export async function getOverview(request: Request, env: { DB: D1Database }, syn
         over: left.over,
         last_sync_at: syncs.at(-1) ?? null,
         connections: connections.map((c) => ({
+          id: c.id,
           bank: c.bank,
           status: c.status,
           consent_expires_on: c.consentExpiresOn,
