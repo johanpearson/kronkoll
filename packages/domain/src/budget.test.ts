@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetOutcome, spendingByCategory, suggestFromAverage, suggestFromPrevious, type BudgetTransaction } from "./budget.ts";
+import { budgetByMainCategory, budgetOutcome, spendingByCategory, suggestFromAverage, suggestFromPrevious, type BudgetTransaction } from "./budget.ts";
 import { CATEGORY_TEMPLATE } from "./categories.ts";
 import type { BudgetPeriod } from "./period.ts";
 import type { SplitPart } from "./split.ts";
@@ -155,5 +155,84 @@ describe("budgetförslag (KK-20-A)", () => {
   it("utgifter per kategori kan räknas för en tidigare period, som underlag till snittet", () => {
     const spend = spendingByCategory({ period: NOVEMBER, transactions: [tx({ amountMinor: -1200 }), tx({ amountMinor: -300, categoryId: null })], splits: new Map(), categories });
     expect([...spend]).toEqual([["mat-livsmedel", 1200], [null, 300]]);
+  });
+});
+
+describe("budget per huvudkategori, med underkategorier summerade uppåt (KK-20-A, KK-20-B)", () => {
+  const groups = (transactions: BudgetTransaction[], lines: { categoryId: string; amountMinor: number }[], splits = new Map<string, SplitPart[]>()) =>
+    budgetByMainCategory({ period: NOVEMBER, transactions, splits, categories, lines });
+
+  it("summerar utgifterna i underkategorierna till huvudkategorin, med budget bara på huvudkategorin", () => {
+    const result = groups(
+      [tx({ categoryId: "mat-livsmedel", amountMinor: -40000 }), tx({ categoryId: "mat-restaurang-cafe", amountMinor: -25000 }), tx({ categoryId: "mat", amountMinor: -5000 })],
+      [{ categoryId: "mat", amountMinor: 60000 }],
+    );
+    expect(result.groups).toEqual([
+      {
+        categoryId: "mat",
+        budgetMinor: 60000,
+        actualMinor: 70000,
+        remainingMinor: -10000,
+        percent: 117,
+        over: true,
+        subcategories: [
+          { categoryId: "mat-livsmedel", budgetMinor: null, actualMinor: 40000, remainingMinor: null, percent: null, over: false },
+          { categoryId: "mat-restaurang-cafe", budgetMinor: null, actualMinor: 25000, remainingMinor: null, percent: null, over: false },
+        ],
+      },
+    ]);
+    expect(result).toMatchObject({ totalBudgetMinor: 60000, totalActualMinor: 70000, uncategorizedMinor: 0 });
+  });
+
+  it("utan budget på huvudkategorin blir dess budget summan av underkategoriernas", () => {
+    const [mat] = groups([tx({ categoryId: "mat-livsmedel", amountMinor: -40000 })], [
+      { categoryId: "mat-livsmedel", amountMinor: 30000 },
+      { categoryId: "mat-restaurang-cafe", amountMinor: 10000 },
+    ]).groups;
+    expect(mat).toMatchObject({ categoryId: "mat", budgetMinor: 40000, actualMinor: 40000, percent: 100, over: false });
+    expect(mat?.subcategories).toEqual([
+      { categoryId: "mat-livsmedel", budgetMinor: 30000, actualMinor: 40000, remainingMinor: -10000, percent: 133, over: true },
+      { categoryId: "mat-restaurang-cafe", budgetMinor: 10000, actualMinor: 0, remainingMinor: 10000, percent: 0, over: false },
+    ]);
+  });
+
+  it("med budget både på huvud- och underkategorier är huvudkategorins belopp taket, och totalen räknas bara en gång", () => {
+    const result = groups([tx({ categoryId: "mat-livsmedel", amountMinor: -10000 })], [
+      { categoryId: "mat", amountMinor: 60000 },
+      { categoryId: "mat-livsmedel", amountMinor: 50000 },
+    ]);
+    expect(result.groups[0]).toMatchObject({ budgetMinor: 60000, actualMinor: 10000 });
+    expect(result.totalBudgetMinor).toBe(60000);
+  });
+
+  it("huvudkategorier med utgifter men utan budget visas, och okategoriserat räknas för sig", () => {
+    const result = groups(
+      [tx({ categoryId: "transport-kollektivtrafik", amountMinor: -9000 }), tx({ categoryId: null, amountMinor: -3000 }), tx({ categoryId: "mat-livsmedel", amountMinor: -1000 })],
+      [{ categoryId: "mat", amountMinor: 50000 }],
+    );
+    expect(result.groups.map((g) => [g.categoryId, g.budgetMinor, g.actualMinor])).toEqual([
+      ["mat", 50000, 1000],
+      ["transport", null, 9000],
+    ]);
+    expect(result.groups[1]).toMatchObject({ remainingMinor: null, percent: null, over: false });
+    expect(result).toMatchObject({ uncategorizedMinor: 3000, totalActualMinor: 13000, totalBudgetMinor: 50000 });
+  });
+
+  it("räknar uppdelade transaktioner per del, och inte interna överföringar eller inkomster", () => {
+    const delad = tx({ id: "delad", categoryId: null, amountMinor: -30000 });
+    const result = groups(
+      [delad, tx({ categoryId: "mat-livsmedel", amountMinor: -500000, internal: true }), tx({ categoryId: "inkomst-lon", amountMinor: 2500000 })],
+      [],
+      new Map([["delad", [{ categoryId: "mat-livsmedel", amountMinor: -20000 }, { categoryId: "transport-kollektivtrafik", amountMinor: -10000 }]]]),
+    );
+    expect(result.groups.map((g) => [g.categoryId, g.actualMinor])).toEqual([
+      ["mat", 20000],
+      ["transport", 10000],
+    ]);
+    expect(result.excludedInternalMinor).toBe(500000);
+  });
+
+  it("utan budget och utgifter blir det inga grupper", () => {
+    expect(groups([], []).groups).toEqual([]);
   });
 });

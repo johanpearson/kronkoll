@@ -99,6 +99,13 @@ describe("GET /api/overview (KK-17)", () => {
     expect(trend[11]).toMatchObject({ income_minor: 4125000, expense_minor: 51250 });
   });
 
+  it("budget både på en huvudkategori och dess underkategori räknas en gång (KK-20-A)", async () => {
+    const lines = [{ categoryId: "mat", amountMinor: 600000 }, { categoryId: "mat-livsmedel", amountMinor: 300000 }, { categoryId: "boende", amountMinor: 400000 }];
+    await budgetRepository(db).replace("2026-11", lines, "manual");
+    expect(await (await call("/api/overview")).json()).toMatchObject({ budget_minor: 1000000 });
+    await budgetRepository(db).replace("2026-11", [{ categoryId: "mat", amountMinor: 600000 }, { categoryId: "boende", amountMinor: 400000 }], "manual");
+  });
+
   it("en äldre period ger dess siffror, utan budget och utan dagar kvar", async () => {
     const body = await (await call("/api/overview?period=2026-10")).json<Overview>();
     expect(body).toMatchObject({ expense_minor: 300000, budget_minor: 0, left_to_spend_minor: -300000, left_per_day_minor: null, days_left: 0, over: true });

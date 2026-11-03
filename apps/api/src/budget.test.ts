@@ -92,6 +92,13 @@ describe("GET /api/budgets/{period} (KK-20, KK-34)", () => {
         { category_id: "hushall-forbrukning", actual_minor: 90000 },
         { category_id: "mat-livsmedel", actual_minor: 2000 },
       ],
+      // Per huvudkategori: underkategoriernas utgifter summeras uppåt.
+      groups: [
+        { category_id: "fritid", budget_minor: null, actual_minor: 34000, remaining_minor: null, percent: null, over: false, subcategories: [{ category_id: "fritid-hobby", budget_minor: null, actual_minor: 34000, remaining_minor: null, percent: null, over: false }] },
+        { category_id: "hushall", budget_minor: 100000, actual_minor: 90000, remaining_minor: 10000, percent: 90, over: false, subcategories: [{ category_id: "hushall-forbrukning", budget_minor: null, actual_minor: 90000, remaining_minor: null, percent: null, over: false }] },
+        { category_id: "mat", budget_minor: 1000, actual_minor: 2000, remaining_minor: -1000, percent: 200, over: true, subcategories: [{ category_id: "mat-livsmedel", budget_minor: null, actual_minor: 2000, remaining_minor: null, percent: null, over: false }] },
+      ],
+      uncategorized_minor: 3000,
     });
   });
 
