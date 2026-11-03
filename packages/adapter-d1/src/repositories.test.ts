@@ -284,15 +284,16 @@ describe("radera en koppling (KK-11-A, KK-11-B)", () => {
     expect(await connections.historyCounts("del1")).toEqual({ accounts: 2, transactions: 3, splits: 1 });
   });
 
-  it("räknar historiken och raderar sedan konton, transaktioner och uppdelningar med kopplingen", async () => {
+  it("räknar historiken och raderar sedan konton, transaktioner, uppdelningar och synklogg med kopplingen", async () => {
     await seedConnection("del2");
     const connections = connectionRepository(db, keys);
+    await syncRunRepository(db).start({ id: "del2-run", connectionId: "del2", kind: "manual", startedAt: "2026-11-02T08:00:00.000Z" });
     expect(await connections.historyCounts("del2")).toEqual({ accounts: 2, transactions: 3, splits: 1 });
     await connections.delete("del2");
     expect(await connections.get("del2")).toBeNull();
     expect(await connections.historyCounts("del2")).toEqual({ accounts: 0, transactions: 0, splits: 0 });
-    const left = await db.prepare(`SELECT (SELECT count(*) FROM transactions WHERE id LIKE 'del2-%') AS t, (SELECT count(*) FROM transaction_splits WHERE id LIKE 'del2-%') AS s`).first();
-    expect(left).toEqual({ t: 0, s: 0 });
+    const left = await db.prepare(`SELECT (SELECT count(*) FROM transactions WHERE id LIKE 'del2-%') AS t, (SELECT count(*) FROM transaction_splits WHERE id LIKE 'del2-%') AS s, (SELECT count(*) FROM sync_runs WHERE id = 'del2-run') AS r`).first();
+    expect(left).toEqual({ t: 0, s: 0, r: 0 });
   });
 });
 

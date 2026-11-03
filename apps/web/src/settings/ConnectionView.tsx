@@ -1,11 +1,12 @@
 // En bankkoppling (#34, KK-7-A, KK-8-A): status, hur länge samtycket gäller, kopplingens konton och de
 // senaste synkkörningarna med hur det gick. Loggen har bara status, antal och felkod, aldrig bankens
-// text (KK-13). Felkoderna översätts till svenska här.
+// text (KK-13). Felkoderna översätts till svenska här. Längst ner kan kopplingen raderas (#28, KK-11).
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { SyncButton } from "../sync/SyncButton.tsx";
+import { DeleteConnection, type HistoryCounts } from "./DeleteConnection.tsx";
 
 interface Run {
   readonly kind: string;
@@ -29,6 +30,7 @@ interface Connection {
   readonly failures: number;
   readonly accounts: readonly Account[];
   readonly runs: readonly Run[];
+  readonly history: HistoryCounts;
 }
 
 const KIND: Record<string, string> = { cron: "Schemalagd", manual: "Manuell", initial: "Första hämtningen", daily: "Daglig" };
@@ -61,6 +63,7 @@ async function fetchConnection(id: string): Promise<Connection | "not_found" | n
     consentExpiresOn: textOrNull(field(body, "consent_expires_on")),
     consentDaysLeft: typeof days === "number" ? days : null,
     failures: num(field(body, "consecutive_failures")),
+    history: { accounts: num(field(field(body, "history"), "accounts")), transactions: num(field(field(body, "history"), "transactions")), splits: num(field(field(body, "history"), "splits")) },
     accounts: list(field(body, "accounts")).map((a) => {
       const balance = field(a, "balance_minor");
       return { id: String(field(a, "id")), name: textOrNull(field(a, "name")) ?? "Konto", balanceMinor: typeof balance === "number" ? balance : null };
@@ -90,6 +93,7 @@ function counts(run: Run): string {
 export function ConnectionView({ id }: { id: string }) {
   const [state, setState] = useState<Connection | "not_found" | "error" | null>(null);
   const [reload, setReload] = useState(0);
+  const [deleted, setDeleted] = useState<string | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -106,6 +110,15 @@ export function ConnectionView({ id }: { id: string }) {
       <Link to="/installningar">‹ Inställningar</Link>
     </p>
   );
+  if (deleted !== null) {
+    return (
+      <main>
+        {back}
+        <h1>Kopplingen är borttagen</h1>
+        <p role="status">{deleted}</p>
+      </main>
+    );
+  }
   if (state === null) return <main>{back}<p>Hämtar…</p></main>;
   if (state === "not_found") return <main>{back}<h1>Kopplingen finns inte</h1></main>;
   if (state === "error") return <main>{back}<p role="alert">Det gick inte att hämta kopplingen. Försök igen om en stund.</p></main>;
@@ -166,6 +179,7 @@ export function ConnectionView({ id }: { id: string }) {
           })}
         </ul>
       )}
+      <DeleteConnection id={id} bank={c.bank} history={c.history} onDeleted={setDeleted} />
     </main>
   );
 }

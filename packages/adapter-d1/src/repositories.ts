@@ -129,10 +129,11 @@ export function connectionRepository(d1: D1Database, keys: Keys) {
     /** Raderar kopplingen med dess konton och transaktioner (KK-11). */
     /**
      * Raderar kopplingen. Konton, transaktioner, uppdelningar och saldon följer med via ON DELETE CASCADE,
-     * och motposter i andra konton tappar sin koppling (SET NULL) (KK-11-B).
+     * och motposter i andra konton tappar sin koppling (SET NULL) (KK-11-B). Synkloggen för kopplingen
+     * raderas också, i samma batch.
      */
     async delete(id: string): Promise<void> {
-      await db.delete(bankConnections).where(eq(bankConnections.id, id));
+      await db.batch([db.delete(syncRuns).where(eq(syncRuns.connectionId, id)), db.delete(bankConnections).where(eq(bankConnections.id, id))]);
     },
     /** Sessionen är återkallad hos banken: session-id raderas, men konton och historik finns kvar (KK-11-A). */
     async revoke(id: string): Promise<void> {
