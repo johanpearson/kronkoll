@@ -18,8 +18,21 @@ const TRAILING_PLACES = new Set([
   "SOLNA", "SUNDBYBERG", "NACKA", "HUDDINGE",
 ]);
 
+/** "BUTIK, ORT" → "BUTIK". Står inget före kommatecknet behålls det som står efter. */
+function withoutPlaceAfterComma(text: string): string {
+  const comma = text.lastIndexOf(",");
+  if (comma === -1) return text;
+  const head = text.slice(0, comma);
+  return head.trim() === "" ? text.slice(comma + 1) : head;
+}
+
 export function normalizeCounterparty(raw: string): string {
-  const upper = raw.toLocaleUpperCase("sv-SE").replace(/\s+/gu, " ").trim();
+  const upper = withoutPlaceAfterComma(raw.toLocaleUpperCase("sv-SE"))
+    // Butiksnummer som sitter ihop med namnet, t.ex. "WILLYS42ODENPLAN", blir ett eget ord.
+    .replace(/(\p{L})(\d)/gu, "$1 $2")
+    .replace(/(\d)(\p{L})/gu, "$1 $2")
+    .replace(/\s+/gu, " ")
+    .trim();
   const tokens = upper.replace(PROCESSOR_PREFIX, "").split(" ").filter((t) => t !== "" && !NUMBER_TOKEN.test(t));
   // Ta bort orter i slutet, men aldrig det första ordet: det är butikens namn.
   while (tokens.length > 1 && TRAILING_PLACES.has(tokens[tokens.length - 1] ?? "")) tokens.pop();

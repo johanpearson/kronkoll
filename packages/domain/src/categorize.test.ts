@@ -86,6 +86,33 @@ describe("kategorisering med regler (KK-18)", () => {
   });
 });
 
+describe("utan motpart från banken används beskrivningen (KK-18)", () => {
+  // Skandia skickar inget motpartsnamn för kortköp; butiken står i beskrivningen.
+  const card = (description: string) => tx({ id: "t1", counterpartyNorm: "", description });
+
+  it("en mallregel matchar butiken i beskrivningen, normaliserad som en motpart", () => {
+    expect(categorize(card("K*ICA NARA SOFO 4711 STHLM"), [templateIca])).toEqual({ categoryId: "mat", source: "template", ruleId: "r-mall-ica" });
+    expect(categorize(card("ICA4711NARA, STOCKHOLM"), [templateIca])?.categoryId).toBe("mat");
+    expect(categorize(card("ICAROS"), [templateIca])).toBeNull();
+  });
+
+  it("en motpart från banken går före beskrivningen", () => {
+    expect(categorize(tx({ id: "t1", counterpartyNorm: "SL", description: "ICA NARA" }), [templateIca])).toBeNull();
+  });
+
+  it("utan motpart och utan beskrivning matchar ingen regel", () => {
+    expect(categorize(card(""), [templateIca])).toBeNull();
+  });
+
+  it("\"Gör alltid så\" lär in beskrivningens butik, och regeln kategoriserar nästa köp där", () => {
+    const { rule } = learnFromManualChoice({ transaction: card("PRESSBYRAN 1234 GBG"), categoryId: "mat-snacks", alwaysDoThis: true, rules: [], newId: counter() });
+    expect(rule).toEqual({ id: "r-ny-1", match: "counterparty_prefix", pattern: "PRESSBYRAN", categoryId: "mat-snacks", source: "learned" });
+    expect(applyRules([tx({ id: "t2", counterpartyNorm: "", description: "PRESSBYRAN 99 GBG" })], rule ? [rule] : [])).toEqual([
+      { id: "t2", categoryId: "mat-snacks", categorySource: "learned" },
+    ]);
+  });
+});
+
 describe("inlärning: \"Gör alltid så\" (KK-18-B)", () => {
   it("markerar transaktionen som manuell och skapar en inlärd regel på normaliserad motpart", () => {
     const result = learnFromManualChoice({
