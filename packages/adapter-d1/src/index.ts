@@ -24,3 +24,4 @@ export { budgetRepository, type BudgetSource } from "./budget.ts";
 export { overviewRepository, type ConnectionAccount, type OverviewAccountRow, type OverviewConnection, type SyncRunRow } from "./overview.ts";
 export { goalRepository, type GoalRecord, type NewGoal } from "./goals.ts";
 export { leaveRepository, type LeavePeriodRecord } from "./leave.ts";
+export { incomeRepository, type IncomeMonth } from "./income.ts";
