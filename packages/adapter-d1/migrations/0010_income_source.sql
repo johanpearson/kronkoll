@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `income_source` text DEFAULT 'none' NOT NULL;
