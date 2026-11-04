@@ -11,6 +11,7 @@ import { RulesView } from "./settings/RulesView.tsx";
 import { SettingsView } from "./settings/SettingsView.tsx";
 import { TransactionDetail } from "./transactions/TransactionDetail.tsx";
 import { TransactionsView } from "./transactions/TransactionsView.tsx";
+import { ToastProvider } from "./toast.tsx";
 
 function NotFound() {
   return (
@@ -60,7 +61,7 @@ function page(path: string): React.JSX.Element {
 export function App() {
   const path = usePath();
   return (
-    <>
+    <ToastProvider>
       {page(path)}
       <nav className="tabbar" aria-label="Huvudmeny">
         <ul>
@@ -74,6 +75,6 @@ export function App() {
           ))}
         </ul>
       </nav>
-    </>
+    </ToastProvider>
   );
 }

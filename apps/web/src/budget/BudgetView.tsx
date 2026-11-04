@@ -8,6 +8,7 @@ import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
+import { useToast } from "../toast.tsx";
 import { BudgetEditor } from "./BudgetEditor.tsx";
 import { DeleteBudget } from "./DeleteBudget.tsx";
 import { fetchCategories, NO_CATEGORIES, shiftPeriodKey, toPeriod, type Categories, type Period } from "../transactions/TransactionsView.tsx";
@@ -127,7 +128,7 @@ export function BudgetView() {
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [reload, setReload] = useState(0);
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     let current = true;
@@ -157,7 +158,6 @@ export function BudgetView() {
   const go = (months: number) => {
     if (budget) setKey(shiftPeriodKey(budget.period.key, months));
     setEditing(false);
-    setNotice(null);
   };
   const toggle = (id: string) => {
     const next = new Set(open);
@@ -212,7 +212,7 @@ export function BudgetView() {
           ) : (
             <>
               <p>
-                <button type="button" className="primary" onClick={() => { setEditing(true); setNotice(null); }}>
+                <button type="button" className="primary" onClick={() => { setEditing(true); }}>
                   {budget.lines.length === 0 ? "Sätt budget" : "Ändra budget"}
                 </button>
               </p>
@@ -222,7 +222,7 @@ export function BudgetView() {
                   periodKey={budget.period.key}
                   lineCount={budget.lines.length}
                   onDeleted={() => {
-                    setNotice("Budgeten för perioden är borttagen.");
+                    toast.done("Budgeten för perioden är borttagen.");
                     setReload((n) => n + 1);
                   }}
                 />
@@ -230,7 +230,6 @@ export function BudgetView() {
             </>
           )}
           {budget.lines.length === 0 && <p>Ingen budget är satt för perioden än.</p>}
-          {notice && <p role="status">{notice}</p>}
           {budget.groups.length > 0 && (
             <ul aria-label="Kategorier">
               {budget.groups.flatMap((g) => [

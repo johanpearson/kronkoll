@@ -10,6 +10,7 @@ import { useEffect, useState, type SyntheticEvent } from "react";
 import { deleteJson, field, getJson, patchJson, postJson, type ApiResult } from "../api.ts";
 import { Link } from "../router.tsx";
 import { SyncButton } from "../sync/SyncButton.tsx";
+import { useToast } from "../toast.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "../transactions/TransactionsView.tsx";
 import { RuleMatches } from "./RuleMatches.tsx";
 
@@ -164,7 +165,7 @@ export function RulesView() {
   const [categories, setCategories] = useState<Categories>(NO_CATEGORIES);
   const [mode, setMode] = useState<Mode | null>(null);
   const [filter, setFilter] = useState("");
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useToast();
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
@@ -180,39 +181,44 @@ export function RulesView() {
     };
   }, [reload]);
 
-  const refresh = (message: string | null) => {
-    setNotice(message);
+  /** Stänger det som är öppet, hämtar om reglerna och säger hur det gick. */
+  const refresh = (ok: boolean, message: string) => {
+    if (ok) toast.done(message);
+    else toast.problem(message);
     setMode(null);
     setReload((n) => n + 1);
   };
   const saved = (ask: Ask | null) => {
     if (ask) setMode({ kind: "ask", ask });
-    else refresh("Regeln är sparad och gäller nya transaktioner.");
+    else refresh(true, "Regeln är sparad och gäller nya transaktioner.");
   };
   const excluded = (matches: number) => {
-    refresh(`Regeln är sparad. ${String(matches)} transaktioner räknas inte längre.`);
+    refresh(true, `Regeln är sparad. ${String(matches)} transaktioner räknas inte längre.`);
   };
   const apply = async (ruleId: string) => {
     const { status, body } = await postJson(`/api/rules/${encodeURIComponent(ruleId)}/apply`, {});
     const updated = field(body, "updated");
-    refresh(status === 200 && typeof updated === "number" ? `${String(updated)} transaktioner fick den nya kategorin.` : "Det gick inte att applicera regeln. Försök igen.");
+    if (status === 200 && typeof updated === "number") refresh(true, `${String(updated)} transaktioner fick den nya kategorin.`);
+    else refresh(false, "Det gick inte att applicera regeln. Försök igen.");
   };
   /** "Applicera alla regler": räkna först, fråga, applicera sedan (KK-18-C). */
   const previewAll = async () => {
     const { status, body } = await postJson("/api/rules/apply-all", { preview: true });
     const count = field(body, "would_update");
-    if (status !== 200 || typeof count !== "number") setNotice("Det gick inte att räkna. Försök igen.");
-    else if (count === 0) refresh("Alla transaktioner har redan kategorin som reglerna ger.");
+    if (status !== 200 || typeof count !== "number") toast.problem("Det gick inte att räkna. Försök igen.");
+    else if (count === 0) refresh(true, "Alla transaktioner har redan kategorin som reglerna ger.");
     else setMode({ kind: "all", count });
   };
   const applyAllRules = async () => {
     const { status, body } = await postJson("/api/rules/apply-all", {});
     const updated = field(body, "updated");
-    refresh(status === 200 && typeof updated === "number" ? `${String(updated)} transaktioner fick ny kategori.` : "Det gick inte att applicera reglerna. Försök igen.");
+    if (status === 200 && typeof updated === "number") refresh(true, `${String(updated)} transaktioner fick ny kategori.`);
+    else refresh(false, "Det gick inte att applicera reglerna. Försök igen.");
   };
   const remove = async (ruleId: string) => {
     const { status } = await deleteJson(`/api/rules/${encodeURIComponent(ruleId)}`);
-    refresh(status === 204 ? "Regeln är borttagen." : "Det gick inte att ta bort regeln. Försök igen.");
+    if (status === 204) refresh(true, "Regeln är borttagen.");
+    else refresh(false, "Det gick inte att ta bort regeln. Försök igen.");
   };
 
   const header = (
@@ -240,7 +246,6 @@ export function RulesView() {
           Applicera alla regler
         </button>
       </div>
-      {notice && <p role="status">{notice}</p>}
       {mode?.kind === "all" && (
         <section className="card">
           <p>
@@ -267,7 +272,7 @@ export function RulesView() {
             <button type="button" className="primary" onClick={() => void apply(mode.ask.ruleId)}>
               Applicera på dem
             </button>
-            <button type="button" onClick={() => { refresh("Regeln är sparad och gäller nya transaktioner."); }}>
+            <button type="button" onClick={() => { refresh(true, "Regeln är sparad och gäller nya transaktioner."); }}>
               Inte nu
             </button>
           </p>

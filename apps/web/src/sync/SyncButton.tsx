@@ -5,6 +5,7 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { field, getJson, postJson } from "../api.ts";
+import { useToast } from "../toast.tsx";
 
 /** Hur ofta knappen frågar om synken är klar. */
 export const POLL_MS = 2000;
@@ -18,7 +19,7 @@ const wait = (ms: number) =>
 
 export function SyncButton(props: { onDone: () => void }) {
   const [running, setRunning] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const toast = useToast();
   const mounted = useRef(true);
   useEffect(
     () => () => {
@@ -42,30 +43,27 @@ export function SyncButton(props: { onDone: () => void }) {
 
   const start = async () => {
     setRunning(true);
-    setMessage(null);
     const { status, body } = await postJson("/api/sync", {});
     const since = field(body, "started_at");
     if (status === 202 && typeof since === "string") {
       const done = await waitUntilDone(since);
       if (!mounted.current) return;
-      setMessage(done ? "Synken är klar." : "Synken tar längre tid än vanligt. Ladda om sidan om en stund för att se allt.");
+      if (done) toast.done("Synken är klar.");
+      else toast.problem("Synken tar längre tid än vanligt. Ladda om sidan om en stund för att se allt.");
       props.onDone();
     } else if (status === 429) {
       const minutes = Math.max(1, Math.ceil((Number(field(body, "retry_after_s")) || 60) / 60));
-      setMessage(`Du kan synka igen om ${String(minutes)} min.`);
+      toast.problem(`Du kan synka igen om ${String(minutes)} min.`);
     } else {
-      setMessage("Det gick inte att starta synken. Försök igen om en stund.");
+      toast.problem("Det gick inte att starta synken. Försök igen om en stund.");
     }
     setRunning(false);
   };
 
   return (
-    <>
-      <button type="button" className="sync-button" disabled={running} aria-busy={running} onClick={() => void start()}>
-        <RefreshCw aria-hidden="true" size={18} strokeWidth={2} className={running ? "spin" : undefined} />
-        {running ? "Synkar…" : "Synka nu"}
-      </button>
-      {message && <p role="status">{message}</p>}
-    </>
+    <button type="button" className="sync-button" disabled={running} aria-busy={running} onClick={() => void start()}>
+      <RefreshCw aria-hidden="true" size={18} strokeWidth={2} className={running ? "spin" : undefined} />
+      {running ? "Synkar…" : "Synka nu"}
+    </button>
   );
 }

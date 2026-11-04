@@ -171,7 +171,7 @@ describe("översikten (#31, KK-17)", () => {
       await vi.advanceTimersByTimeAsync(MAX_WAIT_MS + POLL_MS);
     });
     await settle();
-    expect(screen.getByRole("status").textContent).toContain("Synken tar längre tid än vanligt");
+    expect(screen.getByRole("alert").textContent).toContain("Synken tar längre tid än vanligt");
   });
 
   it.each([
@@ -182,7 +182,7 @@ describe("översikten (#31, KK-17)", () => {
     await open();
     fireEvent.click(screen.getByRole("button", { name: "Synka nu" }));
     await settle();
-    expect(screen.getByRole("status").textContent).toBe(message);
+    expect(screen.getByRole("alert").textContent).toBe(message);
   });
 
   it("varnar när samtycket snart går ut, med både bank och dagar (KK-8-A)", async () => {

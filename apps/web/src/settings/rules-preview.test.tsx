@@ -153,13 +153,13 @@ describe("applicera alla regler (#34, KK-18-C)", () => {
     api({ preview: [503, {}] });
     await open();
     await click("Applicera alla regler");
-    expect(screen.getByRole("status").textContent).toBe("Det gick inte att räkna. Försök igen.");
+    expect(screen.getByRole("alert").textContent).toBe("Det gick inte att räkna. Försök igen.");
     cleanup();
     api({ apply: [503, {}] });
     await open();
     await click("Applicera alla regler");
     await click("Applicera");
-    expect(screen.getByRole("status").textContent).toBe("Det gick inte att applicera reglerna. Försök igen.");
+    expect(screen.getByRole("alert").textContent).toBe("Det gick inte att applicera reglerna. Försök igen.");
   });
 
   it("Synka nu finns på sidan och hämtar reglerna igen när synken är klar", async () => {
