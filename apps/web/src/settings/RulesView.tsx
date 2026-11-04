@@ -4,6 +4,8 @@
 // ändras aldrig. En regel vars kategori är arkiverad markeras med text. "Visa träffar" och frågan efter
 // att en regel sparats visar vilka transaktioner den gäller. "Applicera alla regler" kör alla regler över
 // historiken efter en fråga, och Synka nu hämtar nytt från banken och kategoriserar.
+// En regel kan också ha åtgärden Räkna inte (KK-39-C): den gäller hela historiken direkt, så vyn visar
+// först hur många den träffar och sparar när användaren bekräftar. Egna val ändras aldrig.
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { deleteJson, field, getJson, patchJson, postJson, type ApiResult } from "../api.ts";
 import { Link } from "../router.tsx";
@@ -11,10 +13,15 @@ import { SyncButton } from "../sync/SyncButton.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "../transactions/TransactionsView.tsx";
 import { RuleMatches } from "./RuleMatches.tsx";
 
+/** Värdet i kategorivalet som betyder Räkna inte i stället för en kategori. */
+const EXCLUDE = "exclude";
+
 interface Rule {
   readonly id: string;
   readonly pattern: string;
-  readonly categoryId: string;
+  /** Null för en Räkna inte-regel. */
+  readonly categoryId: string | null;
+  readonly exclude: boolean;
   readonly learned: boolean;
   readonly hits: number;
   readonly archived: boolean;
@@ -24,9 +31,18 @@ function toRule(raw: unknown): Rule | null {
   const id = field(raw, "id");
   const pattern = field(raw, "pattern");
   const categoryId = field(raw, "category_id");
-  if (typeof id !== "string" || typeof pattern !== "string" || typeof categoryId !== "string") return null;
+  const exclude = field(raw, "action") === EXCLUDE;
+  if (typeof id !== "string" || typeof pattern !== "string" || (!exclude && typeof categoryId !== "string")) return null;
   const hits = field(raw, "hits");
-  return { id, pattern, categoryId, learned: field(raw, "source") === "learned", hits: typeof hits === "number" ? hits : 0, archived: field(raw, "category_archived") === true };
+  return {
+    id,
+    pattern,
+    categoryId: exclude ? null : (categoryId as string),
+    exclude,
+    learned: field(raw, "source") === "learned",
+    hits: typeof hits === "number" ? hits : 0,
+    archived: field(raw, "category_archived") === true,
+  };
 }
 
 async function fetchRules(): Promise<Rule[] | null> {
@@ -48,15 +64,38 @@ function outcome({ status, body }: ApiResult): Ask | null | string {
   return { ruleId, candidates, protectedManual: typeof manual === "number" ? manual : 0 };
 }
 
-/** Mönster och kategori, för en ny regel eller en som ändras. */
-function RuleForm(props: { title: string; rule?: Rule; categories: Categories; onSaved: (ask: Ask | null) => void; onClose: () => void }) {
+/** Mönster och kategori (eller Räkna inte), för en ny regel eller en som ändras. */
+function RuleForm(props: { title: string; rule?: Rule; categories: Categories; onSaved: (ask: Ask | null) => void; onExcluded: (matches: number) => void; onClose: () => void }) {
   const [pattern, setPattern] = useState(props.rule?.pattern ?? "");
-  const [categoryId, setCategoryId] = useState(props.rule?.categoryId ?? "");
+  const [categoryId, setCategoryId] = useState(props.rule?.exclude ? EXCLUDE : (props.rule?.categoryId ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Antalet träffar för en ny Räkna inte-regel, som visas innan den sparas. */
+  const [confirm, setConfirm] = useState<number | null>(null);
+
+  /** Sparar en Räkna inte-regel: ny med POST, ändrad med PATCH där bara namnet går att byta. */
+  const saveExclude = async () => {
+    setBusy(true);
+    const result = props.rule ? await patchJson(`/api/rules/${encodeURIComponent(props.rule.id)}`, { pattern }) : await postJson("/api/rules", { pattern, action: EXCLUDE });
+    setBusy(false);
+    const matches = field(result.body, "matches");
+    if ((result.status === 200 || result.status === 201) && typeof matches === "number") props.onExcluded(matches);
+    else setError(result.status === 400 ? "Skriv början av ett namn, till exempel IKEA." : "Det gick inte att spara regeln. Försök igen.");
+  };
+
   const save = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError(null);
+    if (categoryId === EXCLUDE && props.rule) return saveExclude();
     setBusy(true);
+    if (categoryId === EXCLUDE) {
+      const { status, body } = await postJson("/api/rules", { pattern, action: EXCLUDE, preview: true });
+      setBusy(false);
+      const matches = field(body, "matches");
+      if (status === 200 && typeof matches === "number") setConfirm(matches);
+      else setError(status === 400 ? "Skriv början av ett namn, till exempel IKEA." : "Det gick inte att räkna träffarna. Försök igen.");
+      return;
+    }
     const body = { pattern, category_id: categoryId };
     const result = props.rule ? await patchJson(`/api/rules/${encodeURIComponent(props.rule.id)}`, body) : await postJson("/api/rules", body);
     setBusy(false);
@@ -64,23 +103,43 @@ function RuleForm(props: { title: string; rule?: Rule; categories: Categories; o
     if (typeof next === "string") setError(next);
     else props.onSaved(next);
   };
+
+  if (confirm !== null) {
+    return (
+      <div className="tx-editor">
+        <p>Regeln träffar {confirm} transaktioner. De räknas inte i budget och översikt. Det du själv har valt ändras inte.</p>
+        {error && <p role="alert">{error}</p>}
+        <p>
+          <button type="button" className="primary small" disabled={busy} onClick={() => void saveExclude()}>
+            Spara regeln
+          </button>
+          <button type="button" className="small" onClick={props.onClose}>
+            Avbryt
+          </button>
+        </p>
+      </div>
+    );
+  }
   return (
     <form className="tx-editor" aria-label={props.title} onSubmit={(e) => void save(e)}>
       <label>
         Allt som börjar med
         <input value={pattern} maxLength={60} placeholder="IKEA" onChange={(e) => { setPattern(e.target.value); }} />
       </label>
-      <label>
-        Får kategorin
-        <select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); }}>
-          <option value="">Välj kategori</option>
-          {props.categories.options.map((o) => (
-            <option key={o.id} value={o.id}>
-              {o.label}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!props.rule?.exclude && (
+        <label>
+          Får kategorin
+          <select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); }}>
+            <option value="">Välj kategori</option>
+            {!props.rule && <option value={EXCLUDE}>Räkna inte i budget och översikt</option>}
+            {props.categories.options.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {error && <p role="alert">{error}</p>}
       <p>
         <button type="submit" className="primary small" disabled={busy || categoryId === "" || pattern.trim() === ""}>
@@ -130,6 +189,9 @@ export function RulesView() {
     if (ask) setMode({ kind: "ask", ask });
     else refresh("Regeln är sparad och gäller nya transaktioner.");
   };
+  const excluded = (matches: number) => {
+    refresh(`Regeln är sparad. ${String(matches)} transaktioner räknas inte längre.`);
+  };
   const apply = async (ruleId: string) => {
     const { status, body } = await postJson(`/api/rules/${encodeURIComponent(ruleId)}/apply`, {});
     const updated = field(body, "updated");
@@ -164,14 +226,14 @@ export function RulesView() {
   if (rules === null) return <main>{header}<p>Hämtar…</p></main>;
   if (rules === "error") return <main>{header}<p role="alert">Det gick inte att hämta reglerna. Försök igen om en stund.</p></main>;
 
-  const name = (id: string) => categories.names.get(id) ?? id;
+  const name = (r: Rule) => (r.categoryId === null ? "Räknas inte" : (categories.names.get(r.categoryId) ?? r.categoryId));
   const query = filter.trim().toLocaleUpperCase("sv-SE");
-  const shown = rules.filter((r) => query === "" || r.pattern.includes(query) || name(r.categoryId).toLocaleUpperCase("sv-SE").includes(query));
+  const shown = rules.filter((r) => query === "" || r.pattern.includes(query) || name(r).toLocaleUpperCase("sv-SE").includes(query));
 
   return (
     <main>
       {header}
-      <p>En regel ger en kategori åt allt som börjar med ett visst namn. Den används vid varje synk. Manuellt valda kategorier ändras aldrig.</p>
+      <p>En regel ger en kategori åt allt som börjar med ett visst namn. Den används vid varje synk. Manuellt valda kategorier ändras aldrig. En regel kan också göra att det den träffar inte räknas i budget och översikt.</p>
       <div className="sync">
         <SyncButton onDone={() => { setReload((n) => n + 1); }} />
         <button type="button" onClick={() => void previewAll()}>
@@ -213,7 +275,7 @@ export function RulesView() {
       )}
       {mode?.kind === "add" ? (
         <section className="card">
-          <RuleForm title="Ny regel" categories={categories} onSaved={saved} onClose={() => { setMode(null); }} />
+          <RuleForm title="Ny regel" categories={categories} onSaved={saved} onExcluded={excluded} onClose={() => { setMode(null); }} />
         </section>
       ) : (
         <p>
@@ -242,16 +304,18 @@ export function RulesView() {
                   )}
                 </div>
                 <small className="tx-notes">
-                  → {name(r.categoryId)} · {r.learned ? "Egen" : "Mall"} · {r.hits === 1 ? "1 träff" : `${String(r.hits)} träffar`}
+                  → {name(r)} · {r.learned ? "Egen" : "Mall"} · {r.hits === 1 ? "1 träff" : `${String(r.hits)} träffar`}
                 </small>
                 {r.archived && <span className="badge warn">Kategorin är arkiverad</span>}
                 {open === "menu" && (
                   <div className="tx-actions">
-                    <button type="button" className="small" onClick={() => { setMode({ kind: "matches", id: r.id }); }}>
-                      Visa träffar
-                    </button>
+                    {!r.exclude && (
+                      <button type="button" className="small" onClick={() => { setMode({ kind: "matches", id: r.id }); }}>
+                        Visa träffar
+                      </button>
+                    )}
                     <button type="button" className="small" onClick={() => { setMode({ kind: "edit", id: r.id }); }}>
-                      Ändra namn eller kategori
+                      {r.exclude ? "Ändra namn" : "Ändra namn eller kategori"}
                     </button>
                     <button type="button" className="small" onClick={() => { setMode({ kind: "delete", id: r.id }); }}>
                       Ta bort
@@ -271,10 +335,10 @@ export function RulesView() {
                     </p>
                   </div>
                 )}
-                {open === "edit" && <RuleForm title={`Ändra regeln ${r.pattern}`} rule={r} categories={categories} onSaved={saved} onClose={() => { setMode(null); }} />}
+                {open === "edit" && <RuleForm title={`Ändra regeln ${r.pattern}`} rule={r} categories={categories} onSaved={saved} onExcluded={excluded} onClose={() => { setMode(null); }} />}
                 {open === "delete" && (
                   <div className="tx-editor">
-                    <p>Ta bort regeln? Transaktioner som redan har fått kategorin behåller den.</p>
+                    <p>{r.exclude ? "Ta bort regeln? Dess träffar räknas igen, utom det du själv har valt." : "Ta bort regeln? Transaktioner som redan har fått kategorin behåller den."}</p>
                     <p>
                       <button type="button" className="danger small" onClick={() => void remove(r.id)}>
                         Ta bort
