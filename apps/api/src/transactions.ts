@@ -30,6 +30,7 @@ function toJson(item: TransactionListItem) {
     category_id: item.categoryId,
     category_source: item.categorySource,
     is_internal_transfer: item.isInternalTransfer,
+    manual_transfer: item.manualTransfer,
     split: item.split,
   };
 }

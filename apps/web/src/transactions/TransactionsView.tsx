@@ -18,6 +18,8 @@ interface Transaction {
   readonly description: string;
   readonly categoryId: string | null;
   readonly isInternalTransfer: boolean;
+  /** Användarens eget val: true = räknas inte (KK-39), false = räknas, null = automatiskt. */
+  readonly manualTransfer: boolean | null;
   readonly split: boolean;
 }
 
@@ -43,6 +45,7 @@ function toTransaction(raw: unknown): Transaction | null {
   const amount = field(raw, "amount_minor");
   if (typeof id !== "string" || typeof date !== "string" || typeof amount !== "number") return null;
   const category = field(raw, "category_id");
+  const manual = field(raw, "manual_transfer");
   return {
     id,
     status: text(field(raw, "status")),
@@ -52,6 +55,7 @@ function toTransaction(raw: unknown): Transaction | null {
     description: text(field(raw, "description")),
     categoryId: typeof category === "string" ? category : null,
     isInternalTransfer: field(raw, "is_internal_transfer") === true,
+    manualTransfer: typeof manual === "boolean" ? manual : null,
     split: field(raw, "split") === true,
   };
 }
@@ -175,7 +179,7 @@ function Row(props: {
   const notes = [
     t.categoryId === null ? null : (categoryNames.get(t.categoryId) ?? null),
     t.status === "pending" ? "Preliminär" : null,
-    t.isInternalTransfer ? "Intern överföring – räknas inte" : null,
+    t.manualTransfer === true ? "Räknas inte" : t.isInternalTransfer ? "Intern överföring – räknas inte" : null,
     t.split ? "Uppdelad" : null,
     t.categoryId === null && !t.split ? "Okategoriserad" : null,
   ].filter((n): n is string => n !== null);

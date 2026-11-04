@@ -1,5 +1,6 @@
 // Detaljsidan för en transaktion (#32): allt om den, inklusive bankens råa text som ofta förklarar
-// en okänd motpart, och åtgärderna Ändra kategori, Dela upp och Räkna inte som utgift (KK-20-C).
+// en okänd motpart, och åtgärderna Ändra kategori, Dela upp och Räkna inte (KK-20-C, KK-39). Räkna inte
+// tar transaktionen ur budget och översikt; saldot påverkas inte eftersom det kommer från banken.
 // Bankens text renderas alltid som text, aldrig som HTML (KK-30).
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useCallback, useEffect, useState } from "react";
@@ -68,9 +69,9 @@ function toDetail(body: unknown): Detail | null {
 const SOURCE: Record<string, string> = { template: "mall", learned: "inlärd regel", manual: "vald av dig" };
 
 function counting(d: Detail): string {
-  if (d.manualTransfer === true) return "Inte som utgift (vald av dig)";
-  if (d.manualTransfer === false) return "Som utgift (vald av dig)";
-  return d.internal ? "Inte som utgift – intern överföring (automatiskt)" : "Som utgift";
+  if (d.manualTransfer === true) return "Nej (vald av dig)";
+  if (d.manualTransfer === false) return "Ja (vald av dig)";
+  return d.internal ? "Nej – intern överföring (automatiskt)" : "Ja";
 }
 
 type State = { kind: "loading" } | { kind: "missing" } | { kind: "error" } | { kind: "ready"; detail: Detail };
@@ -157,8 +158,8 @@ export function TransactionDetail({ id }: { id: string }) {
         <p className="actions">
           <button type="button" onClick={() => { setMode("category"); }}>Ändra kategori</button>
           <button type="button" onClick={() => { setMode("split"); }}>Dela upp</button>
-          {!d.internal && <button type="button" disabled={busy} onClick={() => void setTransfer(true)}>Räkna inte som utgift</button>}
-          {d.internal && <button type="button" disabled={busy} onClick={() => void setTransfer(false)}>Räkna som utgift</button>}
+          {!d.internal && <button type="button" disabled={busy} onClick={() => void setTransfer(true)}>Räkna inte</button>}
+          {d.internal && <button type="button" disabled={busy} onClick={() => void setTransfer(false)}>Räkna med</button>}
           {d.manualTransfer !== null && <button type="button" disabled={busy} onClick={() => void setTransfer(null)}>Låt Kronkoll avgöra</button>}
         </p>
       )}

@@ -55,6 +55,8 @@ export interface TransactionListItem {
   readonly categoryId: string | null;
   readonly categorySource: Row["categorySource"];
   readonly isInternalTransfer: boolean;
+  /** Användarens eget val (KK-20-C, KK-39): true = räknas inte, false = räknas, null = automatiskt. */
+  readonly manualTransfer: boolean | null;
   /** Transaktionen är uppdelad på flera kategorier (KK-19). */
   readonly split: boolean;
 }
@@ -215,6 +217,7 @@ export function transactionRepository(d1: D1Database) {
           categoryId: transactions.categoryId,
           categorySource: transactions.categorySource,
           isInternalTransfer: transactions.isInternalTransfer,
+          manualTransfer: transactions.manualTransfer,
           // Tabellnamnet behövs: utan det betyder "id" uppdelningens id inne i underfrågan.
           split: sql<number>`EXISTS (SELECT 1 FROM transaction_splits s WHERE s.transaction_id = "transactions"."id")`,
         })

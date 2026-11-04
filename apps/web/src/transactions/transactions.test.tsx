@@ -105,6 +105,7 @@ describe("Transaktioner (#32, KK-4, KK-9, KK-30)", () => {
         items: [
           tx({ id: "p", status: "pending", booking_date: null, counterparty: "PRELIMINÄR" }),
           tx({ id: "i", is_internal_transfer: true, counterparty: "ÖVERFÖRING" }),
+          tx({ id: "m", is_internal_transfer: true, manual_transfer: true, counterparty: "UTLÄGG" }),
           tx({ id: "s", split: true, category_id: "cat_1", category_source: "manual", counterparty: "UPPDELAD" }),
         ],
         next_cursor: null,
@@ -114,6 +115,9 @@ describe("Transaktioner (#32, KK-4, KK-9, KK-30)", () => {
     const row = (name: string) => screen.getByText(name).closest("li")?.textContent ?? "";
     expect(row("PRELIMINÄR")).toContain("Preliminär");
     expect(row("ÖVERFÖRING")).toContain("Intern överföring – räknas inte");
+    // Ett eget val är inte en överföring, bara något som inte ska räknas (KK-39).
+    expect(row("UTLÄGG")).toContain("Räknas inte");
+    expect(row("UTLÄGG")).not.toContain("Intern överföring");
     expect(row("UPPDELAD")).toContain("Uppdelad");
     expect(row("PRELIMINÄR")).toContain("Okategoriserad");
     expect(row("UPPDELAD")).not.toContain("Okategoriserad");

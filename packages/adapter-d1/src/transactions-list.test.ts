@@ -66,10 +66,18 @@ describe("lista transaktioner (KK-9, KK-18, #32)", () => {
       categoryId,
       categorySource: "template",
       isInternalTransfer: false,
+      manualTransfer: null,
       split: false,
     });
     expect(items.find((t) => t.id === "t04")).toMatchObject({ isInternalTransfer: true });
     expect(items.find((t) => t.id === "t03")).toMatchObject({ split: true });
+  });
+
+  it("säger om användaren själv har valt att transaktionen inte räknas (KK-39)", async () => {
+    await db.prepare(`UPDATE transactions SET manual_transfer = 1, is_internal_transfer = 1 WHERE id = 't02'`).run();
+    const { items } = await transactionRepository(db).list(NOVEMBER);
+    expect(items.find((t) => t.id === "t02")).toMatchObject({ isInternalTransfer: true, manualTransfer: true });
+    await db.prepare(`UPDATE transactions SET manual_transfer = NULL, is_internal_transfer = 0 WHERE id = 't02'`).run();
   });
 
   it("filtrerar på okategoriserade och på en kategori, där en uppdelning med en del i kategorin räknas", async () => {
