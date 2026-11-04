@@ -131,6 +131,7 @@ export const accounts = sqliteTable(
 
 const CATEGORY_SOURCE = ["manual", "learned", "template", "none"] as const;
 const INCOME_TYPES = ["salary", "parental_benefit", "other"] as const;
+const INCOME_SOURCE = CATEGORY_SOURCE;
 
 export const categories = sqliteTable(
   "categories",
@@ -169,6 +170,11 @@ export const transactions = sqliteTable(
     categoryId: text("category_id").references(() => categories.id),
     categorySource: text("category_source", { enum: CATEGORY_SOURCE }).notNull().default("none"),
     incomeType: text("income_type", { enum: INCOME_TYPES }),
+    /**
+     * Var inkomsttypen kom ifrån (KK-22-A). "manual" skrivs aldrig över av regler. Ingen CHECK: SQLite kan
+     * bara lägga till en CHECK genom att bygga om tabellen, och då raderas uppdelningar och parningar.
+     */
+    incomeSource: text("income_source", { enum: INCOME_SOURCE }).notNull().default("none"),
     isInternalTransfer: integer("is_internal_transfer", { mode: "boolean" }).notNull().default(false),
     transferPairId: text("transfer_pair_id").references((): AnySQLiteColumn => transactions.id, { onDelete: "set null" }),
     /** Användarens eget val (KK-20-C): 1 = räkna inte som utgift, 0 = räkna som utgift, null = automatiskt. */
