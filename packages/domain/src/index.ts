@@ -71,6 +71,17 @@ export {
   type LearnIncomeResult,
 } from "./income-classify.ts";
 export {
+  compareWithNormal,
+  dailyBenefitMinor,
+  estimateLeaveIncome,
+  parametersFor,
+  withdrawalDays,
+  type IncomeParameters,
+  type LeaveMonth,
+  type LeavePeriod,
+  type MonthComparison,
+} from "./income-forecast.ts";
+export {
   CATEGORY_TEMPLATE,
   TEMPLATE_RULES,
   addCategory,
