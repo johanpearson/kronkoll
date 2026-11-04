@@ -8,6 +8,7 @@ import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
+import { CategoryDot } from "../category-color.tsx";
 import { useToast } from "../toast.tsx";
 import { BudgetEditor } from "./BudgetEditor.tsx";
 import { DeleteBudget } from "./DeleteBudget.tsx";
@@ -91,6 +92,9 @@ function details(f: Figures): string {
   return `${formatSek(f.actualMinor)} av ${formatSek(f.budgetMinor)} · ${left}`;
 }
 
+/** Budgetens rader är huvudkategorier; de har ingen förälder att slå upp. */
+const MAIN: ReadonlyMap<string, string | null> = new Map();
+
 function BudgetRow(props: { figures: Figures; name: string; periodKey: string; sub?: boolean; toggle?: { open: boolean; count: number; onToggle: () => void } }) {
   const f = props.figures;
   const near = !f.over && f.percent !== null && f.percent >= 90;
@@ -99,6 +103,7 @@ function BudgetRow(props: { figures: Figures; name: string; periodKey: string; s
     <li className={`budget-line${tone}${props.sub ? " sub" : ""}`}>
       <div className="tx-main">
         <span className="tx-name">
+          {!props.sub && <CategoryDot categoryId={f.categoryId} parentOf={MAIN} />}
           {/* Raden leder till transaktionerna bakom utgifterna, med underkategorier och uppdelningar. */}
           <Link to={`/transaktioner?period=${encodeURIComponent(props.periodKey)}&kategori=${encodeURIComponent(f.categoryId)}`}>{props.name}</Link>
         </span>

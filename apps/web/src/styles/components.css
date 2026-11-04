@@ -580,3 +580,27 @@ main ul > li.budget-line.sub {
     transform: translateY(8px);
   }
 }
+/* Kategoriprickar (KK-26-D). Färgen är bara en ledtråd bredvid namnet. */
+.cat-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: var(--space-2);
+  border-radius: 50%;
+  background: var(--cat);
+  vertical-align: 0.05em;
+}
+
+.cat-blue { --cat: var(--cat-blue); }
+.cat-green { --cat: var(--cat-green); }
+.cat-orange { --cat: var(--cat-orange); }
+.cat-pink { --cat: var(--cat-pink); }
+.cat-violet { --cat: var(--cat-violet); }
+.cat-teal { --cat: var(--cat-teal); }
+.cat-brown { --cat: var(--cat-brown); }
+.cat-gold { --cat: var(--cat-gold); }
+.cat-olive { --cat: var(--cat-olive); }
+.cat-plum { --cat: var(--cat-plum); }
+.cat-slate { --cat: var(--cat-slate); }
+.cat-grey { --cat: var(--cat-grey); }
+.cat-lime { --cat: var(--cat-lime); }

@@ -6,6 +6,7 @@ import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
+import { CategoryDot } from "../category-color.tsx";
 import { useToast } from "../toast.tsx";
 import { CategoryEditor, type CategoryOption } from "./CategoryEditor.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
@@ -192,7 +193,12 @@ function Row(props: {
         </span>
         <span className={t.amountMinor > 0 ? "amount income" : "amount"}>{formatSek(t.amountMinor)}</span>
       </div>
-      {notes.length > 0 && <small className="tx-notes">{notes.join(" · ")}</small>}
+      {notes.length > 0 && (
+        <small className="tx-notes">
+          {t.categoryId !== null && categoryNames.has(t.categoryId) && <CategoryDot categoryId={t.categoryId} parentOf={categories.parentOf} />}
+          {notes.join(" · ")}
+        </small>
+      )}
       {props.mode === null && (
         <div className="tx-actions">
           <button type="button" className="small" aria-label={`Ändra kategori för ${name}`} onClick={() => { props.onOpen("category"); }}>
