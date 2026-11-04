@@ -57,6 +57,20 @@ export {
   type LearnResult,
 } from "./categorize.ts";
 export {
+  INCOME_TEMPLATE_RULES,
+  applyIncomeRules,
+  classifyIncome,
+  learnIncomeFromManualChoice,
+  type IncomeChange,
+  type IncomeClassification,
+  type IncomeRule,
+  type IncomeSource,
+  type IncomeTransaction,
+  type IncomeType,
+  type LearnIncomeInput,
+  type LearnIncomeResult,
+} from "./income-classify.ts";
+export {
   CATEGORY_TEMPLATE,
   TEMPLATE_RULES,
   addCategory,
