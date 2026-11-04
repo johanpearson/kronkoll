@@ -1,7 +1,7 @@
 // Lighthouse på produktionsbygget i mobilläge (KK-25, V-e2e-pwa): prestanda, tillgänglighet och bästa
 // praxis. Lighthouse öppnar en egen flik via Chrome DevTools-protokollet. Den fliken hör till samma
 // webbläsarkontext som fake-API:t, så sidan visar påhittad data i stället för fel.
-// Lighthouse 13 har ingen PWA-kategori längre. Installbarheten kontrolleras när appen får manifest.
+// Lighthouse 13 har ingen PWA-kategori längre. Installbarheten kontrolleras i pwa.spec.ts.
 import { chromium, expect, test } from "@playwright/test";
 import lighthouse from "lighthouse";
 import { useFakeApi } from "./fake-api.ts";
