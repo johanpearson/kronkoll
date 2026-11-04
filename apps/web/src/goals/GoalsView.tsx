@@ -1,7 +1,8 @@
 // Sparmål (#39, KK-21): alla mål med hur mycket som är sparat, när de nås i nuvarande takt och om de
-// är i fas med måldatumet. Formuläret för nya mål och sidan för ett mål kommer i egna PR:er.
+// är i fas med måldatumet. Sidan för ett mål kommer i en egen PR.
 import { formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
+import { navigate } from "../router.tsx";
 import { fetchGoals, formatPeriod, goalBadge, type Goal } from "./goals.ts";
 
 type State = { readonly kind: "loading" } | { readonly kind: "error" } | { readonly kind: "ready"; readonly goals: readonly Goal[] };
@@ -40,6 +41,11 @@ export function GoalsView() {
   return (
     <main>
       <h1>Sparmål</h1>
+      <p>
+        <button type="button" className="primary" onClick={() => { navigate("/sparmal/nytt"); }}>
+          Nytt sparmål
+        </button>
+      </p>
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta sparmålen. Försök igen om en stund.</p>}
       {state.kind === "ready" && state.goals.length === 0 && (
