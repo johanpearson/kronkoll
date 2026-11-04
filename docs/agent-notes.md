@@ -61,6 +61,10 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - `e2e/a11y.spec.ts` kör axe (WCAG 2.1 A och AA) på huvudvyerna i ljust och mörkt läge via
   `emulateMedia({ colorScheme })`. En ny vy läggs till i `VIEWS`, och fake-API:t måste svara på alla dess
   anrop: testet kräver att ingen `role="alert"` syns, så att axe granskar riktigt innehåll.
+- `e2e/lighthouse.spec.ts` kör Lighthouse (mobil, simulerad strypning) på `/` och `/transaktioner`. Lighthouse
+  öppnar en egen flik via CDP-porten i en `launchPersistentContext`, och fake-API:t läggs på hela kontexten.
+  Krav: tillgänglighet och bästa praxis 100, prestanda ≥ 90. Lighthouse 13 saknar PWA-kategori; installbarhet
+  (KK-25-A) får en egen kontroll när appen har manifest och service worker.
 
 ## Cloudflare och D1: gränser som har orsakat riktiga fel
 
@@ -105,5 +109,5 @@ pnpm --filter @kronkoll/<paket> test:coverage
   nytt konto. Matcha på namn och typ inom kopplingen om det händer.
 - "Bara okategoriserade" i Transaktioner visar även okategoriserade insättningar, medan budgetens belopp bara
   räknar utbetalningar (#153).
-- Kvar i M1: #35 (mutationstest, integrationstester, E2E och axe klara, kvar: Lighthouse), #29
+- Kvar i M1: #29
   (CSV-import, kanske stryks) och #24 (avsluta spiken).

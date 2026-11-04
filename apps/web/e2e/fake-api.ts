@@ -1,6 +1,6 @@
 // Ett påhittat API för E2E (KK-13: ingen riktig bankdata). Det håller ett litet tillstånd per test,
 // så att ett flöde kan spara något och se resultatet efter omladdning, som mot det riktiga API:t.
-import type { Page, Route } from "@playwright/test";
+import type { BrowserContext, Page, Route } from "@playwright/test";
 
 const NOVEMBER = { key: "2026-11", start: "2026-11-01", end: "2026-11-30" };
 
@@ -77,8 +77,8 @@ export interface FakeApi {
   readonly budgetPuts: unknown[];
 }
 
-/** Svarar på alla /api/*-anrop från sidan med påhittad data. */
-export async function useFakeApi(page: Page): Promise<FakeApi> {
+/** Svarar på alla /api/*-anrop från sidan, eller från alla flikar i en webbläsare, med påhittad data. */
+export async function useFakeApi(page: Page | BrowserContext): Promise<FakeApi> {
   const transactions = [
     transaction("t1", "2026-11-12", -41250, "Hörnbutiken Exempelvägen"),
     transaction("t2", "2026-11-05", -18900, "Hörnbutiken Exempelvägen"),
