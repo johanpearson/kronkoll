@@ -32,6 +32,25 @@ function transaction(id: string, date: string, amountMinor: number, counterparty
 /** Bankens inloggning i testerna. connect.spec.ts fångar adressen och skickar tillbaka till appen. */
 export const FAKE_BANK = "https://bank.example.test";
 
+/** Påhittade sparmål i samma form som GET /api/goals: i fas, sent och utan sparttakt. */
+const GOALS = [
+  {
+    id: "g1", name: "Resa till Japan", target_minor: 6000000, target_date: "2027-08-31", source: "manual", account_id: null, account_missing: false,
+    saved_minor: 2150000, monthly_rate_minor: 320000, contributions: [],
+    forecast: { kind: "eta", remaining_minor: 3850000, months_left: 13, reach_period: "2027-12", on_track: false, months_late: 4, required_monthly_minor: 427778 },
+  },
+  {
+    id: "g2", name: "Buffert", target_minor: 10000000, target_date: "2027-12-31", source: "account", account_id: "acc_2", account_missing: false,
+    saved_minor: 7400000, monthly_rate_minor: 300000, contributions: [],
+    forecast: { kind: "eta", remaining_minor: 2600000, months_left: 9, reach_period: "2027-08", on_track: true, months_late: 0, required_monthly_minor: 200000 },
+  },
+  {
+    id: "g3", name: "Ny barnvagn", target_minor: 800000, target_date: "2027-03-31", source: "manual", account_id: null, account_missing: false,
+    saved_minor: 120000, monthly_rate_minor: 0, contributions: [],
+    forecast: { kind: "never", remaining_minor: 680000, required_monthly_minor: 170000 },
+  },
+];
+
 const OVERVIEW = {
   period: NOVEMBER,
   balance_minor: 4831240,
@@ -142,6 +161,7 @@ export async function useFakeApi(
 
   const handle = (method: string, path: string, body: Record<string, unknown>): [number, unknown] => {
     if (path === "/api/overview") return [200, overview()];
+    if (path === "/api/goals") return [200, { items: GOALS }];
     if (path === "/api/categories") return [200, { items: CATEGORIES }];
     if (path === "/api/rules") return [200, { items: state.rules }];
     if (path === "/api/connections" && method === "POST") return [200, { redirect_url: `${FAKE_BANK}/auth?state=s-1` }];

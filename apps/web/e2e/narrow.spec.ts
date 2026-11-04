@@ -25,3 +25,14 @@ for (const path of ["/", "/budget"]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(350);
   });
 }
+
+test("alla fem flikarna i menyn får plats på 350 px", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/sparmal");
+  const tabs = page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link");
+  await expect(tabs).toHaveCount(5);
+  const overflowing = await tabs.evaluateAll((links) =>
+    links.filter((a) => a.scrollWidth > (a.parentElement?.clientWidth ?? 0)).map((a) => a.textContent),
+  );
+  expect(overflowing).toEqual([]);
+});

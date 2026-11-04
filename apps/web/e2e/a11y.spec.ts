@@ -4,7 +4,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 import { useFakeApi } from "./fake-api.ts";
 
-const VIEWS = ["/", "/transaktioner", "/budget", "/installningar", "/installningar/kategorier", "/installningar/regler"];
+const VIEWS = ["/", "/transaktioner", "/budget", "/sparmal", "/installningar", "/installningar/kategorier", "/installningar/regler"];
 
 /** Längsta övergång eller animation på sidans knappar och länkar, i millisekunder. */
 function longestMotionMs(page: Page): Promise<number> {

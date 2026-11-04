@@ -69,7 +69,7 @@ describe("flikraden har ikoner (KK-26)", () => {
     at("/");
     const links = within(screen.getByRole("navigation", { name: "Huvudmeny" })).getAllByRole("link");
     for (const link of links) expect(link.querySelector("svg[aria-hidden='true']")).not.toBeNull();
-    expect(links.map((l) => l.textContent)).toEqual(["Översikt", "Transaktioner", "Budget", "Inställningar"]);
+    expect(links.map((l) => l.textContent)).toEqual(["Översikt", "Transaktioner", "Budget", "Sparmål", "Inställningar"]);
   });
 });
 
