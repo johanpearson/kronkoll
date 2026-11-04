@@ -1,6 +1,6 @@
 // Interna överföringar (KK-20-C). Omräkningen används både efter varje synk och när användaren
 // markerar en transaktion själv, så att en motpost alltid följer med åt rätt håll.
-import { transactionRepository } from "@kronkoll/adapter-d1";
+import { ruleRepository, transactionRepository } from "@kronkoll/adapter-d1";
 import { classifyTransfers } from "@kronkoll/domain";
 
 function json(body: unknown, status: number): Response {
@@ -9,7 +9,8 @@ function json(body: unknown, status: number): Response {
 
 /**
  * Räknar om vilka transaktioner som är interna överföringar och skriver bara det som ändras.
- * Användarens eget val vinner alltid. Hela historiken räknas om, eftersom en ny transaktion kan ge en
+ * Användarens eget val vinner alltid, och regler med åtgärden Räkna inte (KK-39-C) tas med. Hela
+ * historiken räknas om, eftersom en ny transaktion kan ge en
  * gammal sin motpost. Ingen lista med kortfaktura-mottagare än: korten hör till vanliga konton.
  * Returnerar hur många som ändrades.
  */
@@ -17,8 +18,7 @@ export async function recomputeTransfers(db: D1Database): Promise<number> {
   const store = transactionRepository(db);
   const current = await store.forTransfers();
   const now = new Map(current.map((t) => [t.id, t]));
-  // Regler med åtgärden Räkna inte (KK-39-C) kopplas in när de kan sparas.
-  const changes = classifyTransfers({ transactions: current, accounts: await store.ownAccounts(), cardPaymentCounterparties: [], excludeRules: [] })
+  const changes = classifyTransfers({ transactions: current, accounts: await store.ownAccounts(), cardPaymentCounterparties: [], excludeRules: await ruleRepository(db).excludeRules() })
     .filter((c) => now.get(c.id)?.internal !== c.internal || now.get(c.id)?.pairId !== c.pairId)
     .map((c) => ({ id: c.id, internal: c.internal, pairId: c.pairId }));
   await store.setTransfers(changes);

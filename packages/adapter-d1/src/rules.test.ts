@@ -35,3 +35,37 @@ describe("regler i D1 (KK-18)", () => {
     expect(await repo.remove("r-ikea")).toBe(false);
   });
 });
+
+describe("regler med åtgärden Räkna inte i D1 (KK-39-C)", () => {
+  it("sparas utan kategori, listas för sig och aldrig som kategoriregel", async () => {
+    const repo = ruleRepository(db);
+    const templates = (await repo.list()).length;
+    await repo.saveExclude({ id: "r-mobler", match: "counterparty_prefix", pattern: "PAHITTADE MOBLER" });
+    expect(await repo.excludeRules()).toEqual([{ id: "r-mobler", match: "counterparty_prefix", pattern: "PAHITTADE MOBLER" }]);
+    expect(await repo.list()).toHaveLength(templates);
+  });
+
+  it("hoppar över Räkna inte-regler med en matchning som domänen inte kan än", async () => {
+    await db.prepare(`INSERT INTO category_rules (id, match, pattern, source, action) VALUES ('r-belopp', 'amount_range', '100-200', 'learned', 'exclude')`).run();
+    expect((await ruleRepository(db).excludeRules()).some((r) => r.id === "r-belopp")).toBe(false);
+    await db.prepare(`DELETE FROM category_rules WHERE id = 'r-belopp'`).run();
+  });
+
+  it("ändrar mönstret och tar bort regeln som andra regler", async () => {
+    const repo = ruleRepository(db);
+    await repo.saveExclude({ id: "r-utlagg", match: "counterparty_prefix", pattern: "UTLAGG" });
+    expect(await repo.updateExclude({ id: "r-utlagg", pattern: "UTLAGG RESA" })).toBe(true);
+    expect((await repo.excludeRules()).find((r) => r.id === "r-utlagg")?.pattern).toBe("UTLAGG RESA");
+    expect(await repo.updateExclude({ id: "mall-ica", pattern: "X" })).toBe(false);
+    expect(await repo.remove("r-utlagg")).toBe(true);
+    expect((await repo.excludeRules()).some((r) => r.id === "r-utlagg")).toBe(false);
+  });
+
+  it("databasen tillåter ingen Räkna inte-regel med kategori och ingen kategoriregel utan mål", async () => {
+    const insert = (action: string, categoryId: string | null) =>
+      db.prepare(`INSERT INTO category_rules (id, match, pattern, category_id, source, action) VALUES (?, 'counterparty_prefix', 'X', ?, 'learned', ?)`).bind(`r-${action}-${String(categoryId)}`, categoryId, action).run();
+    await expect(insert("exclude", "mat")).rejects.toThrow();
+    await expect(insert("categorize", null)).rejects.toThrow();
+    await expect(insert("hide", null)).rejects.toThrow();
+  });
+});
