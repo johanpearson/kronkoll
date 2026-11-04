@@ -17,6 +17,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -313,5 +314,61 @@ export const goalContributions = sqliteTable(
     check("goal_contributions_date", isoDate("date")),
     check("goal_contributions_amount", sql`amount_minor <> 0`),
     index("goal_contributions_goal_date").on(t.goalId, t.date),
+  ],
+);
+
+/**
+ * Planerad föräldraledighet (KK-23). Uppskattningen räknas i domänen (`estimateLeaveIncome`) och sparas
+ * inte. Ett manuellt nettobelopp per månad vinner över uppskattningen (KK-23-B). Ingen ägare: appen har
+ * en enda användare (KK-28).
+ */
+export const leavePeriods = sqliteTable(
+  "leave_periods",
+  {
+    id: text("id").primaryKey(),
+    fromDate: text("from_date").notNull(),
+    toDate: text("to_date").notNull(),
+    /** 0–7, halva dagar tillåtna. */
+    daysPerWeek: real("days_per_week").notNull(),
+    sgiAnnualMinor: integer("sgi_annual_minor").notNull(),
+    employerTopupPct: real("employer_topup_pct").notNull().default(0),
+    /** Anges av användaren (antagande A-9). */
+    taxRatePct: real("tax_rate_pct").notNull(),
+    overrideNetMonthlyMinor: integer("override_net_monthly_minor"),
+    createdAt: createdAt(),
+  },
+  () => [
+    check("leave_periods_from", isoDate("from_date")),
+    check("leave_periods_to", isoDate("to_date")),
+    check("leave_periods_order", sql`to_date >= from_date`),
+    check("leave_periods_days", sql`days_per_week BETWEEN 0 AND 7`),
+    check("leave_periods_sgi", sql`sgi_annual_minor >= 0`),
+    check("leave_periods_topup", sql`employer_topup_pct BETWEEN 0 AND 100`),
+    check("leave_periods_tax", sql`tax_rate_pct BETWEEN 0 AND 100`),
+    check("leave_periods_override", sql`override_net_monthly_minor IS NULL OR override_net_monthly_minor >= 0`),
+  ],
+);
+
+/**
+ * Försäkringskassans parametrar per år (antagande A-5). Läggs in med en migrering per år, med källan
+ * angiven. Saknas ett år använder domänen det senaste och varnar.
+ */
+export const incomeParameters = sqliteTable(
+  "income_parameters",
+  {
+    year: integer("year").primaryKey(),
+    priceBaseAmountMinor: integer("price_base_amount_minor").notNull(),
+    sgiCapMultiplier: real("sgi_cap_multiplier").notNull(),
+    benefitRate: real("benefit_rate").notNull(),
+    sgiFactor: real("sgi_factor").notNull(),
+    sourceUrl: text("source_url").notNull(),
+  },
+  () => [
+    check("income_parameters_year", sql`year BETWEEN 2000 AND 2100`),
+    check("income_parameters_price_base", sql`price_base_amount_minor > 0`),
+    check("income_parameters_cap", sql`sgi_cap_multiplier > 0`),
+    check("income_parameters_rate", sql`benefit_rate > 0 AND benefit_rate <= 1`),
+    check("income_parameters_factor", sql`sgi_factor > 0 AND sgi_factor <= 1`),
+    check("income_parameters_source", sql`source_url LIKE 'https://%'`),
   ],
 );
