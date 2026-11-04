@@ -706,6 +706,71 @@
           "text": "Det egna namnet är användarens text och renderas alltid som text, aldrig som HTML (som KK-30-A)."
         }
       ]
+    },
+    {
+      "id": "KK-38",
+      "title": "Saldo per konto",
+      "normative_strength": "should",
+      "statement": "Översikten visar saldot på varje konto, inte bara totalen, så att användaren ser hur mycket som finns på till exempel lönekontot, kortet och sparkontot. (Ägarens önskemål 2026-11-04.)",
+      "verification_note": "Komponenttest av översikten med syntetiska konton; API-test att saldot per konto kommer från senaste synk och att kontot har sitt egna namn.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-38-A",
+          "text": "Under totalsaldot listas varje konto med sitt namn (eget namn enligt KK-37, annars bankens maskerade namn) och saldo i SEK från senaste synk. Summan av kontona är totalsaldot."
+        },
+        {
+          "id": "KK-38-B",
+          "given": "ett konto där banken inte har lämnat något saldo",
+          "when": "översikten visas",
+          "then": "står det Saldo saknas för kontot, och totalsaldot räknar bara konton som har saldo"
+        }
+      ]
+    },
+    {
+      "id": "KK-39",
+      "title": "Räkna inte en transaktion",
+      "normative_strength": "should",
+      "statement": "Användaren kan markera en transaktion som Räknas inte, för hand eller med en regel. Den räknas då inte i budget, översikt eller trend, men syns nedtonad i transaktionslistan och kan ångras. (Motiv: till exempel utlägg som betalas tillbaka, eller köp som inte hör till hushållets ekonomi. Ägarens önskemål 2026-11-04.)",
+      "verification_note": "Unit-tester (TDD) för att undantagna transaktioner inte räknas i budget och översikt; API-test av markering och regel; E2E att markera och ångra.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-39-A",
+          "given": "en utgift på 1 299 kr i november",
+          "when": "den markeras Räknas inte",
+          "then": "minskar novembers utgifter och budgetens utfall med 1 299 kr, och raden i Transaktioner är nedtonad med texten Räknas inte (inte bara färg)"
+        },
+        {
+          "id": "KK-39-B",
+          "text": "Markeringen kan tas bort i transaktionen, och då räknas den igen."
+        },
+        {
+          "id": "KK-39-C",
+          "text": "En regel kan ha åtgärden Räkna inte i stället för en kategori. Den gäller nya transaktioner direkt och tidigare transaktioner efter en fråga, som andra regler. En transaktion som användaren själv har markerat eller avmarkerat ändras aldrig av en regel (som KK-18-C)."
+        },
+        {
+          "id": "KK-39-D",
+          "text": "Kontots saldo påverkas inte, eftersom det kommer från banken."
+        }
+      ]
+    },
+    {
+      "id": "KK-40",
+      "title": "Ta bort en periods budget",
+      "normative_strength": "should",
+      "statement": "Användaren kan ta bort hela budgeten för en period, efter en fråga om bekräftelse. (Ägarens önskemål 2026-11-04.)",
+      "verification_note": "API-test mot lokal D1 att bara vald period tas bort och att CSRF-skyddet gäller; komponenttest av bekräftelsen.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-40-A",
+          "given": "november har budget för fem kategorier",
+          "when": "användaren väljer Ta bort budget och bekräftar",
+          "then": "har november ingen budget, och budgetvyn visar utfallet utan plan, som en period som aldrig har haft budget"
+        },
+        {
+          "id": "KK-40-B",
+          "text": "Avbryt ändrar ingenting, och andra perioders budget påverkas inte."
+        }
+      ]
     }
   ]
 }

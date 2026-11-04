@@ -67,6 +67,11 @@
           { "type": "stat", "label": "In", "value": "41 250,00 kr" },
           { "type": "stat", "label": "Ut", "value": "23 418,35 kr", "delta": "−6 % mot okt." }
         ] },
+        { "id": "account-balances", "type": "list", "title": "Konton", "satisfies": ["KK-38", "KK-38-A", "KK-37-B"], "items": [
+          { "title": "Vardag", "subtitle": "Privatkonto ••4821 · Skandia", "meta": "18 527,90 kr" },
+          { "title": "Sparkonto ••7712", "subtitle": "Skandia", "meta": "32 998,00 kr" },
+          { "title": "Privat kort", "subtitle": "Visa ••1190 · Skandia", "meta": "−3 213,50 kr" }
+        ] },
         { "id": "trend", "type": "chart", "label": "In och ut, 12 mån (tkr)", "values": [31, 34, 29, 36, 33, 30, 41, 28, 32, 35, 31, 23], "satisfies": ["KK-17-C"] },
         { "id": "budget-glance", "type": "list", "title": "Budget i korthet", "items": [
           { "title": "Mat", "subtitle": "6 552 av 6 300 kr", "badge": "104 % – över", "tone": "bad", "goto": "budget" },
@@ -83,6 +88,14 @@
       "states": [
         { "id": "consent-expiring", "label": "Samtycke går snart ut", "satisfies": ["KK-8-A"], "description": "**Skandia-kopplingen går ut 14 nov. 2026 (om 13 dagar).** Förnya med BankID så fortsätter hämtningen. [Koppla om]" },
         { "id": "offline", "label": "Offline", "satisfies": ["KK-25-B"], "description": "Offline – visar data från i dag 06:02." },
+        { "id": "balance-missing", "label": "Konto utan saldo", "satisfies": ["KK-38-B"], "elements": [
+          { "type": "stat", "label": "Saldo (2 av 3 konton)", "value": "51 525,90 kr" },
+          { "type": "list", "title": "Konton", "items": [
+            { "title": "Vardag", "subtitle": "Privatkonto ••4821 · Skandia", "meta": "18 527,90 kr" },
+            { "title": "Sparkonto ••7712", "subtitle": "Skandia", "meta": "32 998,00 kr" },
+            { "title": "Privat kort", "subtitle": "Visa ••1190 · Skandia", "meta": "Saldo saknas" }
+          ] }
+        ] },
         { "id": "first-run", "label": "Första start (ingen bank)", "satisfies": ["KK-17"], "elements": [
           { "type": "heading", "text": "Välkommen till Kronkoll", "level": 2 },
           { "type": "empty", "icon": "🏦", "text": "Koppla ditt första konto för att se saldo, budget och trender. Kronkoll kan bara läsa – aldrig betala.", "elements": [
@@ -94,8 +107,8 @@
     },
     {
       "id": "transaktioner", "title": "Transaktioner", "group": "Huvudvyer", "nav_parent": "transaktioner",
-      "description": "Lista grupperad per dag med sökning och filter. Preliminära transaktioner har en badge. Uppdelade transaktioner har ikonen ⑂ och interna överföringar är nedtonade (räknas inte).",
-      "satisfies": ["KK-9", "KK-18", "KK-4"],
+      "description": "Lista grupperad per dag med sökning och filter. Preliminära transaktioner har en badge. Uppdelade transaktioner har ikonen ⑂. Interna överföringar och transaktioner markerade Räknas inte (KK-39) är nedtonade och har en text som säger det.",
+      "satisfies": ["KK-9", "KK-18", "KK-4", "KK-39"],
       "elements": [
         { "id": "search", "type": "search", "placeholder": "Sök motpart, belopp, kategori…" },
         { "type": "row", "elements": [
@@ -109,6 +122,7 @@
         { "id": "list-yday", "type": "list", "title": "31 okt.", "items": [
           { "title": "Clas Ohlson ⑂", "subtitle": "Uppdelad: Hushåll 900 kr · Hobby 340 kr", "meta": "−1 240,00 kr", "goto": "transaktion" },
           { "title": "Överföring till Sparkonto", "subtitle": "Intern överföring – räknas inte", "meta": "−5 000,00 kr", "badge": "Intern", "tone": "info", "satisfies": ["KK-20-C"] },
+          { "title": "Påhittade Möbler AB", "subtitle": "Räknas inte · utlägg", "meta": "−1 299,00 kr", "badge": "Räknas inte", "tone": "info", "goto": "transaktion", "satisfies": ["KK-39-A"] },
           { "title": "Försäkringskassan", "subtitle": "Inkomst › Föräldrapenning", "meta": "+4 830,00 kr", "badge": "Bokförd", "tone": "ok" }
         ] },
         { "type": "button", "label": "Importera CSV", "variant": "link", "goto": "csv-import" }
@@ -134,6 +148,7 @@
         { "id": "learn", "type": "checkbox", "label": "Gör alltid så för \"ICA Nära Sofo\" (skapar regel)", "checked": true, "satisfies": ["KK-18-B"] },
         { "id": "manual-note", "type": "alert", "tone": "info", "text": "Manuellt vald kategori – regler ändrar inte den här transaktionen.", "satisfies": ["KK-18-C"] },
         { "id": "split", "type": "button", "label": "Dela upp transaktion", "variant": "secondary", "opens": "dela-upp", "satisfies": ["KK-19"] },
+        { "id": "exclude", "type": "toggle", "label": "Räkna inte i budget och översikt", "checked": false, "hint": "Till exempel ett utlägg som betalas tillbaka. Saldot påverkas inte.", "toast": "Räknas inte längre i budget och översikt", "satisfies": ["KK-39-A", "KK-39-B", "KK-39-D"] },
         { "id": "save", "type": "button", "label": "Spara", "variant": "primary", "opens": "regel-historik", "satisfies": ["KK-18-B"] },
         { "type": "card", "title": "Detaljer från banken", "body": "Beskrivning: ICA NARA SOFO STHLM\nStatus: PDNG · Transaktionsdatum 2026-11-01\nVisas som Bokförd när banken bokför (matchas automatiskt)." }
       ]
@@ -180,7 +195,7 @@
     {
       "id": "budget", "title": "Budget", "group": "Huvudvyer", "nav_parent": "budget",
       "description": "Utfall mot plan per huvudkategori, med underkategorier när man fäller ut. Överskridning visas med färg **och** text (KK-20-B). Preliminära transaktioner räknas med (se `Q-pending-budget`).",
-      "satisfies": ["KK-20", "KK-17-B"],
+      "satisfies": ["KK-20", "KK-17-B", "KK-40"],
       "elements": [
         { "id": "month", "type": "select", "label": "Period", "options": ["November 2026", "December 2026", "April 2027 (föräldraledig)"], "value": "November 2026" },
         { "id": "summary", "type": "row", "elements": [
@@ -200,10 +215,21 @@
         { "type": "row", "satisfies": ["KK-20-A"], "elements": [
           { "id": "copy-prev", "type": "button", "label": "Kopiera oktober", "variant": "secondary", "toast": "Budget kopierad från oktober", "satisfies": ["KK-20-A"] },
           { "id": "suggest", "type": "button", "label": "Föreslå från snitt", "variant": "secondary", "toast": "Förslag baserat på aug–okt", "satisfies": ["KK-20-A"] }
-        ] }
+        ] },
+        { "id": "delete-budget", "type": "button", "label": "Ta bort budget", "variant": "danger", "opens": "budget-ta-bort", "satisfies": ["KK-40-A"] }
       ],
       "states": [
         { "id": "leave-month", "label": "Månad med föräldraledighet", "satisfies": ["KK-23-C"], "description": "**April 2027: planerad föräldraledighet.** Uppskattad inkomst 20 140 kr (−13 470 kr mot normal månad). Kvar att spendera och sparmål är omräknade. [Se inkomst]" }
+      ]
+    },
+    {
+      "id": "budget-ta-bort", "title": "Ta bort budget", "modal": true, "group": "Huvudvyer",
+      "description": "Bekräftelse innan hela periodens budget tas bort (KK-40). Bara vald period påverkas; utfallet ligger kvar.",
+      "satisfies": ["KK-40"],
+      "elements": [
+        { "type": "text", "text": "Ta bort budgeten för **november 2026**? Budgeten för 5 kategorier tas bort. Utfallet och transaktionerna ändras inte, och andra månader påverkas inte." },
+        { "id": "confirm-delete", "type": "button", "label": "Ta bort budget", "variant": "danger", "close": true, "toast": "Budgeten för november är borttagen", "satisfies": ["KK-40-A"] },
+        { "id": "cancel-delete", "type": "button", "label": "Avbryt", "variant": "secondary", "close": true, "satisfies": ["KK-40-B"] }
       ]
     },
     {
@@ -554,11 +580,12 @@
             ] }
           ] },
           { "label": "Regler (38)", "elements": [
-            { "id": "rules", "type": "table", "columns": ["Om motpart/text", "→ Kategori", "Källa", "Träffar"], "satisfies": ["KK-18-B"], "rows": [
+            { "id": "rules", "type": "table", "columns": ["Om motpart/text", "→ Kategori", "Källa", "Träffar"], "satisfies": ["KK-18-B", "KK-39-C"], "rows": [
               ["ICA*", "Mat › Livsmedel", { "badge": "Inlärd", "tone": "info" }, "62"],
               ["FORSAKRINGSKASSAN", "Inkomst › Föräldrapenning", { "badge": "Mall", "tone": "ok" }, "9"],
               ["SL ", "Transport › Kollektivtrafik", { "badge": "Mall", "tone": "ok" }, "14"],
-              ["K*RESTAURANG*", "Mat › Restaurang & café", { "badge": "Inlärd", "tone": "info" }, "7"]
+              ["K*RESTAURANG*", "Mat › Restaurang & café", { "badge": "Inlärd", "tone": "info" }, "7"],
+              ["PÅHITTADE MÖBLER", "Räknas inte", { "badge": "Egen", "tone": "info" }, "2"]
             ] }
           ] }
         ] }
@@ -573,12 +600,12 @@
       "auth": "Cloudflare Access-JWT (Cf-Access-Jwt-Assertion) valideras i Workern mot teamets JWKS, aud och iss",
       "latency": "p95 < 300 ms (en läsning av 12 perioders transaktioner; aggregat först om det behövs)",
       "params": [{ "name": "period", "in": "query", "type": "YYYY-MM", "description": "Default: aktuell period i Europe/Stockholm" }],
-      "description": "Byggt i #31. `connections` har en rad per bankkoppling (avbrutna kopplingar utelämnas), så att flera banker får var sitt samtycke. `left_per_day_minor` är null när perioden är slut.",
+      "description": "Byggt i #31. `connections` har en rad per bankkoppling (avbrutna kopplingar utelämnas), så att flera banker får var sitt samtycke. `left_per_day_minor` är null när perioden är slut. **Tillägg (KK-38):** `accounts` har en rad per konto med `name` (eget namn eller bankens maskerade), `bank` och `balance_minor` (null om banken inte har lämnat saldo); `balance_minor` på toppnivå är summan av de konton som har saldo. **Tillägg (KK-39):** transaktioner markerade Räknas inte tas inte med i in, ut, kvar att spendera eller trend.",
       "responses": {
-        "200": { "description": "OK", "body": { "period": { "key": "2026-11", "start": "2026-11-01", "end": "2026-11-30" }, "balance_minor": 4831240, "income_minor": 4125000, "expense_minor": 2341835, "net_minor": 1783165, "budget_minor": 3200000, "left_to_spend_minor": 858200, "left_per_day_minor": 28600, "days_left": 30, "over": false, "last_sync_at": "2026-11-01T05:02:11Z", "connections": [{ "bank": "Skandia", "status": "active", "consent_expires_on": "2027-04-30", "consent_days_left": 180 }], "trend": [{ "period": "2025-12", "income_minor": 3100000, "expense_minor": 2950000, "net_minor": 150000 }] } },
+        "200": { "description": "OK", "body": { "period": { "key": "2026-11", "start": "2026-11-01", "end": "2026-11-30" }, "balance_minor": 4831240, "accounts": [{ "id": "acc_1", "name": "Vardag", "bank": "Skandia", "balance_minor": 1852790 }], "income_minor": 4125000, "expense_minor": 2341835, "net_minor": 1783165, "budget_minor": 3200000, "left_to_spend_minor": 858200, "left_per_day_minor": 28600, "days_left": 30, "over": false, "last_sync_at": "2026-11-01T05:02:11Z", "connections": [{ "bank": "Skandia", "status": "active", "consent_expires_on": "2027-04-30", "consent_days_left": 180 }], "trend": [{ "period": "2025-12", "income_minor": 3100000, "expense_minor": 2950000, "net_minor": 150000 }] } },
         "401": { "description": "Saknad/ogiltig Access-JWT", "body": { "error": "unauthorized" } }
       },
-      "satisfies": ["KK-17", "KK-17-A", "KK-17-B", "KK-17-C", "KK-2-B", "KK-8-A"]
+      "satisfies": ["KK-17", "KK-17-A", "KK-17-B", "KK-17-C", "KK-2-B", "KK-8-A", "KK-38-A", "KK-38-B", "KK-39-A"]
     },
     {
       "id": "api-transactions", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/transactions",
@@ -602,8 +629,8 @@
         "403": { "description": "CSRF-skydd: fel Origin eller saknad X-Kronkoll-header", "body": { "error": "forbidden" } },
         "404": { "body": { "error": "not_found" } }
       },
-      "description": "Byggt i #111. Ändrar ingen historik: svaret säger bara vad regeln skulle ändra bakåt. Själva transaktionen räknas inte med i retroactive_candidates eller protected_manual.",
-      "satisfies": ["KK-18-B", "KK-18-C", "KK-29-B"]
+      "description": "Byggt i #111. Ändrar ingen historik: svaret säger bara vad regeln skulle ändra bakåt. Själva transaktionen räknas inte med i retroactive_candidates eller protected_manual. **Tillägg (KK-39):** `{ \"excluded\": true | false }` markerar eller avmarkerar Räknas inte, med `excluded_source: manual` så att regler inte ändrar valet.",
+      "satisfies": ["KK-18-B", "KK-18-C", "KK-29-B", "KK-39-A", "KK-39-B"]
     },
     {
       "id": "api-rule-apply", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "POST", "path": "/api/rules/{id}/apply",
@@ -638,8 +665,8 @@
         "201": { "body": { "rule": { "id": "…", "match": "counterparty_prefix", "pattern": "IKEA", "category_id": "hushall-forbrukning", "source": "learned" }, "retroactive_candidates": 12, "protected_manual": 1 } },
         "400": { "body": { "error": "invalid_request | unknown_category" } }
       },
-      "description": "Byggt i #34. Mönstret normaliseras som en motpart. Regeln gäller direkt för nya transaktioner; svaret säger vad den skulle ändra bakåt, och appen frågar innan POST /api/rules/{id}/apply. GET ger också `hits` och `category_archived`. GET /api/rules/{id}/matches förhandsvisar vilka transaktioner regeln gäller (ändras, oförändrad eller manuell); POST /api/rules/apply-all kör alla regler över historiken, med { preview: true } för att bara räkna. Ingen kategori tas bort och manuella rörs aldrig.",
-      "satisfies": ["KK-18-B", "KK-18-C"]
+      "description": "Byggt i #34. Mönstret normaliseras som en motpart. Regeln gäller direkt för nya transaktioner; svaret säger vad den skulle ändra bakåt, och appen frågar innan POST /api/rules/{id}/apply. GET ger också `hits` och `category_archived`. GET /api/rules/{id}/matches förhandsvisar vilka transaktioner regeln gäller (ändras, oförändrad eller manuell); POST /api/rules/apply-all kör alla regler över historiken, med { preview: true } för att bara räkna. Ingen kategori tas bort och manuella rörs aldrig. **Tillägg (KK-39):** en regel kan ha `action: \"exclude\"` i stället för `category_id`, och markerar då träffarna Räknas inte på samma sätt.",
+      "satisfies": ["KK-18-B", "KK-18-C", "KK-39-C"]
     },
     {
       "id": "api-category-add", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "POST", "path": "/api/categories",
@@ -687,6 +714,13 @@
       "responses": { "200": { "body": { "period": "2026-11", "lines": [{ "category_id": "cat_mat", "budget_minor": 630000, "actual_minor": 655200, "remaining_minor": -25200, "ratio": 1.04, "over": true }], "excluded": { "internal_transfers_minor": 1500000, "card_payment_minor": 821400 } } } },
       "description": "GET ger också `groups`: en rad per huvudkategori med budget eller utgifter, där utfallet alltid är huvudkategorin plus underkategorierna. Har huvudkategorin egen budget är den taket; annars är gruppens budget summan av underkategoriernas. `total_budget_minor` räknar varje grupp en gång.",
       "satisfies": ["KK-20-A", "KK-20-B", "KK-20-C"]
+    },
+    {
+      "id": "api-budget-delete", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "DELETE", "path": "/api/budgets/{period}",
+      "summary": "Ta bort hela budgeten för en period",
+      "responses": { "204": { "description": "Budgeten borttagen (även om perioden inte hade någon)" }, "400": { "body": { "error": "invalid_request" } }, "403": { "description": "CSRF-skydd", "body": { "error": "forbidden" } } },
+      "description": "Raderar periodens budgetrader och inget annat; transaktioner och andra perioder rörs inte. Appen frågar innan anropet (KK-40-B).",
+      "satisfies": ["KK-40-A", "KK-40-B", "KK-29-B"]
     },
     {
       "id": "api-loans", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/loans",
@@ -1103,6 +1137,8 @@
         { "name": "category_source", "type": "manual|learned|template|none", "satisfies": ["KK-18-C"] },
         { "name": "income_type", "type": "salary|parental_benefit|other|null", "satisfies": ["KK-22-A"] },
         { "name": "is_internal_transfer", "type": "bool", "satisfies": ["KK-20-C"] },
+        { "name": "excluded", "type": "bool", "description": "Räknas inte i budget, översikt eller trend", "satisfies": ["KK-39-A", "KK-39-B"] },
+        { "name": "excluded_source", "type": "manual|rule|none", "description": "manual skrivs aldrig över av regler", "satisfies": ["KK-39-C"] },
         { "name": "transfer_pair_id", "type": "fk?" }
       ],
       "relations": [{ "to": "TransactionSplit", "cardinality": "0..*", "label": "delas i" }, { "to": "Category", "cardinality": "0..1" }]
@@ -1137,6 +1173,7 @@
         { "name": "match", "type": "counterparty_prefix|counterparty_exact|description_contains|amount_range", "required": true },
         { "name": "pattern", "type": "text", "required": true },
         { "name": "category_id", "type": "fk?" },
+        { "name": "action", "type": "categorize|exclude", "description": "exclude markerar träffarna Räknas inte i stället för att sätta kategori", "satisfies": ["KK-39-C"] },
         { "name": "income_type", "type": "salary|parental_benefit|other?", "satisfies": ["KK-22-A"] },
         { "name": "source", "type": "template|learned", "satisfies": ["KK-18-B"] },
         { "name": "priority", "type": "int" },
@@ -1558,7 +1595,7 @@
     {
       "id": "M1", "title": "M1 · MVP: koppla, se, kategorisera, budgetera", "target": "Vecka 3–8",
       "description": "**MVP-avgränsning:** koppla Skandia (eller CSV), automatisk synk med dedup, transaktionslista, kategorisering med inlärning och uppdelning, budget per kategori, översikt med \"kvar att spendera\" och trend, samtyckesbanner, koppla om, radering, PWA i ljust och mörkt läge. Push, insikter, sparmål och inkomstplanering ingår inte.",
-      "includes": ["oversikt", "transaktioner", "transaktion", "regel-historik", "dela-upp", "budget", "budget-redigera", "installningar", "koppling", "radera-koppling", "koppla-bank", "koppla-samtycke", "koppla-hamtar", "csv-import", "kategorier", "api-overview", "api-transactions", "api-tx-patch", "api-rule-apply", "api-tx-split", "api-budget", "api-conn-start", "api-conn-callback", "api-conn-renew", "api-conn-delete", "api-sync", "api-csv", "job-sync", "job-daily", "evt-imported", "port-bank", "port-repo", "F-dataflode", "F-koppla", "F-koppla-om", "F-conn-state", "F-tx-state", "F-learn", "F-contract-nightly", "Settings", "User", "BankConnection", "Account", "Transaction", "TransactionSplit", "Category", "CategoryRule", "BudgetLine", "SyncRun", "web", "domain", "adapter-eb", "adapter-csv", "adapter-d1", "d1"]
+      "includes": ["oversikt", "transaktioner", "transaktion", "regel-historik", "dela-upp", "budget", "budget-redigera", "budget-ta-bort", "installningar", "koppling", "radera-koppling", "koppla-bank", "koppla-samtycke", "koppla-hamtar", "csv-import", "kategorier", "api-overview", "api-transactions", "api-tx-patch", "api-rule-apply", "api-tx-split", "api-budget", "api-budget-delete", "api-conn-start", "api-conn-callback", "api-conn-renew", "api-conn-delete", "api-sync", "api-csv", "job-sync", "job-daily", "evt-imported", "port-bank", "port-repo", "F-dataflode", "F-koppla", "F-koppla-om", "F-conn-state", "F-tx-state", "F-learn", "F-contract-nightly", "Settings", "User", "BankConnection", "Account", "Transaction", "TransactionSplit", "Category", "CategoryRule", "BudgetLine", "SyncRun", "web", "domain", "adapter-eb", "adapter-csv", "adapter-d1", "d1"]
     },
     {
       "id": "M2", "title": "M2 · Sparmål, lån och inkomst (föräldraledighet)", "target": "Vecka 9–11",
@@ -1609,6 +1646,11 @@
     { "id": "V-e2e-connect", "title": "E2E: koppla bank (sandbox) och samtyckesbanner", "type": "e2e", "given": "Playwright i mobil viewport mot preview, EB sandbox", "when": "Koppla bank → Mock ASPSP → tillbaka", "then": "konton syns, historik hämtad; med klocka 14 dagar före utgång syns bannern med Koppla om", "satisfies": ["KK-15-B", "KK-8-A"] },
     { "id": "V-e2e-categorize", "title": "E2E: kategorisera och dela upp", "type": "e2e", "given": "syntetiska transaktioner seedade", "when": "byt kategori med Gör alltid så; dela upp 1 240 kr", "then": "regeln skapas och syns under Regler; uppdelningen syns i listan; fel summa blockerar Spara", "satisfies": ["KK-18-B", "KK-19-A", "KK-19-B", "KK-15-B"] },
     { "id": "V-e2e-budget", "title": "E2E: sätta budget", "type": "e2e", "given": "november utan budget", "when": "Föreslå från snitt, justera Mat till 6 300, spara", "then": "Mat visar 104 % – över (färg + text)", "satisfies": ["KK-20-A", "KK-20-B", "KK-15-B"] },
+    { "id": "V-u-balances", "title": "Saldo per konto i översikten", "type": "unit", "given": "tre syntetiska konton, ett utan saldo från banken", "when": "översikten hämtas och visas", "then": "varje konto visas med sitt namn och saldo, kontot utan saldo visar Saldo saknas, och totalen är summan av de två andra", "satisfies": ["KK-38-A", "KK-38-B"] },
+    { "id": "V-u-exclude", "title": "domain: Räknas inte", "type": "unit", "given": "en novembermånad med en utgift på 1 299 kr markerad Räknas inte", "when": "budgetens utfall och översikten räknas", "then": "utgiften är inte med i ut, utfall, kvar att spendera eller trend; saldot är oförändrat", "satisfies": ["KK-39-A", "KK-39-D"] },
+    { "id": "V-i-exclude", "title": "API: markera, ångra och regel för Räknas inte", "type": "integration", "given": "lokal D1 med syntetiska transaktioner, en manuellt avmarkerad", "when": "PATCH excluded true/false och en regel med action exclude appliceras bakåt", "then": "markeringen sätts och tas bort; regeln markerar träffarna men inte den manuellt avmarkerade", "satisfies": ["KK-39-B", "KK-39-C"] },
+    { "id": "V-e2e-exclude", "title": "E2E: räkna inte en transaktion", "type": "e2e", "given": "syntetiska transaktioner i november", "when": "markera en utgift Räknas inte, öppna budget, ångra", "then": "raden är nedtonad med texten Räknas inte och utfallet minskar; efter ångra är allt som innan", "satisfies": ["KK-39-A", "KK-39-B"] },
+    { "id": "V-i-budget-delete", "title": "API: ta bort en periods budget", "type": "integration", "given": "budget för oktober och november i lokal D1", "when": "DELETE /api/budgets/2026-11 med och utan CSRF-header", "then": "med header: november saknar budget, oktober är orörd; utan header: 403 och inget ändras", "satisfies": ["KK-40-A", "KK-40-B"] },
     { "id": "V-e2e-goal", "title": "E2E: skapa sparmål", "type": "e2e", "given": "inga sparmål", "when": "skapa Resa till Japan 60 000 / aug. 2027", "then": "prognos och krav per månad visas; måldatum i dåtid ger fel", "satisfies": ["KK-21-A", "KK-15-B"] },
     { "id": "V-e2e-leave", "title": "E2E: planera ledighet", "type": "e2e", "given": "inkomsthistorik och ett sparmål", "when": "lägg till mars–aug. 2027", "then": "uppskattning, påverkan på budget april 2027 och sparmål visas; manuellt belopp slår igenom", "satisfies": ["KK-23-A", "KK-23-C", "KK-22-B"] },
     { "id": "V-e2e-dashboard", "title": "E2E: översikt", "type": "e2e", "given": "syntetisk månad", "when": "öppna appen", "then": "saldo, in, ut, kvar att spendera, senaste synk och 12-månaderstrend stämmer mot fixture", "satisfies": ["KK-17-A", "KK-17-C"] },
