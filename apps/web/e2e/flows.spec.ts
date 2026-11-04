@@ -82,3 +82,20 @@ test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {
   await page.reload();
   await expect(page.getByText("Ingen budget är satt för perioden än.")).toBeVisible();
 });
+
+test("skapa ett sparmål och se det i listan (V-e2e-goal, KK-21)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Sparmål" }).click();
+  await page.getByRole("button", { name: "Nytt sparmål" }).click();
+  const form = page.getByRole("form", { name: "Nytt sparmål" });
+  await form.getByLabel("Namn").fill("Ny cykel");
+  await form.getByLabel("Målbelopp (kr)").fill("12 000");
+  await form.getByLabel("Måldatum (valfritt)").fill("2027-06-30");
+  await form.getByRole("button", { name: "Skapa sparmål" }).click();
+
+  await expect(page.getByRole("status")).toHaveText("Sparmålet är skapat.");
+  const row = page.getByRole("list", { name: "Dina sparmål" }).getByRole("listitem").filter({ hasText: "Ny cykel" });
+  await expect(row).toContainText("0,00 kr av 12 000,00 kr");
+  await expect(row).toContainText("Nås inte i nuvarande takt");
+});

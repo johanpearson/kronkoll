@@ -125,6 +125,7 @@ export async function useFakeApi(
     transaction("t3", "2026-11-03", -129900, "Påhittade Möbler AB"),
   ];
   const budgets = new Map<string, { category_id: string; budget_minor: number }[]>();
+  const goals: Record<string, unknown>[] = [...GOALS];
   const state: FakeApi = { rules: [], budgetPuts: [] };
   // Utan bank visar översikten välkomstsidan. Kopplingen görs klar med koden som banken skickar tillbaka.
   let connected = options.connected ?? true;
@@ -161,7 +162,15 @@ export async function useFakeApi(
 
   const handle = (method: string, path: string, body: Record<string, unknown>): [number, unknown] => {
     if (path === "/api/overview") return [200, overview()];
-    if (path === "/api/goals") return [200, { items: GOALS }];
+    if (path === "/api/goals" && method === "POST") {
+      const goal = {
+        ...GOALS[2], id: `g${String(goals.length + 1)}`, name: body["name"], target_minor: body["target_minor"], target_date: body["target_date"] ?? null,
+        saved_minor: 0, monthly_rate_minor: 0, forecast: { kind: "never", remaining_minor: body["target_minor"], required_monthly_minor: null },
+      };
+      goals.push(goal);
+      return [201, goal];
+    }
+    if (path === "/api/goals") return [200, { items: goals }];
     if (path === "/api/categories") return [200, { items: CATEGORIES }];
     if (path === "/api/rules") return [200, { items: state.rules }];
     if (path === "/api/connections" && method === "POST") return [200, { redirect_url: `${FAKE_BANK}/auth?state=s-1` }];
