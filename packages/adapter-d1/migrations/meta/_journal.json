@@ -57,6 +57,20 @@
       "when": 1793794179428,
       "tag": "0007_savings_goals",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793796127559,
+      "tag": "0008_leave_periods",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793796129538,
+      "tag": "0009_income_parameters_2026_2027",
+      "breakpoints": true
     }
   ]
 }
