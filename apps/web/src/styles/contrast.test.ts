@@ -1,6 +1,7 @@
 // Kontrollerar att färgtokens klarar WCAG AA i både ljust och mörkt läge (KK-26-A). Läser tokens.css
 // direkt, så att en ändrad färg som blir svårläst stoppas i CI.
 import { describe, expect, it } from "vitest";
+import { CATEGORY_COLORS } from "../category-color.tsx";
 import css from "./tokens.css?raw";
 
 /** Färgerna i ett block, t.ex. `:root { … }`, som namn → #rrggbb. */
@@ -40,6 +41,11 @@ const PAIRS: [string, string, number][] = [
   ["info", "surface", 4.5],
   ["focus", "background", 3],
   ["border-strong", "surface", 3],
+  // Kategoriprickarna (KK-26-D) är grafik bredvid namnet: 3:1 mot ytan de står på.
+  ...CATEGORY_COLORS.flatMap((c): [string, string, number][] => [
+    [`cat-${c}`, "surface", 3],
+    [`cat-${c}`, "background", 3],
+  ]),
 ];
 
 const THEMES = [

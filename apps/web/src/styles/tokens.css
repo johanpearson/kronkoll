@@ -23,6 +23,20 @@
   --danger: #b42323;
   --info: #1f4fbf;
   --focus: #1f4fbf;
+  /* Kategorifärger (KK-26-D): en prick per huvudkategori, minst 3:1 mot ytan. */
+  --cat-blue: #2563c9;
+  --cat-green: #2e7d32;
+  --cat-orange: #c25e00;
+  --cat-pink: #c2185b;
+  --cat-violet: #7044c4;
+  --cat-teal: #00838f;
+  --cat-brown: #8d5a3b;
+  --cat-gold: #9a6b00;
+  --cat-olive: #5f7a1c;
+  --cat-plum: #9c3d8f;
+  --cat-slate: #55657a;
+  --cat-grey: #767676;
+  --cat-lime: #4d8a00;
 
   --font: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
   --radius: 16px;
@@ -58,6 +72,19 @@
   --danger: #f07a7a;
   --info: #84a9ff;
   --focus: #84a9ff;
+  --cat-blue: #6ea0ff;
+  --cat-green: #5fbf68;
+  --cat-orange: #f0954a;
+  --cat-pink: #f27aa8;
+  --cat-violet: #a98af0;
+  --cat-teal: #4cc3cc;
+  --cat-brown: #c99872;
+  --cat-gold: #e0b443;
+  --cat-olive: #a5c25a;
+  --cat-plum: #d38ad0;
+  --cat-slate: #94a3b8;
+  --cat-grey: #a3a3a3;
+  --cat-lime: #b5e061;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -79,5 +106,18 @@
     --danger: #f07a7a;
     --info: #84a9ff;
     --focus: #84a9ff;
+    --cat-blue: #6ea0ff;
+    --cat-green: #5fbf68;
+    --cat-orange: #f0954a;
+    --cat-pink: #f27aa8;
+    --cat-violet: #a98af0;
+    --cat-teal: #4cc3cc;
+    --cat-brown: #c99872;
+    --cat-gold: #e0b443;
+    --cat-olive: #a5c25a;
+    --cat-plum: #d38ad0;
+    --cat-slate: #94a3b8;
+    --cat-grey: #a3a3a3;
+    --cat-lime: #b5e061;
   }
 }

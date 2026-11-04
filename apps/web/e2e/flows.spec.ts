@@ -36,7 +36,11 @@ test("kategorisera med Gör alltid så skapar en regel som även tar tidigare k�
   const row = (name: string) => page.getByRole("listitem").filter({ hasText: name, hasNot: page.getByRole("heading") });
   const rows = row("Hörnbutiken Exempelvägen");
   await expect(rows).toHaveCount(2);
-  for (const r of await rows.all()) await expect(r).toContainText("Hushåll › Förbrukning");
+  for (const r of await rows.all()) {
+    await expect(r).toContainText("Hushåll › Förbrukning");
+    // Huvudkategorins färg som en prick bredvid namnet (KK-26-D).
+    await expect(r.locator(".cat-dot.cat-violet")).toBeVisible();
+  }
   await expect(row("Påhittade Möbler AB")).not.toContainText("Hushåll");
 
   await page.goto("/installningar/regler");

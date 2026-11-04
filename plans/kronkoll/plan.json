@@ -1404,7 +1404,7 @@
       "options": ["Eget litet designsystem (tokens + 15 komponenter)", "shadcn/ui + Tailwind", "MUI"],
       "chosen": "Eget litet designsystem (tokens + 15 komponenter)",
       "rationale": "Ger det lugna, egna uttrycket du ber om. shadcn/ui (Radix-primitiver) kan användas för tillgängliga dialoger och menyer.",
-      "satisfies": ["KK-26", "KK-26-A", "KK-26-B", "KK-26-C"]
+      "satisfies": ["KK-26", "KK-26-A", "KK-26-B", "KK-26-C", "KK-26-D"]
     },
     {
       "id": "D-secrets", "title": "Hemlighetshantering och secret scanning", "status": "proposed",
@@ -1657,6 +1657,7 @@
     { "id": "V-e2e-pwa", "title": "PWA: Lighthouse installability + offline", "type": "e2e", "given": "produktionsbygge", "when": "Lighthouse CI och Playwright offline-läge", "then": "manifest, ikoner och service worker godkända; offline visar senaste översikt med tidsstämpel; cache > 24 h ignoreras", "satisfies": ["KK-25-A", "KK-25-B"] },
     { "id": "V-e2e-a11y", "title": "Tillgänglighet och rörelse", "type": "e2e", "given": "ljust och mörkt läge", "when": "axe körs på huvudvyerna och prefers-reduced-motion emuleras", "then": "inga AA-kontrastfel; animationer avstängda", "satisfies": ["KK-26-A", "KK-26-B"] },
     { "id": "V-u-toast", "title": "Bekräftelser försvinner, fel ligger kvar", "type": "unit", "given": "en bekräftelse och ett fel i appen", "when": "4 sekunder går med falsk klocka", "then": "bekräftelsen är borta och läses upp av skärmläsare (role=status); felet syns kvar", "satisfies": ["KK-26-C"] },
+    { "id": "V-u-catcolor", "title": "En färg per huvudkategori", "type": "unit", "given": "mallens huvudkategorier, en underkategori och en egen kategori", "when": "färgen väljs och tokens.css läses", "then": "varje mallkategori har en egen färg, underkategorin får huvudkategorins, en egen kategori får alltid samma färg, och alla färger har minst 3:1 mot ytan i båda lägena", "satisfies": ["KK-26-D"] },
     { "id": "V-e2e-csp", "title": "Säkerhetsheaders", "type": "e2e", "given": "preview-deploy", "when": "hämta / och /api/overview", "then": "CSP enligt KK-30-B, no-store på API", "satisfies": ["KK-30-B"] },
     { "id": "V-e2e-logout", "title": "Logga ut rensar enheten", "type": "e2e", "given": "inloggad med cachad översikt", "when": "Logga ut och rensa enheten", "then": "Cache Storage och IndexedDB tomma; omdirigering till Access", "satisfies": ["KK-35-A"] },
     { "id": "V-e2e-csv", "title": "E2E: CSV-import", "type": "e2e", "given": "syntetisk Amex-CSV", "when": "importera två gånger", "then": "första gången 142 nya; andra gången 0 nya och 142 dubbletter", "satisfies": ["KK-10-A", "KK-10-B"] },
