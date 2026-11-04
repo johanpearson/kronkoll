@@ -143,7 +143,7 @@ export function createEnableBankingProvider(options: EnableBankingOptions): Bank
     },
 
     async transactions(accountUid, query) {
-      const params: Record<string, string> = { date_from: query.dateFrom };
+      const params: Record<string, string> = query.dateFrom === null ? { strategy: "longest" } : { date_from: query.dateFrom };
       if (query.continuationKey !== null) params.continuation_key = query.continuationKey;
       const body = await get(`/accounts/${segment(accountUid)}/transactions`, params);
       const rows = Array.isArray(body.transactions) ? body.transactions : bad();

@@ -9,7 +9,6 @@ import { createEnableBankingProvider, createJwtSigner } from "../packages/adapte
 
 const sessionId = process.env.EB_SESSION_ID ?? "";
 const summaryFile = process.env.GITHUB_STEP_SUMMARY;
-const HISTORY_DAYS = 730;
 const MAX_PAGES = 50;
 
 const lines: string[] = [];
@@ -52,7 +51,8 @@ const provider = createEnableBankingProvider({
 });
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/u;
-const dateFrom = new Date(Date.now() - HISTORY_DAYS * 86_400_000).toISOString().slice(0, 10);
+// Som första synken i appen: så lång historik som banken tillåter (KK-5-C).
+const dateFrom = null;
 
 out("## Kontraktstest: Enable Banking (sandbox)");
 out();

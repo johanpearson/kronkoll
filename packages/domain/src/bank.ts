@@ -82,6 +82,9 @@ export interface BankDataProvider {
   accounts(sessionId: string): Promise<BankAccount[]>;
   /** Bokfört saldo i öre, eller null om banken inte ger något. */
   balance(accountUid: string): Promise<number | null>;
-  /** En sida transaktioner från och med ett datum. Hämtas sida för sida (CPU-gränsen, R-3). */
-  transactions(accountUid: string, query: { dateFrom: string; continuationKey: string | null }): Promise<TransactionPage>;
+  /**
+   * En sida transaktioner från och med ett datum. Hämtas sida för sida (CPU-gränsen, R-3).
+   * `dateFrom: null` betyder så långt bakåt som banken tillåter (KK-5-C).
+   */
+  transactions(accountUid: string, query: { dateFrom: string | null; continuationKey: string | null }): Promise<TransactionPage>;
 }
