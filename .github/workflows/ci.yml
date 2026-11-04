@@ -244,8 +244,8 @@ jobs:
       - name: Integrationstester i Workers-miljön (vitest-plugin, Worker + D1)
         run: pnpm --filter @kronkoll/api test:integration
 
-  # De kritiska flödena och axe (ljust och mörkt läge) i Playwright mot produktionsbygget i Pages lokala
-  # runtime, med påhittat API. Bara Chromium i mobil viewport (R-7, KK-15-B, KK-26).
+  # De kritiska flödena, axe (ljust och mörkt läge) och Lighthouse i Playwright mot produktionsbygget i Pages
+  # lokala runtime, med påhittat API. Bara Chromium i mobil viewport (R-7, KK-15-B, KK-25, KK-26).
   e2e:
     name: e2e
     runs-on: ubuntu-latest
