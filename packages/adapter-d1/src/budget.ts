@@ -61,5 +61,10 @@ export function budgetRepository(d1: D1Database) {
         ...lines.map((line) => db.insert(budgetLines).values({ period: periodKey, categoryId: line.categoryId, amountMinor: line.amountMinor, source })),
       ]);
     },
+
+    /** Tar bort hela periodens budget (KK-40). Transaktioner och andra perioder rörs inte. */
+    async remove(periodKey: string): Promise<void> {
+      await db.delete(budgetLines).where(eq(budgetLines.period, periodKey)).run();
+    },
   };
 }

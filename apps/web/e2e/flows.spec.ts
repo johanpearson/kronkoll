@@ -56,3 +56,23 @@ test("sätt budget från snittet, justera Mat och se att den är över (V-e2e-bu
   await expect.poll(() => api.budgetPuts).toEqual([{ lines: [{ category_id: "boende", amount_minor: 980000 }, { category_id: "mat", amount_minor: 630000 }], source: "manual" }]);
   await expect(page.getByRole("list", { name: "Kategorier" }).getByRole("listitem").filter({ hasText: "Mat" })).toContainText("104 % – över");
 });
+
+test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/budget");
+  await page.getByRole("button", { name: "Sätt budget" }).click();
+  await page.getByRole("form", { name: "Sätt budget" }).getByLabel("Mat", { exact: true }).fill("6300");
+  await page.getByRole("form", { name: "Sätt budget" }).getByRole("button", { name: "Spara" }).click();
+
+  await page.getByRole("button", { name: "Ta bort budget" }).click();
+  const dialog = page.getByRole("region", { name: "Ta bort budgeten" });
+  await dialog.getByRole("button", { name: "Avbryt" }).click();
+  await expect(page.getByRole("button", { name: "Ändra budget" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Ta bort budget" }).click();
+  await dialog.getByRole("button", { name: "Ta bort budget" }).click();
+  await expect(page.getByRole("status")).toHaveText("Budgeten för perioden är borttagen.");
+  await expect(page.getByRole("button", { name: "Sätt budget" })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText("Ingen budget är satt för perioden än.")).toBeVisible();
+});

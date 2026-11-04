@@ -98,3 +98,15 @@ export async function putBudget(request: Request, env: { DB: D1Database }, key: 
     return json({ error: "unavailable" }, 503);
   }
 }
+
+/** DELETE: tar bort hela periodens budget (KK-40). Appen frågar först; här finns ingen ångra. */
+export async function deleteBudget(env: { DB: D1Database }, key: string, sync: SyncDeps): Promise<Response> {
+  try {
+    const period = await periodFor(env.DB, key, sync);
+    if (!period) return invalid();
+    await budgetRepository(env.DB).remove(period.key);
+    return new Response(null, { status: 204 });
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
+}
