@@ -109,7 +109,7 @@
       "id": "KK-6",
       "title": "Spike: Skandia konto och Visa-kort",
       "normative_strength": "must",
-      "statement": "Innan bankflödet byggs ska en spike lista ASPSP:er för SE via Enable Banking-API:t, bekräfta att Skandia finns, vilka kontotyper som exponeras och om Visa-kortet kommer som eget konto. Saknas något används CSV-import som reserv.",
+      "statement": "Innan bankflödet byggs ska en spike lista ASPSP:er för SE via Enable Banking-API:t, bekräfta att Skandia finns, vilka kontotyper som exponeras och om Visa-kortet kommer som eget konto. (CSV-import som reserv ströks 2026-11-04, se KK-10.)",
       "verification_note": "Manuellt spike-protokoll (sandbox + restricted production) med svar på frågorna; resultatet förs in som beslut i planen.",
       "acceptance_criteria": [
         {
@@ -118,7 +118,7 @@
         },
         {
           "id": "KK-6-B",
-          "text": "Planen noterar att American Express inte går att koppla i Sverige och anvisar CSV-import för sådana kort."
+          "text": "Planen noterar att American Express inte går att koppla i Sverige och därför inte stöds i Kronkoll."
         }
       ]
     },
@@ -197,9 +197,9 @@
     },
     {
       "id": "KK-10",
-      "title": "CSV-import som reserv",
+      "title": "CSV-import som reserv (struken 2026-11-04)",
       "normative_strength": "should",
-      "statement": "Transaktioner ska kunna importeras från CSV (t.ex. bankens export eller kort som inte går att koppla) via samma port som bankleverantören, med samma dedup och kategorisering.",
+      "statement": "Struken av ägaren 2026-11-04: Skandias konton och Visa-kortet hämtas via Enable Banking, och ingen annan källa behövs. Ursprunglig lydelse: Transaktioner ska kunna importeras från CSV (t.ex. bankens export eller kort som inte går att koppla) via samma port som bankleverantören, med samma dedup och kategorisering.",
       "verification_note": "Unit-test av CSV-parsern med syntetiska filer; E2E av importflödet.",
       "acceptance_criteria": [
         {
@@ -288,7 +288,7 @@
         },
         {
           "id": "KK-14-B",
-          "text": "Det finns minst två implementationer av BankDataProvider (Enable Banking och CSV) som klarar samma kontraktstestsvit."
+          "text": "BankDataProvider har en gemensam kontraktstestsvit som Enable Banking-adaptern klarar, och som varje ny leverantör ska klara innan den används."
         }
       ]
     },
