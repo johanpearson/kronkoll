@@ -6,6 +6,14 @@ export { fixedClock, stockholmDate, todayInStockholm, type Clock } from "./clock
 export { easterSunday, isBankDay, previousBankDayOnOrBefore, swedishBankHolidays } from "./bankdays.ts";
 export { budgetPeriodForKey, budgetPeriodOf, currentBudgetPeriod, weekStart, type BudgetPeriod } from "./period.ts";
 export {
+  averageMonthlySaving,
+  forecastGoal,
+  RATE_MONTHS,
+  type GoalForecast,
+  type GoalForecastInput,
+  type GoalMovement,
+} from "./goals.ts";
+export {
   reconcile,
   MATCH_WINDOW_DAYS,
   PENDING_GRACE_DAYS,
