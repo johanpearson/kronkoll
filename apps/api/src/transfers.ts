@@ -17,7 +17,8 @@ export async function recomputeTransfers(db: D1Database): Promise<number> {
   const store = transactionRepository(db);
   const current = await store.forTransfers();
   const now = new Map(current.map((t) => [t.id, t]));
-  const changes = classifyTransfers({ transactions: current, accounts: await store.ownAccounts(), cardPaymentCounterparties: [] })
+  // Regler med åtgärden Räkna inte (KK-39-C) kopplas in när de kan sparas.
+  const changes = classifyTransfers({ transactions: current, accounts: await store.ownAccounts(), cardPaymentCounterparties: [], excludeRules: [] })
     .filter((c) => now.get(c.id)?.internal !== c.internal || now.get(c.id)?.pairId !== c.pairId)
     .map((c) => ({ id: c.id, internal: c.internal, pairId: c.pairId }));
   await store.setTransfers(changes);

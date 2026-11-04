@@ -8,10 +8,13 @@
  *    betalningen av kortfakturan.
  * 3. Kortfaktura utan motpost: ett uttag från ett eget konto som inte är ett kortkonto, till en
  *    känd kortmottagare (t.ex. "skandia visa"). Listan är konfigurerbar (antagande A-6).
+ * 4. Regler med åtgärden Räkna inte (KK-39-C): det användaren vill hålla utanför budget och översikt,
+ *    t.ex. utlägg som betalas tillbaka. De är inte överföringar, men räknas inte på samma sätt.
  *
  * En insättning på kortkontot utan motpost räknas inte som intern: det kan vara en återbetalning.
  */
 import { daysBetween, parseDate } from "./calendar.ts";
+import { matchingRule, type RuleCondition } from "./categorize.ts";
 import { assertMinor } from "./money.ts";
 
 export const TRANSFER_WINDOW_DAYS = 3;
@@ -30,14 +33,19 @@ export interface TransferInput {
   readonly status: "pending" | "booked" | "removed";
   /** Användarens egen markering: true = överföring, false = inte överföring, null = automatiskt. */
   readonly manualTransfer: boolean | null;
+  /** Bankens meddelande, för regler som Räkna inte när banken inte skickar motpart (KK-39-C). */
+  readonly description: string;
 }
+
+/** En regel med åtgärden Räkna inte: bara villkoret, ingen kategori (KK-39-C). */
+export type ExcludeRule = RuleCondition;
 
 export interface TransferClassification {
   readonly id: string;
   readonly internal: boolean;
   /** Den andra halvan av en överföring, om den finns. */
   readonly pairId: string | null;
-  readonly reason: "manual" | "pair" | "card_payment" | "none";
+  readonly reason: "manual" | "pair" | "card_payment" | "rule" | "none";
 }
 
 export interface ClassifyTransfersInput {
@@ -45,6 +53,8 @@ export interface ClassifyTransfersInput {
   readonly accounts: readonly OwnAccount[];
   /** Normaliserade motparter som betyder "betalning av kortfaktura". */
   readonly cardPaymentCounterparties: readonly string[];
+  /** Regler med åtgärden Räkna inte. De gäller hela historiken, men aldrig före ett eget val eller ett par. */
+  readonly excludeRules: readonly ExcludeRule[];
 }
 
 const byDateThenId = (a: TransferInput, b: TransferInput): number =>
@@ -100,7 +110,28 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
     }
   }
 
+  // 4. Regler med åtgärden Räkna inte (KK-39-C), för det som inte redan är avgjort.
+  for (const tx of eligible) {
+    if (!result.has(tx.id) && matchingRule(tx, input.excludeRules) !== null) {
+      result.set(tx.id, { id: tx.id, internal: true, pairId: null, reason: "rule" });
+    }
+  }
+
   return input.transactions.map(
     (tx) => result.get(tx.id) ?? { id: tx.id, internal: false, pairId: null, reason: "none" },
   );
+}
+
+/**
+ * Hur många transaktioner varje Räkna inte-regel träffar, för regellistan. Egna val räknas med, som för
+ * kategoriregler: de visar vad regeln gäller även när den inte bestämmer. Regler utan träffar saknas.
+ */
+export function excludeRuleHits(transactions: readonly TransferInput[], rules: readonly ExcludeRule[]): Map<string, number> {
+  const hits = new Map<string, number>();
+  for (const tx of transactions) {
+    if (tx.status === "removed") continue;
+    const ruleId = matchingRule(tx, rules);
+    if (ruleId !== null) hits.set(ruleId, (hits.get(ruleId) ?? 0) + 1);
+  }
+  return hits;
 }

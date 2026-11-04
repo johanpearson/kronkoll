@@ -323,6 +323,7 @@ export function transactionRepository(d1: D1Database) {
           transactionDate: transactions.transactionDate,
           amountMinor: transactions.amountMinor,
           counterpartyNorm: transactions.counterpartyNorm,
+          description: transactions.description,
           status: transactions.status,
           internal: transactions.isInternalTransfer,
           pairId: transactions.transferPairId,

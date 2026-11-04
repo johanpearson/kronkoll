@@ -745,7 +745,7 @@
         },
         {
           "id": "KK-39-C",
-          "text": "En regel kan ha åtgärden Räkna inte i stället för en kategori. Den gäller nya transaktioner direkt och tidigare transaktioner efter en fråga, som andra regler. En transaktion som användaren själv har markerat eller avmarkerat ändras aldrig av en regel (som KK-18-C)."
+          "text": "En regel kan ha åtgärden Räkna inte i stället för en kategori. Den gäller alla transaktioner den träffar direkt, gamla som nya, och innan regeln sparas visas hur många den träffar. Tas regeln bort räknas träffarna igen. En transaktion som användaren själv har markerat eller avmarkerat ändras aldrig av en regel (som KK-18-C). (Ändrat 2026-11-04 efter ägarens beslut: inte \"tidigare efter en fråga\".)"
         },
         {
           "id": "KK-39-D",

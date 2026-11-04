@@ -53,7 +53,7 @@ interface MatchText {
   readonly description: string;
 }
 
-function matches(rule: CategoryRule, text: MatchText): boolean {
+function matches(rule: Pick<CategoryRule, "match" | "pattern">, text: MatchText): boolean {
   switch (rule.match) {
     case "counterparty_exact":
       return rule.pattern !== "" && text.key === rule.pattern;
@@ -82,6 +82,22 @@ export function categorize(tx: CategorizableTransaction, rules: readonly Categor
   const text = { key: ruleKey(tx), description: tx.description.toLocaleUpperCase("sv-SE") };
   const rule = rules.filter((r) => matches(r, text)).sort(byPriority)[0];
   return rule ? { categoryId: rule.categoryId, source: rule.source, ruleId: rule.id } : null;
+}
+
+/** Bara villkoret i en regel: vad den träffar, inte vad den gör. */
+export type RuleCondition = Pick<CategoryRule, "id" | "match" | "pattern">;
+
+/**
+ * Den regel som träffar transaktionen, med samma matchning och ordning som kategoriseringen (exakt före
+ * prefix före text, längre mönster först), eller null. Används av regler som Räkna inte (KK-39-C).
+ */
+export function matchingRule(tx: Pick<CategorizableTransaction, "counterpartyNorm" | "description">, rules: readonly RuleCondition[]): string | null {
+  if (rules.length === 0) return null;
+  const text = { key: ruleKey(tx), description: tx.description.toLocaleUpperCase("sv-SE") };
+  const hit = rules
+    .filter((r) => matches(r, text))
+    .sort((a, b) => MATCH_RANK[a.match] - MATCH_RANK[b.match] || b.pattern.length - a.pattern.length || (a.id < b.id ? -1 : 1))[0];
+  return hit?.id ?? null;
 }
 
 export interface CategoryChange {
