@@ -3,7 +3,7 @@
 import { expect, test } from "@playwright/test";
 import { useFakeApi } from "./fake-api.ts";
 
-test("översikten visar periodens saldo, in, ut och kvar att spendera (V-e2e-dashboard)", async ({ page }) => {
+test("översikten visar periodens saldo, saldo per konto, in, ut och kvar att spendera (V-e2e-dashboard, KK-38)", async ({ page }) => {
   await useFakeApi(page);
   const response = await page.goto("/");
   // Bygget körs med samma _headers som i drift (KK-30-B).
@@ -12,6 +12,10 @@ test("översikten visar periodens saldo, in, ut och kvar att spendera (V-e2e-das
   await expect(main.getByRole("heading", { name: "Översikt" })).toBeVisible();
   await expect(main).toContainText("November");
   await expect(main.getByRole("definition")).toHaveText(["48 312,40 kr", "41 250,00 kr", "23 418,00 kr"]);
+  await expect(main.getByRole("term").first()).toHaveText("Saldo (2 av 3 konton)");
+  const accounts = main.getByRole("list", { name: "Konton" }).getByRole("listitem");
+  await expect(accounts).toContainText(["Vardag", "Sparkonto ••7712", "Kort ••1190"]);
+  await expect(accounts).toContainText(["18 527,90 kr", "29 784,50 kr", "Saldo saknas"]);
   await expect(main).toContainText("8 582,00 kr");
   await expect(main).toContainText("73 % av periodens budget är använd");
 });

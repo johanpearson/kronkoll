@@ -1,4 +1,4 @@
-// Översikten (#31, KK-17, KK-7-C, KK-8-A): saldo, periodens in och ut, kvar att spendera, trenden för
+// Översikten (#31, KK-17, KK-7-C, KK-8-A, KK-38): saldo totalt och per konto, periodens in och ut, kvar att spendera, trenden för
 // tolv perioder och när synken senast gick, med knappen Synka nu. Utan bank visas en välkomstsida.
 // Siffrorna räknas i API:t (GET /api/overview); vyn visar dem bara.
 import { formatSek } from "@kronkoll/domain";
@@ -23,6 +23,14 @@ interface Connection {
   readonly consentDaysLeft: number | null;
 }
 
+interface Account {
+  readonly id: string;
+  readonly name: string;
+  readonly bank: string | null;
+  /** Null när banken inte har lämnat något saldo (KK-38-B). */
+  readonly balanceMinor: number | null;
+}
+
 interface Overview {
   readonly period: Period;
   readonly balanceMinor: number;
@@ -34,6 +42,7 @@ interface Overview {
   readonly daysLeft: number;
   readonly lastSyncAt: string | null;
   readonly connections: readonly Connection[];
+  readonly accounts: readonly Account[];
   readonly trend: readonly TrendPoint[];
 }
 
@@ -61,6 +70,18 @@ async function fetchOverview(): Promise<Overview | null> {
       const bank = field(c, "bank");
       const id = field(c, "id");
       return { id: typeof id === "string" ? id : "", bank: typeof bank === "string" ? bank : "Banken", consentDaysLeft: typeof days === "number" ? days : null };
+    }),
+    accounts: list(field(body, "accounts")).map((a) => {
+      const id = field(a, "id");
+      const name = field(a, "name");
+      const bank = field(a, "bank");
+      const balance = field(a, "balance_minor");
+      return {
+        id: typeof id === "string" ? id : "",
+        name: typeof name === "string" ? name : "Konto",
+        bank: typeof bank === "string" ? bank : null,
+        balanceMinor: Number.isSafeInteger(balance) ? (balance as number) : null,
+      };
     }),
     trend: list(field(body, "trend")).map((t) => {
       const period = field(t, "period");
@@ -109,6 +130,25 @@ function TrendChart({ trend }: { trend: readonly TrendPoint[] }) {
   );
 }
 
+function AccountList({ accounts }: { accounts: readonly Account[] }) {
+  return (
+    <>
+      <h2>Konton</h2>
+      <ul aria-label="Konton">
+        {accounts.map((a) => (
+          <li key={a.id} className="tx">
+            <div className="tx-main">
+              <span className="tx-name">{a.name}</span>
+              <span className="amount">{a.balanceMinor === null ? "Saldo saknas" : formatSek(a.balanceMinor)}</span>
+            </div>
+            {a.bank !== null && <small className="tx-notes">{a.bank}</small>}
+          </li>
+        ))}
+      </ul>
+    </>
+  );
+}
+
 function SyncRow({ lastSyncAt, onDone }: { lastSyncAt: string | null; onDone: () => void }) {
   return (
     <div className="sync">
@@ -153,6 +193,8 @@ export function OverviewView() {
 
   const used = o.budgetMinor === 0 ? null : Math.round((o.expenseMinor * 100) / o.budgetMinor);
   const expiring = o.connections.filter((c) => c.consentDaysLeft !== null && c.consentDaysLeft <= CONSENT_WARNING_DAYS);
+  const withBalance = o.accounts.filter((a) => a.balanceMinor !== null).length;
+  const balanceLabel = withBalance === o.accounts.length ? "Saldo" : `Saldo (${String(withBalance)} av ${String(o.accounts.length)} konton)`;
 
   return (
     <main>
@@ -190,7 +232,7 @@ export function OverviewView() {
       </section>
       <dl className="card stats">
         <div>
-          <dt>Saldo</dt>
+          <dt>{balanceLabel}</dt>
           <dd>{formatSek(o.balanceMinor)}</dd>
         </div>
         <div>
@@ -202,6 +244,7 @@ export function OverviewView() {
           <dd>{formatSek(o.expenseMinor)}</dd>
         </div>
       </dl>
+      {o.accounts.length > 0 && <AccountList accounts={o.accounts} />}
       {o.trend.length > 0 && <TrendChart trend={o.trend} />}
     </main>
   );

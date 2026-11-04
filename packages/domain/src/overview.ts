@@ -15,14 +15,15 @@ import { budgetPeriodForKey, type BudgetPeriod } from "./period.ts";
 import { allocateByCategory } from "./split.ts";
 
 export interface OverviewAccount {
-  readonly balanceMinor: number;
+  /** Saldo från senaste synk, eller null när banken inte har lämnat något (KK-38-B). */
+  readonly balanceMinor: number | null;
   /** Användaren har valt kontot i översikten. */
   readonly included: boolean;
 }
 
-/** Totalt saldo över valda konton (KK-17-A). */
+/** Totalt saldo över valda konton som har saldo (KK-17-A, KK-38-B). */
 export function totalBalance(accounts: readonly OverviewAccount[]): number {
-  return sumMinor(accounts.filter((a) => a.included).map((a) => assertMinor(a.balanceMinor)));
+  return sumMinor(accounts.flatMap((a) => (a.included && a.balanceMinor !== null ? [assertMinor(a.balanceMinor)] : [])));
 }
 
 export interface PeriodTotals {

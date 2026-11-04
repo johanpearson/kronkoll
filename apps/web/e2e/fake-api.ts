@@ -42,6 +42,12 @@ const OVERVIEW = {
   over: false,
   last_sync_at: "2026-11-15T05:02:11.000Z",
   connections: [{ bank: "Exempelbanken", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
+  // Ett konto utan saldo, så att axe och Lighthouse även granskar "Saldo saknas" (KK-38-B).
+  accounts: [
+    { id: "acc_1", name: "Vardag", bank: "Exempelbanken", balance_minor: 1852790 },
+    { id: "acc_2", name: "Sparkonto ••7712", bank: "Exempelbanken", balance_minor: 2978450 },
+    { id: "acc_3", name: "Kort ••1190", bank: "Exempelbanken", balance_minor: null },
+  ],
   trend: [
     { period: "2026-10", income_minor: 3300000, expense_minor: 2900000, net_minor: 400000 },
     { period: "2026-11", income_minor: 4125000, expense_minor: 2341800, net_minor: 1783200 },
