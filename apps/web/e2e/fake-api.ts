@@ -147,6 +147,10 @@ export async function useFakeApi(page: Page | BrowserContext): Promise<FakeApi> 
       budgets.set(key, lines.map((l) => ({ category_id: l.category_id, budget_minor: l.amount_minor })));
       return [200, { period: key, lines: lines.length }];
     }
+    if (key !== undefined && method === "DELETE") {
+      budgets.delete(key);
+      return [204, null];
+    }
     if (key !== undefined && key in ACTUALS) return [200, budget(key)];
     return [404, { error: "not_found" }];
   };
@@ -155,7 +159,7 @@ export async function useFakeApi(page: Page | BrowserContext): Promise<FakeApi> 
     const request = route.request();
     const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
     const [status, json] = handle(request.method(), new URL(request.url()).pathname, body);
-    await route.fulfill({ status, json });
+    await route.fulfill(status === 204 ? { status } : { status, json });
   });
   return state;
 }

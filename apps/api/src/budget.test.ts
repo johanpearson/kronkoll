@@ -51,14 +51,14 @@ beforeEach(async () => {
   await settingsRepository(db).setBudgetPeriodStartDay(1);
 });
 
-async function call(method: string, path: string, body?: unknown, env: Partial<Env> = {}) {
+async function call(method: string, path: string, body?: unknown, env: Partial<Env> = {}, csrf = true) {
   const context: RouteContext = {
     waitUntil: () => undefined,
     sync: { logger: captureLogs().logger, clock: fixedClock("2026-11-15T10:00:00.000Z"), newId: () => "x", providerFor: () => null },
     connectorFor: () => null,
   };
   const headers = new Headers({ "cf-access-jwt-assertion": await signToken(key), "content-type": "application/json" });
-  if (method !== "GET") {
+  if (method !== "GET" && csrf) {
     headers.set("origin", ORIGIN);
     headers.set("x-kronkoll", "1");
   }
@@ -154,9 +154,55 @@ describe("PUT /api/budgets/{period} (KK-20)", () => {
     expect((await (await call("GET", "/api/budgets/2026-11")).json<{ lines: unknown[] }>()).lines).toHaveLength(2);
   });
 
-  it("andra metoder ger 405, och ändringar kräver CSRF-skydd", async () => {
-    const res = await call("DELETE", "/api/budgets/2026-11");
+  it("andra metoder ger 405", async () => {
+    const res = await call("POST", "/api/budgets/2026-11", { lines: LINES });
     expect(res.status).toBe(405);
-    expect(res.headers.get("allow")).toBe("GET, PUT");
+    expect(res.headers.get("allow")).toBe("GET, PUT, DELETE");
+  });
+});
+
+describe("DELETE /api/budgets/{period} (KK-40)", () => {
+  const budgetLines = async (period: string) => (await (await call("GET", `/api/budgets/${period}`)).json<{ lines: { category_id: string }[] }>()).lines;
+
+  it("tar bort hela periodens budget men inte andra perioders (KK-40-A, KK-40-B)", async () => {
+    await call("PUT", "/api/budgets/2026-10", { lines: [LINES[0]] });
+    await call("PUT", "/api/budgets/2026-11", { lines: LINES });
+    const res = await call("DELETE", "/api/budgets/2026-11");
+    expect(res.status).toBe(204);
+    expect(await budgetLines("2026-11")).toEqual([]);
+    expect((await budgetLines("2026-10")).map((l) => l.category_id)).toEqual(["mat"]);
+  });
+
+  it("utfallet finns kvar, som för en period som aldrig haft budget", async () => {
+    const before = await (await call("GET", "/api/budgets/2026-11")).json<{ groups: unknown }>();
+    await call("PUT", "/api/budgets/2026-11", { lines: LINES });
+    await call("DELETE", "/api/budgets/2026-11");
+    expect((await (await call("GET", "/api/budgets/2026-11")).json<{ groups: unknown }>()).groups).toEqual(before.groups);
+  });
+
+  it("\"current\" tar bort den pågående perioden, och en period utan budget ger också 204", async () => {
+    await call("PUT", "/api/budgets/2026-11", { lines: LINES });
+    expect((await call("DELETE", "/api/budgets/current")).status).toBe(204);
+    expect(await budgetLines("2026-11")).toEqual([]);
+    expect((await call("DELETE", "/api/budgets/2026-11")).status).toBe(204);
+  });
+
+  it("en ogiltig period ger 400", async () => {
+    const res = await call("DELETE", "/api/budgets/2026-13");
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_request" });
+  });
+
+  it("kräver CSRF-skydd och ändrar då ingenting (KK-29-B)", async () => {
+    await call("PUT", "/api/budgets/2026-11", { lines: LINES });
+    expect((await call("DELETE", "/api/budgets/2026-11", undefined, {}, false)).status).toBe(403);
+    expect(await budgetLines("2026-11")).toHaveLength(2);
+  });
+
+  it("svarar 503 utan detaljer när databasen inte går att skriva", async () => {
+    const broken = { prepare: () => { throw new Error("D1 nere"); } } as unknown as D1Database;
+    const res = await call("DELETE", "/api/budgets/2026-11", undefined, { DB: broken });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "unavailable" });
   });
 });

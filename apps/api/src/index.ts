@@ -7,7 +7,7 @@ import { manualSyncGate, type BankConnector, type BankDataProvider } from "@kron
 import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
 import { listAccounts, patchAccount } from "./accounts.ts";
-import { getBudget, putBudget } from "./budget.ts";
+import { deleteBudget, getBudget, putBudget } from "./budget.ts";
 import { createCategory, listCategories, mergeCategory, patchCategory } from "./categories.ts";
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
@@ -166,7 +166,8 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (budgetMatch?.[1]) {
     if (request.method === "GET") return getBudget(env, budgetMatch[1], context.sync);
     if (request.method === "PUT") return putBudget(request, env, budgetMatch[1], context.sync);
-    return json({ error: "method_not_allowed" }, 405, { allow: "GET, PUT" });
+    if (request.method === "DELETE") return deleteBudget(env, budgetMatch[1], context.sync);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, PUT, DELETE" });
   }
 
   const accountMatch = /^\/api\/accounts\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
