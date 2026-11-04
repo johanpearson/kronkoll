@@ -63,8 +63,17 @@ pnpm --filter @kronkoll/<paket> test:coverage
   anrop: testet kräver att ingen `role="alert"` syns, så att axe granskar riktigt innehåll.
 - `e2e/lighthouse.spec.ts` kör Lighthouse (mobil, simulerad strypning) på `/` och `/transaktioner`. Lighthouse
   öppnar en egen flik via CDP-porten i en `launchPersistentContext`, och fake-API:t läggs på hela kontexten.
-  Krav: tillgänglighet och bästa praxis 100, prestanda ≥ 90. Lighthouse 13 saknar PWA-kategori; installbarhet
-  (KK-25-A) får en egen kontroll när appen har manifest och service worker.
+  Krav: tillgänglighet och bästa praxis 100, prestanda ≥ 90. Lighthouse 13 saknar PWA-kategori; installbarheten
+  (KK-25-A) kontrolleras i `e2e/pwa.spec.ts` med Chromiums `Page.getInstallabilityErrors` via CDP.
+
+## PWA och service worker
+
+- Egen liten service worker utan beroenden (ägarens val 2026-11-04, i stället för vite-plugin-pwa). Logiken
+  finns i `apps/web/src/sw/shell.ts` med tester, och `src/sw/sw.ts` byggs av Vite till `/sw.js` utan hash.
+  sw.js får inte innehålla `import`, eftersom den registreras som klassiskt skript.
+- Service workern rör aldrig `/api/` eller `/cdn-cgi/`, och sparar aldrig en omdirigering (Access-inloggningen).
+- Manifestet länkas med `crossorigin="use-credentials"`, annars hämtas det utan Access-cookie och stoppas.
+- Ikonerna ritas från `public/icons/icon.svg` med `node scripts/icons.ts` i `apps/web`.
 
 ## Cloudflare och D1: gränser som har orsakat riktiga fel
 
