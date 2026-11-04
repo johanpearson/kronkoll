@@ -11,6 +11,7 @@ import { deleteBudget, getBudget, putBudget } from "./budget.ts";
 import { createCategory, listCategories, mergeCategory, patchCategory } from "./categories.ts";
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
+import { addContribution, createGoal, getGoal, listGoals } from "./goals.ts";
 import { getOverview } from "./overview.ts";
 import { getSettings, patchSettings } from "./settings.ts";
 import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule } from "./rules.ts";
@@ -160,6 +161,24 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (ruleMatch?.[1]) {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     return applyRule(env, ruleMatch[1]);
+  }
+
+  const contributionMatch = /^\/api\/goals\/([A-Za-z0-9_-]{1,64})\/contributions$/u.exec(pathname);
+  if (contributionMatch?.[1]) {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return addContribution(request, env, contributionMatch[1], context.sync);
+  }
+
+  const goalMatch = /^\/api\/goals\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (goalMatch?.[1]) {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return getGoal(env, goalMatch[1], context.sync);
+  }
+
+  if (pathname === "/api/goals") {
+    if (request.method === "GET") return listGoals(env, context.sync);
+    if (request.method === "POST") return createGoal(request, env, context.sync);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
   }
 
   const budgetMatch = /^\/api\/budgets\/([A-Za-z0-9-]{1,16})$/u.exec(pathname);
