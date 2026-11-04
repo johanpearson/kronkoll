@@ -138,6 +138,20 @@ describe("transaktioner (KK-5-C, KK-11-C)", () => {
     const second = await provider.transactions("a", { dateFrom: "2026-08-01", continuationKey: "nästa" });
     expect(second).toMatchObject({ continuationKey: null, transactions: [{ providerTxId: "ref-2" }] });
     expect(calls.map((c) => c.url.searchParams.get("date_from"))).toEqual(["2026-08-01", "2026-08-01"]);
+    expect(calls.map((c) => c.url.searchParams.get("strategy"))).toEqual([null, null]);
+  });
+
+  it("utan startdatum ber den om så lång historik som banken tillåter, även på följande sidor (KK-5-C)", async () => {
+    const { provider, calls } = fakeApi({
+      "/accounts/a/transactions": { transactions: [tx({})], continuation_key: "nästa" },
+      "/accounts/a/transactions?nästa": { transactions: [] },
+    });
+    await provider.transactions("a", { dateFrom: null, continuationKey: null });
+    await provider.transactions("a", { dateFrom: null, continuationKey: "nästa" });
+    expect(calls.map((c) => [c.url.searchParams.get("strategy"), c.url.searchParams.has("date_from")])).toEqual([
+      ["longest", false],
+      ["longest", false],
+    ]);
   });
 
   it.each([

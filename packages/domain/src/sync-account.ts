@@ -13,7 +13,11 @@ import { normalizeCounterparty } from "./normalize.ts";
 import { reconcile, type ImportedTransaction, type ReconcileResult, type StoredTransaction } from "./reconcile.ts";
 import { syncDateFrom, type AccountSyncResult } from "./sync.ts";
 
-/** Hur långt bakåt första hämtningen går. Banker tillåter normalt minst 90 dagar utan extra samtycke. */
+/**
+ * Första hämtningen ber om så lång historik som banken tillåter (KK-5-C). Klarar banken inte det,
+ * eller blir det fler sidor än gränsen, hämtas så här många dagar i stället. Banker tillåter normalt
+ * minst 90 dagar utan extra samtycke.
+ */
 export const FIRST_SYNC_DAYS = 90;
 /** Skydd mot en bank som aldrig slutar bläddra. Fler sidor än så räknas som misslyckad hämtning. */
 export const DEFAULT_MAX_PAGES = 20;
@@ -51,7 +55,7 @@ function toImported(accountId: string, tx: ProviderTransaction): ImportedTransac
   };
 }
 
-async function fetchAll(input: SyncAccountInput, dateFrom: string): Promise<ProviderTransaction[]> {
+async function fetchAll(input: SyncAccountInput, dateFrom: string | null): Promise<ProviderTransaction[]> {
   const maxPages = input.maxPages ?? DEFAULT_MAX_PAGES;
   const fetched: ProviderTransaction[] = [];
   let continuationKey: string | null = null;
@@ -64,11 +68,22 @@ async function fetchAll(input: SyncAccountInput, dateFrom: string): Promise<Prov
   throw new ProviderError("FAILED");
 }
 
+/** Första hämtningen: längsta historiken, annars FIRST_SYNC_DAYS. Bara FAILED (t.ex. för lång period) prövas igen. */
+async function fetchFirst(input: SyncAccountInput): Promise<ProviderTransaction[]> {
+  try {
+    return await fetchAll(input, null);
+  } catch (error) {
+    if (!(error instanceof ProviderError) || error.code !== "FAILED") throw error;
+    return fetchAll(input, addDays(input.today, -FIRST_SYNC_DAYS));
+  }
+}
+
 export async function syncAccount(input: SyncAccountInput): Promise<AccountSyncResult> {
   try {
     const { store, account, today } = input;
-    const dateFrom = syncDateFrom(await store.latestBookedDate(account.id)) ?? addDays(today, -FIRST_SYNC_DAYS);
-    const incoming = (await fetchAll(input, dateFrom)).map((tx) => toImported(account.id, tx));
+    const dateFrom = syncDateFrom(await store.latestBookedDate(account.id));
+    const fetched = dateFrom === null ? await fetchFirst(input) : await fetchAll(input, dateFrom);
+    const incoming = fetched.map((tx) => toImported(account.id, tx));
     const existing = await store.forReconcile([account.id], dateFrom);
     const result = reconcile({ existing, incoming, accountIds: [account.id], today, newId: input.newId });
     await store.save(result);

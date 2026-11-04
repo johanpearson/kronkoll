@@ -51,7 +51,7 @@ function memoryStore(initial: StoredTransaction[] = []) {
 
 /** En bank som svarar med sidor i ordning och minns vilka frågor den fick. */
 function fakeBank(pages: (TransactionPage | ProviderError)[]) {
-  const calls: { accountUid: string; dateFrom: string; continuationKey: string | null }[] = [];
+  const calls: { accountUid: string; dateFrom: string | null; continuationKey: string | null }[] = [];
   const provider: BankDataProvider = {
     accounts: () => Promise.resolve([]),
     balance: () => Promise.resolve(null),
@@ -72,7 +72,7 @@ function run(bank: BankDataProvider, store: TransactionStore, options: { today?:
 }
 
 describe("hämta, stäm av och spara ett konto (KK-7-A)", () => {
-  it("första gången hämtas 90 dagar bakåt och alla sidor följs", async () => {
+  it("första gången begärs så lång historik som banken tillåter och alla sidor följs (KK-5-C)", async () => {
     const { store, state } = memoryStore();
     const bank = fakeBank([
       { transactions: [bankTx({ providerTxId: "a" })], continuationKey: "k2" },
@@ -80,11 +80,27 @@ describe("hämta, stäm av och spara ett konto (KK-7-A)", () => {
     ]);
     expect(await run(bank.provider, store)).toEqual({ ok: true, newCount: 2, updatedCount: 0 });
     expect(bank.calls).toEqual([
-      { accountUid: "uid-1", dateFrom: "2026-08-22", continuationKey: null },
-      { accountUid: "uid-1", dateFrom: "2026-08-22", continuationKey: "k2" },
+      { accountUid: "uid-1", dateFrom: null, continuationKey: null },
+      { accountUid: "uid-1", dateFrom: null, continuationKey: "k2" },
     ]);
+    expect(state.reads).toEqual([{ accountIds: ["acc_1"], dateFrom: null }]);
     expect(state.rows).toHaveLength(2);
     expect(state.saves).toBe(1);
+  });
+
+  it("klarar banken inte längsta historiken hämtas 90 dagar i stället", async () => {
+    const { store, state } = memoryStore();
+    const bank = fakeBank([new ProviderError("FAILED"), onePage([bankTx({ providerTxId: "a" })])]);
+    expect(await run(bank.provider, store)).toEqual({ ok: true, newCount: 1, updatedCount: 0 });
+    expect(bank.calls.map((c) => c.dateFrom)).toEqual([null, "2026-08-22"]);
+    expect(state.saves).toBe(1);
+  });
+
+  it.each(["UNAUTHORIZED", "RATE_LIMITED", "UNAVAILABLE", "BAD_RESPONSE"] as const)("vid %s försöker den inte igen med 90 dagar", async (code) => {
+    const { store } = memoryStore();
+    const bank = fakeBank([new ProviderError(code)]);
+    expect(await run(bank.provider, store)).toEqual({ ok: false, error: code });
+    expect(bank.calls).toHaveLength(1);
   });
 
   it("senare hämtningar börjar 10 dagar före senaste bokförda och läser lagringen från samma datum", async () => {
@@ -169,9 +185,10 @@ describe("fel isoleras och lämnar inget halvt resultat (KK-7-B)", () => {
 
   it("fler sidor än gränsen räknas som misslyckat, så att en avkortad hämtning aldrig markerar preliminära som borttagna", async () => {
     const { store, state } = memoryStore();
-    const endless = fakeBank(Array.from({ length: 5 }, (_, i) => ({ transactions: [bankTx({ providerTxId: `t${String(i)}` })], continuationKey: `k${String(i)}` })));
+    const endless = fakeBank(Array.from({ length: 10 }, (_, i) => ({ transactions: [bankTx({ providerTxId: `t${String(i)}` })], continuationKey: `k${String(i)}` })));
     expect(await run(endless.provider, store, { maxPages: 3 })).toEqual({ ok: false, error: "FAILED" });
-    expect(endless.calls).toHaveLength(3);
+    // Tre sidor med längsta historiken, sedan tre till med 90 dagar.
+    expect(endless.calls.map((c) => c.dateFrom)).toEqual([null, null, null, "2026-08-22", "2026-08-22", "2026-08-22"]);
     expect(state.saves).toBe(0);
   });
 });
