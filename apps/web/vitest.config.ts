@@ -9,8 +9,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["functions/**/*.ts", "server/**/*.ts", "src/**/*.ts", "src/**/*.tsx"],
-      // main.tsx startar bara appen i webbläsaren.
-      exclude: ["**/*.test.ts", "**/*.test.tsx", "src/main.tsx"],
+      // main.tsx och sw.ts startar bara appen och service workern i webbläsaren; logiken testas i shell.ts.
+      exclude: ["**/*.test.ts", "**/*.test.tsx", "src/main.tsx", "src/sw/sw.ts"],
       thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 },
     },
   },
