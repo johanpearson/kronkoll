@@ -19,7 +19,7 @@ Kronkoll har **bara läsbehörighet** mot banken och kan inte göra betalningar 
 |---|---|---|
 | Konton: namn, typ och kontonummer **maskerat till de sista 4 siffrorna** | Banken via Enable Banking | Visa vilka konton som är kopplade |
 | Saldon | Banken via Enable Banking | Visa saldo och trender |
-| Transaktioner: datum, belopp, motpart och beskrivning | Banken via Enable Banking, eller CSV-fil du själv laddar upp | Kategorisera, budgetera och visa insikter |
+| Transaktioner: datum, belopp, motpart och beskrivning | Banken via Enable Banking | Kategorisera, budgetera och visa insikter |
 | Bankkopplingens session-id och giltighetstid | Enable Banking | Hämta nya transaktioner tills samtycket går ut. Session-id lagras **krypterat**. |
 | Kategorier, regler, budgetar, sparmål | Det du själv anger | Appens funktioner |
 | Inkomstparametrar, till exempel SGI, skattesats och planerad föräldraledighet | Det du själv anger | Uppskatta inkomst under ledighet |

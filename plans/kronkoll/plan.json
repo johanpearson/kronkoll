@@ -1,8 +1,9 @@
 {
   "$schema": "https://github.com/system-verification/reqplan/skills/reqplan/schema/plan.schema.json",
   "title": "Kronkoll – personlig budgetapp (plan v3)",
-  "summary": "**Kronkoll** är en privat, gratis och säker budgetapp för Johan. Den hämtar transaktioner från Skandia via Enable Banking (endast läsbehörighet), kategoriserar dem med regler som lär sig, och visar budget, sparmål och hur föräldraledighet påverkar inkomsten. Allt körs på Cloudflare free tier (Pages + Worker + D1 + Access) och deployas från GitHub Actions bakom hårda kvalitetsgrindar.\n\n**Så läser du planen**\n- **Prototyp** (mobil): Översikt → Transaktioner → Budget → Sparmål → Inkomst, plus koppla bank, CSV-import, inställningar och radering.\n- **Flöden**: dataflödet *bank → databas → kategori → budget* (`F-dataflode`), koppla bank/koppla om, samtyckets och transaktionens livscykel, regelinlärning och omräkning vid föräldraledighet.\n- **Data & arkitektur**: ports & adapters – `domain` är ren TypeScript; Enable Banking, CSV, D1, Web Push och Access ligger i adaptrar.\n- **Risker**: risker `R-*` och en kort **hotmodell enligt STRIDE** (`T-*`).\n- **Verifiering**: varje krav och AC är kopplat till unit-, integrations-, kontrakts-, E2E- eller manuella tester – se spårbarhetsmatrisen.\n- **Etapper**: M0 fundament + spike, **M1 = MVP**, M2 sparmål & inkomst, M3 insikter & notiser. Hushåll med flera användare ingår inte (KK-28).\n\n**v2 (granskning godkänd 2026-11-01):** publikt repo, 2 synkar/dygn, preliminära räknas i budget, transaktioner sparas tills du raderar, ingen överföring av budgetrest, mutationströskel 85 %. Sparmål och ledighet ligger kvar i M2. Skandia är sett på Enable Bankings webbplats; kortet och villkoren verifieras i spiken. **v3:** KK-29–KK-35 (tidigare SYN-1–SYN-7) är nu ordinarie krav. Branch protection och CI-grinden finns i repot (D-branch). Se de accepterade besluten D-branch, D-repo, D-sync, D-pending, D-retention, D-rollover och D-mutation.\n\n> **Notera:** American Express går inte att koppla i Sverige. Amex-kort hanteras med CSV-import (KK-6-B, KK-10).\n\n### Antaganden (A-1 … A-11)\nAllt nedan är **antaget av agenten** och ska verifieras – främst i spiken i M0.\n1. **A-1** ✅ *Verifierat 2026-11-01.* Enable Banking *Restricted Production* är tillåtet för privat bruk med egna, länkade konton, och villkoren nämner ingen kostnad. Antalet länkade konton kan begränsas (ingen siffra anges). Bara konton som tillhör den som länkade dem får läsas, vilket passar eftersom Kronkoll har en användare (KK-28).\n2. **A-2** Skandia finns som ASPSP i SE med AIS. ✅ *Verifierat 2026-11-01:* ASPSP-namnet är `Skandia` (personal och business), längsta samtycke är 180 dagar och Visa-kortet kommer som eget konto. Historikdjup vid första samtycket och preliminära (PDNG) är fortfarande okänt (ofta 13–24 mån, därefter ~90 dagar per hämtning) och verifieras när adaptern (#24) körs i produktion.\n3. **A-3** Cloudflare free-gränser (nov 2026): Workers 100 000 anrop/dygn och 10 ms CPU per anrop, 5 Cron Triggers per konto, D1 5 GB lagring, 5 M lästa rader/dygn, 100 000 skrivna rader/dygn och Time Travel 7 dagar, Access gratis upp till 50 användare. Verifiera mot aktuella villkor. *Verifierat 2026-11-01:* Zero Trust free kräver ett registrerat betalkort, även om planen kostar 0 kr.\n4. **A-4** ✅ *Verifierat 2026-11-01.* Cloudflare Access skyddar produktionsvärden `kronkoll-25e.pages.dev` som en self-hosted application. Projektet heter `kronkoll`; adressen fick tillägget `-25e` eftersom `kronkoll.pages.dev` var upptaget. Två Access-applikationer behövs: en för `kronkoll-25e.pages.dev` och en för `*.kronkoll-25e.pages.dev` (förhandsversioner och adresser per deploy). Båda använder policyn *Endast Johan*. En icke inbjuden e-post nekas, och deployens rökprov visar att `/` och `/api/health` omdirigeras till Access-inloggningen.\n5. **A-5** Föräldrapenning ≈ 80 % av SGI × 0,97 / 365 per dag, tak 10 prisbasbelopp. Prisbasbelopp 2026 = 59 200 kr. Lagras som årsparametrar, aldrig hårdkodat.\n6. **A-6** Utbetalningar från Försäkringskassan syns med motpart som innehåller \"FORSAKRINGSKASSAN\"/\"FÖRSÄKRINGSKASSAN\".\n7. **A-7** iOS ≥ 16.4 och Android stöder Web Push för installerad PWA.\n8. **A-8** GitHub secret scanning och push protection är gratis för publika repon men inte för privata (där kräver de GitHub Advanced Security). gitleaks i CI är gratis i båda fallen.\n9. **A-9** Skattesatsen för nettouppskattning anges av användaren (från lönebeskedet) och beräknas inte från skattetabeller.\n10. **A-10** All exempeldata i prototypen är påhittad.\n11. **A-11** Tröskelvärdena (14 dagars banner, 10 dagar för försvunna preliminära, 15 min manuell synk, avvikelse 30 %/500 kr, cache 24 h, push 14/3/0) är bekräftade som startvärden och kan konfigureras.",
+  "summary": "**Kronkoll** är en privat, gratis och säker budgetapp för Johan. Den hämtar transaktioner från Skandia via Enable Banking (endast läsbehörighet), kategoriserar dem med regler som lär sig, och visar budget, sparmål och hur föräldraledighet påverkar inkomsten. Allt körs på Cloudflare free tier (Pages + Worker + D1 + Access) och deployas från GitHub Actions bakom hårda kvalitetsgrindar.\n\n**Så läser du planen**\n- **Prototyp** (mobil): Översikt → Transaktioner → Budget → Sparmål → Inkomst, plus koppla bank, inställningar och radering.\n- **Flöden**: dataflödet *bank → databas → kategori → budget* (`F-dataflode`), koppla bank/koppla om, samtyckets och transaktionens livscykel, regelinlärning och omräkning vid föräldraledighet.\n- **Data & arkitektur**: ports & adapters – `domain` är ren TypeScript; Enable Banking, D1, Web Push och Access ligger i adaptrar.\n- **Risker**: risker `R-*` och en kort **hotmodell enligt STRIDE** (`T-*`).\n- **Verifiering**: varje krav och AC är kopplat till unit-, integrations-, kontrakts-, E2E- eller manuella tester – se spårbarhetsmatrisen.\n- **Etapper**: M0 fundament + spike, **M1 = MVP**, M2 sparmål & inkomst, M3 insikter & notiser. Hushåll med flera användare ingår inte (KK-28).\n\n**v2 (granskning godkänd 2026-11-01):** publikt repo, 2 synkar/dygn, preliminära räknas i budget, transaktioner sparas tills du raderar, ingen överföring av budgetrest, mutationströskel 85 %. Sparmål och ledighet ligger kvar i M2. Skandia är sett på Enable Bankings webbplats; kortet och villkoren verifieras i spiken. **v3:** KK-29–KK-35 (tidigare SYN-1–SYN-7) är nu ordinarie krav. Branch protection och CI-grinden finns i repot (D-branch). Se de accepterade besluten D-branch, D-repo, D-sync, D-pending, D-retention, D-rollover och D-mutation.\n\n> **Notera:** American Express går inte att koppla i Sverige och stöds inte i Kronkoll (KK-6-B). CSV-importen (KK-10) ströks av ägaren 2026-11-04.\n\n### Antaganden (A-1 … A-11)\nAllt nedan är **antaget av agenten** och ska verifieras – främst i spiken i M0.\n1. **A-1** ✅ *Verifierat 2026-11-01.* Enable Banking *Restricted Production* är tillåtet för privat bruk med egna, länkade konton, och villkoren nämner ingen kostnad. Antalet länkade konton kan begränsas (ingen siffra anges). Bara konton som tillhör den som länkade dem får läsas, vilket passar eftersom Kronkoll har en användare (KK-28).\n2. **A-2** Skandia finns som ASPSP i SE med AIS. ✅ *Verifierat 2026-11-01:* ASPSP-namnet är `Skandia` (personal och business), längsta samtycke är 180 dagar och Visa-kortet kommer som eget konto. Historikdjup vid första samtycket och preliminära (PDNG) är fortfarande okänt (ofta 13–24 mån, därefter ~90 dagar per hämtning) och verifieras när adaptern (#24) körs i produktion.\n3. **A-3** Cloudflare free-gränser (nov 2026): Workers 100 000 anrop/dygn och 10 ms CPU per anrop, 5 Cron Triggers per konto, D1 5 GB lagring, 5 M lästa rader/dygn, 100 000 skrivna rader/dygn och Time Travel 7 dagar, Access gratis upp till 50 användare. Verifiera mot aktuella villkor. *Verifierat 2026-11-01:* Zero Trust free kräver ett registrerat betalkort, även om planen kostar 0 kr.\n4. **A-4** ✅ *Verifierat 2026-11-01.* Cloudflare Access skyddar produktionsvärden `kronkoll-25e.pages.dev` som en self-hosted application. Projektet heter `kronkoll`; adressen fick tillägget `-25e` eftersom `kronkoll.pages.dev` var upptaget. Två Access-applikationer behövs: en för `kronkoll-25e.pages.dev` och en för `*.kronkoll-25e.pages.dev` (förhandsversioner och adresser per deploy). Båda använder policyn *Endast Johan*. En icke inbjuden e-post nekas, och deployens rökprov visar att `/` och `/api/health` omdirigeras till Access-inloggningen.\n5. **A-5** Föräldrapenning ≈ 80 % av SGI × 0,97 / 365 per dag, tak 10 prisbasbelopp. Prisbasbelopp 2026 = 59 200 kr. Lagras som årsparametrar, aldrig hårdkodat.\n6. **A-6** Utbetalningar från Försäkringskassan syns med motpart som innehåller \"FORSAKRINGSKASSAN\"/\"FÖRSÄKRINGSKASSAN\".\n7. **A-7** iOS ≥ 16.4 och Android stöder Web Push för installerad PWA.\n8. **A-8** GitHub secret scanning och push protection är gratis för publika repon men inte för privata (där kräver de GitHub Advanced Security). gitleaks i CI är gratis i båda fallen.\n9. **A-9** Skattesatsen för nettouppskattning anges av användaren (från lönebeskedet) och beräknas inte från skattetabeller.\n10. **A-10** All exempeldata i prototypen är påhittad.\n11. **A-11** Tröskelvärdena (14 dagars banner, 10 dagar för försvunna preliminära, 15 min manuell synk, avvikelse 30 %/500 kr, cache 24 h, push 14/3/0) är bekräftade som startvärden och kan konfigureras.",
   "requirements": "./requirements.json",
+  "scope": { "exclude": [{ "id": "KK-10", "reason": "Struken av ägaren 2026-11-04. Skandias konton och Visa-kortet hämtas via Enable Banking, och ingen annan källa behövs." }] },
   "prototype": { "app_name": "Kronkoll", "device": "mobile" },
   "theme": {
     "preset": "light",
@@ -99,8 +100,7 @@
         { "id": "first-run", "label": "Första start (ingen bank)", "satisfies": ["KK-17"], "elements": [
           { "type": "heading", "text": "Välkommen till Kronkoll", "level": 2 },
           { "type": "empty", "icon": "🏦", "text": "Koppla ditt första konto för att se saldo, budget och trender. Kronkoll kan bara läsa – aldrig betala.", "elements": [
-            { "type": "button", "label": "Koppla bank", "variant": "primary", "goto": "koppla-bank" },
-            { "type": "button", "label": "Importera CSV i stället", "variant": "link", "goto": "csv-import" }
+            { "type": "button", "label": "Koppla bank", "variant": "primary", "goto": "koppla-bank" }
           ] }
         ] }
       ]
@@ -124,8 +124,7 @@
           { "title": "Överföring till Sparkonto", "subtitle": "Intern överföring – räknas inte", "meta": "−5 000,00 kr", "badge": "Intern", "tone": "info", "satisfies": ["KK-20-C"] },
           { "title": "Påhittade Möbler AB", "subtitle": "Räknas inte · utlägg", "meta": "−1 299,00 kr", "badge": "Räknas inte", "tone": "info", "goto": "transaktion", "satisfies": ["KK-39-A"] },
           { "title": "Försäkringskassan", "subtitle": "Inkomst › Föräldrapenning", "meta": "+4 830,00 kr", "badge": "Bokförd", "tone": "ok" }
-        ] },
-        { "type": "button", "label": "Importera CSV", "variant": "link", "goto": "csv-import" }
+        ] }
       ],
       "states": [
         { "id": "no-hits", "label": "Ingen träff", "elements": [
@@ -427,8 +426,7 @@
       "satisfies": ["KK-11", "KK-26-A", "KK-27"],
       "elements": [
         { "id": "connections", "type": "list", "title": "Bankkopplingar", "items": [
-          { "title": "Skandia", "subtitle": "3 konton · samtycke giltigt till 30 apr. 2027", "badge": "Aktiv", "tone": "ok", "goto": "koppling" },
-          { "title": "CSV: American Express", "subtitle": "Manuell import · senast 2 okt.", "badge": "CSV", "tone": "info", "goto": "csv-import", "satisfies": ["KK-6-B"] }
+          { "title": "Skandia", "subtitle": "3 konton · samtycke giltigt till 30 apr. 2027", "badge": "Aktiv", "tone": "ok", "goto": "koppling" }
         ] },
         { "type": "button", "label": "Koppla ny bank", "variant": "secondary", "goto": "koppla-bank" },
         { "id": "accounts-named", "type": "list", "title": "Konton", "satisfies": ["KK-37-A", "KK-37-B"], "items": [
@@ -494,13 +492,12 @@
     },
     {
       "id": "koppla-bank", "title": "Koppla bank", "group": "Bankkoppling",
-      "description": "Byggt i #103. Listan är fast i appen och innehåller bara Skandia (namnet verifierat i spiken). SBAB valdes bort 2026-11-02: bara bolånet var intressant och det syns inte via PSD2, så det läggs in för hand (#72). En lista från `GET /aspsps?country=SE` kan ersätta den fasta listan om fler banker behövs. Ingen Amex-notis: ägaren har inget Amex-kort (beslut 2026-11-02); CSV-importen finns kvar för kort som inte går att koppla.",
+      "description": "Byggt i #103. Listan är fast i appen och innehåller bara Skandia (namnet verifierat i spiken). SBAB valdes bort 2026-11-02: bara bolånet var intressant och det syns inte via PSD2, så det läggs in för hand (#72). En lista från `GET /aspsps?country=SE` kan ersätta den fasta listan om fler banker behövs. Ingen Amex-notis: ägaren har inget Amex-kort (beslut 2026-11-02), och CSV-importen ströks 2026-11-04.",
       "satisfies": ["KK-5", "KK-6"],
       "elements": [
         { "id": "aspsps", "type": "list", "items": [
           { "title": "Skandia", "subtitle": "Konton och kort · BankID", "goto": "koppla-samtycke" }
-        ] },
-        { "type": "button", "label": "Importera CSV", "variant": "link", "goto": "csv-import" }
+        ] }
       ]
     },
     {
@@ -538,27 +535,6 @@
           { "type": "alert", "tone": "error", "text": "Kopplingen avbröts hos banken. Inget sparades." },
           { "type": "button", "label": "Försök igen", "variant": "primary", "goto": "koppla-bank" }
         ] }
-      ]
-    },
-    {
-      "id": "csv-import", "title": "Importera CSV", "group": "Bankkoppling",
-      "description": "CSV-adaptern implementerar samma port `BankDataProvider` som Enable Banking-adaptern (KK-14-B). Den går igenom samma dedup och kategorisering. Kolumnmappningen sparas per källa.",
-      "satisfies": ["KK-10", "KK-6-B"],
-      "elements": [
-        { "type": "upload", "label": "CSV-fil", "accept": ".csv", "hint": "Filen läses i webbläsaren och skickas till API:t. Den sparas inte." },
-        { "type": "select", "label": "Konto", "options": ["American Express (manuellt konto)", "Privatkonto ••4821"], "value": "American Express (manuellt konto)" },
-        { "id": "mapping", "type": "row", "satisfies": ["KK-10-A"], "elements": [
-          { "type": "select", "label": "Datum", "options": ["Kolumn A: Datum"], "value": "Kolumn A: Datum" },
-          { "type": "select", "label": "Text", "options": ["Kolumn B: Beskrivning"], "value": "Kolumn B: Beskrivning" },
-          { "type": "select", "label": "Belopp", "options": ["Kolumn D: Belopp"], "value": "Kolumn D: Belopp" }
-        ] },
-        { "id": "preview", "type": "table", "title": "Förhandsvisning", "columns": ["Datum", "Text", "Belopp", ""], "rows": [
-          ["2026-10-28", "SAS Biljett", "−3 420,00", { "badge": "Ny", "tone": "ok" }],
-          ["2026-10-21", "Apple.com", "−129,00", { "badge": "Ny", "tone": "ok" }],
-          ["2026-10-02", "Hotell Tylösand", "−2 980,00", { "badge": "Dubblett", "tone": "warn" }]
-        ] },
-        { "id": "counts", "type": "alert", "tone": "info", "text": "142 nya · 18 dubbletter hoppas över", "satisfies": ["KK-10-A", "KK-10-B"] },
-        { "type": "button", "label": "Importera 142", "variant": "primary", "goto": "transaktioner", "toast": "142 transaktioner importerade" }
       ]
     },
     {
@@ -815,14 +791,6 @@
       "satisfies": ["KK-7-C"]
     },
     {
-      "id": "api-csv", "group": "API: bankkoppling", "method": "POST", "path": "/api/import/csv",
-      "summary": "Importera CSV. dry_run=true ger förhandsvisning med antal nya och dubbletter.",
-      "params": [{ "name": "dry_run", "in": "query", "type": "bool" }],
-      "request": { "account_id": "acc_amex", "mapping": { "date": 0, "text": 1, "amount": 3, "decimal": ",", "date_format": "yyyy-MM-dd" }, "csv": "<text, max 1 MB>" },
-      "responses": { "200": { "body": { "new": 142, "duplicates": 18, "errors": [] } }, "413": { "body": { "error": "too_large" } } },
-      "satisfies": ["KK-10-A", "KK-10-B"]
-    },
-    {
       "id": "api-push", "group": "API: bankkoppling", "method": "POST", "path": "/api/push/subscriptions",
       "summary": "Registrera Web Push-prenumeration (endpoint + nycklar) och valda notistyper",
       "request": { "endpoint": "https://web.push.apple.com/…", "keys": { "p256dh": "…", "auth": "…" }, "topics": ["consent", "budget_over", "sync_failed"] },
@@ -878,8 +846,8 @@
     {
       "id": "port-bank", "kind": "other", "group": "Portar (TypeScript-gränssnitt i domain)", "name": "BankDataProvider",
       "summary": "listInstitutions · startConsent · completeConsent · fetchAccounts · fetchTransactions(cursor) · revoke",
-      "description": "```ts\ninterface BankDataProvider {\n  fetchTransactions(acc: AccountRef, since: IsoDate, cursor?: string):\n    Promise<{ items: ImportedTransaction[]; next?: string }>\n  revoke(conn: ConnectionRef): Promise<void>\n  // …\n}\n```\nImplementeras av `adapter-enablebanking` och `adapter-csv` (CSV saknar consent-metoderna och kastar `NotSupported`). Den gemensamma kontraktstestsviten körs mot båda (KK-14-B).",
-      "satisfies": ["KK-14", "KK-14-B", "KK-10"]
+      "description": "```ts\ninterface BankDataProvider {\n  fetchTransactions(acc: AccountRef, since: IsoDate, cursor?: string):\n    Promise<{ items: ImportedTransaction[]; next?: string }>\n  revoke(conn: ConnectionRef): Promise<void>\n  // …\n}\n```\nImplementeras av `adapter-enablebanking`. Den gemensamma kontraktstestsviten (`runProviderContract`, #171) körs mot den, och en ny leverantör ska klara samma svit (KK-14-B).",
+      "satisfies": ["KK-14", "KK-14-B"]
     },
     {
       "id": "port-repo", "kind": "other", "group": "Portar (TypeScript-gränssnitt i domain)", "name": "Repositories",
@@ -1005,7 +973,7 @@
       "transitions": [
         { "from": "pending", "to": "booked", "on": "BOOK matchas (id eller fingeravtryck)", "effect": "behåll id, kategori och uppdelning; uppdatera belopp och datum", "satisfies": ["KK-9-B"] },
         { "from": "pending", "to": "removed", "on": "saknas i bankens svar > 10 dagar", "satisfies": ["KK-9-C"] },
-        { "from": "booked", "to": "booked", "on": "samma transaktion levereras igen", "effect": "no-op (idempotent)", "satisfies": ["KK-9-A", "KK-10-B"] }
+        { "from": "booked", "to": "booked", "on": "samma transaktion levereras igen", "effect": "no-op (idempotent)", "satisfies": ["KK-9-A"] }
       ]
     },
     {
@@ -1059,7 +1027,7 @@
       "satisfies": ["KK-15", "KK-14-B"],
       "steps": [
         { "id": "n-start", "label": "schedule 02:41 UTC", "kind": "start", "next": ["n-run"] },
-        { "id": "n-run", "label": "Kontraktssvit BankDataProvider mot EB sandbox (Mock ASPSP) + CSV-adapter", "actor": "GitHub Actions (secret: EB_SANDBOX_KEY)", "next": ["n-ok"], "satisfies": ["KK-14-B", "KK-5-A"] },
+        { "id": "n-run", "label": "Kontraktssvit BankDataProvider mot EB sandbox (Mock ASPSP)", "actor": "GitHub Actions (secret: EB_SANDBOX_KEY)", "next": ["n-ok"], "satisfies": ["KK-14-B", "KK-5-A"] },
         { "id": "n-ok", "label": "Grönt?", "kind": "decision", "next": [{ "to": "n-end", "label": "ja" }, { "to": "n-issue", "label": "nej" }] },
         { "id": "n-issue", "label": "Skapa GitHub-issue \"Kontrakt brutet\"", "next": ["n-end"] },
         { "id": "n-end", "label": "Klart", "kind": "end" }
@@ -1092,7 +1060,7 @@
       "satisfies": ["KK-5", "KK-8", "KK-11"],
       "fields": [
         { "name": "id", "type": "text", "required": true },
-        { "name": "provider", "type": "enablebanking|csv", "required": true, "satisfies": ["KK-14-B"] },
+        { "name": "provider", "type": "enablebanking", "required": true, "satisfies": ["KK-14-B"] },
         { "name": "aspsp_name", "type": "text", "description": "Skandia" },
         { "name": "session_id_enc", "type": "blob (AES-GCM)", "pii": true, "description": "Krypterat med nyckel från Worker secret SESSION_ENC_KEY. Utan JWT-signeringsnyckeln är värdet ändå oanvändbart.", "satisfies": ["KK-11-C"] },
         { "name": "status", "type": "pending_auth|active|expiring|expired|revoked", "required": true, "satisfies": ["KK-8-A"] },
@@ -1125,7 +1093,7 @@
         { "name": "id", "type": "text (ulid)", "required": true },
         { "name": "account_id", "type": "fk", "required": true },
         { "name": "provider_tx_id", "type": "text?", "description": "entry_reference / transaction_id om de finns", "satisfies": ["KK-9-A"] },
-        { "name": "fingerprint", "type": "text", "description": "hash(konto, belopp, normaliserad motpart, datum, löpnummer)", "satisfies": ["KK-9-A", "KK-10-B"] },
+        { "name": "fingerprint", "type": "text", "description": "hash(konto, belopp, normaliserad motpart, datum, löpnummer)", "satisfies": ["KK-9-A"] },
         { "name": "status", "type": "pending|booked|removed", "required": true, "satisfies": ["KK-9-B", "KK-9-C"] },
         { "name": "last_seen_at", "type": "datetime", "satisfies": ["KK-9-C"] },
         { "name": "transaction_date", "type": "date" },
@@ -1301,7 +1269,7 @@
     {
       "id": "api", "name": "api (Worker)", "kind": "service", "tech": "Cloudflare Workers + Hono + Zod",
       "description": "`apps/api`. HTTP-adapter (routes) och `scheduled()`-handler för cron. `workers_dev = false`: ingen publik URL, nås bara via service binding. Komponerar domain med adaptrar (composition root). Secrets: `EB_PRIVATE_KEY`, `EB_APP_ID`, `SESSION_ENC_KEY`, `STATE_HMAC_KEY`, `VAPID_PRIVATE_KEY`, `ACCESS_AUD`.",
-      "depends_on": ["domain", "adapter-access", "adapter-eb", "adapter-csv", "adapter-d1", "adapter-webpush"],
+      "depends_on": ["domain", "adapter-access", "adapter-eb", "adapter-d1", "adapter-webpush"],
       "satisfies": ["KK-2-B", "KK-7", "KK-12", "KK-1"]
     },
     {
@@ -1314,11 +1282,6 @@
       "description": "Implementerar BankDataProvider. Importerar privat nyckel (PKCS#8) en gång per isolate. Endast AIS. Kontraktstestas mot sandbox.",
       "depends_on": [{ "to": "eb", "label": "HTTPS + JWT" }, "domain"],
       "satisfies": ["KK-5", "KK-5-A", "KK-5-B"]
-    },
-    {
-      "id": "adapter-csv", "name": "adapter-csv", "kind": "adapter", "tech": "Egen liten CSV-parser (sv-format: semikolon, komma-decimal)",
-      "depends_on": ["domain"],
-      "satisfies": ["KK-10", "KK-14-B"]
     },
     {
       "id": "adapter-d1", "name": "adapter-d1", "kind": "adapter", "tech": "Drizzle ORM (D1) + wrangler d1 migrations",
@@ -1338,7 +1301,7 @@
     { "id": "d1", "name": "D1 (SQLite)", "kind": "database", "tech": "Cloudflare D1 free, Time Travel 7 dagar", "description": "Krypterad i vila av Cloudflare. Session-id dessutom krypterat på applikationsnivå.", "satisfies": ["KK-1", "KK-32"] },
     { "id": "access", "name": "Cloudflare Access", "kind": "external", "tech": "Zero Trust free (≤ 50 användare)", "description": "Två self-hosted applications (A-4, verifierat): `kronkoll-25e.pages.dev` (produktion) och `*.kronkoll-25e.pages.dev` (förhandsversioner och adresser per deploy). Den återanvändbara policyn *Endast Johan* släpper bara in inbjudna e-postadresser. Sessionslängd 24 h (KK-35). API-workern godtar bara produktionsapplikationens AUD-tagg, så adresser per deploy når inte API:t.", "satisfies": ["KK-2", "KK-2-A"] },
     { "id": "eb", "name": "Enable Banking", "kind": "external", "tech": "Restricted Production (A-1) / Sandbox", "depends_on": [{ "to": "skandia", "label": "PSD2 AIS" }], "satisfies": ["KK-5"] },
-    { "id": "skandia", "name": "Skandia (ASPSP)", "kind": "external", "tech": "BankID-SCA", "description": "Konto, sparkonto och Visa (om exponerat – spike). **American Express går inte att koppla i Sverige** → CSV.", "satisfies": ["KK-6", "KK-6-B"] },
+    { "id": "skandia", "name": "Skandia (ASPSP)", "kind": "external", "tech": "BankID-SCA", "description": "Konto, sparkonto och Visa (om exponerat – spike). **American Express går inte att koppla i Sverige** och stöds inte (CSV-importen ströks 2026-11-04).", "satisfies": ["KK-6", "KK-6-B"] },
     { "id": "push", "name": "Push-tjänster (Apple/Google/Mozilla)", "kind": "external", "tech": "Gratis Web Push", "satisfies": ["KK-27"] },
     {
       "id": "gha", "name": "GitHub Actions", "kind": "ci", "tech": "Wrangler, Vitest, Playwright, Stryker, gitleaks, actionlint",
@@ -1564,10 +1527,10 @@
   ],
 
   "risks": [
-    { "id": "R-1", "risk": "Enable Banking ändrar villkoren för Restricted Production eller tar betalt.", "likelihood": "medium", "impact": "high", "mitigation": "BankDataProvider-porten och CSV-adaptern finns från MVP. Kontraktstestsviten gör det billigt att lägga till en ny leverantör. Flaggat enligt KK-1-A.", "satisfies": ["KK-14-B", "KK-1-A"] },
-    { "id": "R-2", "risk": "Skandia saknas, eller Visa-kortet exponeras inte som eget konto.", "likelihood": "medium", "impact": "medium", "mitigation": "Spike först (M0). CSV-import för kortet. Skandia Visa går att exportera som fil (antagande).", "satisfies": ["KK-6", "KK-10"] },
+    { "id": "R-1", "risk": "Enable Banking ändrar villkoren för Restricted Production eller tar betalt.", "likelihood": "medium", "impact": "high", "mitigation": "BankDataProvider-porten och dess kontraktssvit finns från MVP. Kontraktstestsviten gör det billigt att lägga till en ny leverantör. Flaggat enligt KK-1-A.", "satisfies": ["KK-14-B", "KK-1-A"] },
+    { "id": "R-2", "risk": "Skandia saknas, eller Visa-kortet exponeras inte som eget konto.", "likelihood": "medium", "impact": "medium", "mitigation": "Spike först (M0). Utfall 2026-11-01: Visa-kortet kommer som eget konto via Enable Banking.", "satisfies": ["KK-6"] },
     { "id": "R-3", "risk": "Free-gränsen på 10 ms CPU per Worker-anrop överskrids vid stor initial import (JSON-parsning av många sidor).", "likelihood": "high", "impact": "medium", "mitigation": "Mätt 2026-11-04: en manuell synk av fyra konton tog 108 ms CPU och slutade ändå ok, så gränsen överskrids redan men stoppas inte. Sidvis hämtning med sparad cursor, en sida per steg. Fortsätter i följande anrop. Ingen tung kryptering i loopen (JWT signeras en gång per körning).", "satisfies": ["KK-1-B", "KK-7"] },
-    { "id": "R-4", "risk": "Samtycket går ut obemärkt och ger glapp i data.", "likelihood": "high", "impact": "low", "mitigation": "Daglig kontroll, banner + push 14/3/0 dagar före, koppla om fyller glappet med överlapp och dedup. Om banken bara ger 90 dagar bakåt vid koppla om kan större glapp fyllas med CSV.", "satisfies": ["KK-8", "KK-27-B"] },
+    { "id": "R-4", "risk": "Samtycket går ut obemärkt och ger glapp i data.", "likelihood": "high", "impact": "low", "mitigation": "Daglig kontroll, banner + push 14/3/0 dagar före, koppla om fyller glappet med överlapp och dedup.", "satisfies": ["KK-8", "KK-27-B"] },
     { "id": "R-5", "risk": "Web Push opålitligt på iOS (kräver installerad PWA, kan tystas).", "likelihood": "medium", "impact": "low", "mitigation": "Appens banner och inkorg är baslinjen. Push är ett extra lager.", "satisfies": ["KK-27"] },
     { "id": "R-6", "risk": "Föräldrapenningregler och parametrar ändras eller missförstås, så att prognosen blir fel.", "likelihood": "medium", "impact": "medium", "mitigation": "Årsparametrar i tabell med källa, tydlig \"uppskattning\"-text och manuellt överstyrt belopp. Unit-tester per år.", "satisfies": ["KK-23-A", "KK-23-B"] },
     { "id": "R-7", "risk": "Om repot någon gång görs privat: GitHub Actions-minuter (2 000/mån) tar slut på grund av Stryker och Playwright, och secret scanning blir betalt. Repot är publikt (D-repo), så risken gäller bara vid ett byte.", "likelihood": "low", "impact": "medium", "mitigation": "Inkrementell Stryker i PR och full nattligt bara vid ändringar i domain. Playwright bara med Chromium och mobil viewport. gitleaks i stället för GHAS. Repot är publikt enligt beslut D-repo.", "satisfies": ["KK-1-A", "KK-16"] },
@@ -1594,8 +1557,8 @@
     },
     {
       "id": "M1", "title": "M1 · MVP: koppla, se, kategorisera, budgetera", "target": "Vecka 3–8",
-      "description": "**MVP-avgränsning:** koppla Skandia (eller CSV), automatisk synk med dedup, transaktionslista, kategorisering med inlärning och uppdelning, budget per kategori, översikt med \"kvar att spendera\" och trend, samtyckesbanner, koppla om, radering, PWA i ljust och mörkt läge. Push, insikter, sparmål och inkomstplanering ingår inte.",
-      "includes": ["oversikt", "transaktioner", "transaktion", "regel-historik", "dela-upp", "budget", "budget-redigera", "budget-ta-bort", "installningar", "koppling", "radera-koppling", "koppla-bank", "koppla-samtycke", "koppla-hamtar", "csv-import", "kategorier", "api-overview", "api-transactions", "api-tx-patch", "api-rule-apply", "api-tx-split", "api-budget", "api-budget-delete", "api-conn-start", "api-conn-callback", "api-conn-renew", "api-conn-delete", "api-sync", "api-csv", "job-sync", "job-daily", "evt-imported", "port-bank", "port-repo", "F-dataflode", "F-koppla", "F-koppla-om", "F-conn-state", "F-tx-state", "F-learn", "F-contract-nightly", "Settings", "User", "BankConnection", "Account", "Transaction", "TransactionSplit", "Category", "CategoryRule", "BudgetLine", "SyncRun", "web", "domain", "adapter-eb", "adapter-csv", "adapter-d1", "d1"]
+      "description": "**MVP-avgränsning:** koppla Skandia, automatisk synk med dedup, transaktionslista, kategorisering med inlärning och uppdelning, budget per kategori, översikt med \"kvar att spendera\" och trend, samtyckesbanner, koppla om, radering, PWA i ljust och mörkt läge. Push, insikter, sparmål och inkomstplanering ingår inte.",
+      "includes": ["oversikt", "transaktioner", "transaktion", "regel-historik", "dela-upp", "budget", "budget-redigera", "budget-ta-bort", "installningar", "koppling", "radera-koppling", "koppla-bank", "koppla-samtycke", "koppla-hamtar", "kategorier", "api-overview", "api-transactions", "api-tx-patch", "api-rule-apply", "api-tx-split", "api-budget", "api-budget-delete", "api-conn-start", "api-conn-callback", "api-conn-renew", "api-conn-delete", "api-sync", "job-sync", "job-daily", "evt-imported", "port-bank", "port-repo", "F-dataflode", "F-koppla", "F-koppla-om", "F-conn-state", "F-tx-state", "F-learn", "F-contract-nightly", "Settings", "User", "BankConnection", "Account", "Transaction", "TransactionSplit", "Category", "CategoryRule", "BudgetLine", "SyncRun", "web", "domain", "adapter-eb", "adapter-d1", "d1"]
     },
     {
       "id": "M2", "title": "M2 · Sparmål, lån och inkomst (föräldraledighet)", "target": "Vecka 9–11",
@@ -1612,7 +1575,7 @@
   "verification": [
     { "id": "V-u-money", "title": "domain/money + format: sv-SE belopp och datum", "type": "unit", "given": "1234567 öre, 2026-11-03", "when": "formatAmount / formatDate", "then": "\"12 345,67 kr\", \"3 nov. 2026\", \"2026-11-03\"; veckostart måndag", "satisfies": ["KK-4-A", "KK-4-B"] },
     { "id": "V-u-period", "title": "domain/period: svensk tid och lönedagsperiod", "type": "unit", "given": "Clock i UTC 2026-10-31T23:30Z (00:30 svensk tid 1 nov.) och booking_date 2026-10-31", "when": "perioden räknas", "then": "rätt period i Europe/Stockholm; startdag 25 flyttas till närmast föregående bankdag", "satisfies": ["KK-33-A", "KK-34-A"] },
-    { "id": "V-u-reconcile", "title": "domain/reconcile: dedup och PDNG→BOOK (TDD + fast-check)", "type": "unit", "given": "syntetiska serier från fixture-fabriken", "when": "samma batch importeras 1–n gånger, i olika ordning, med id-byte vid bokföring", "then": "exakt en rad per verklig transaktion; preliminär ersätts och behåller kategori och uppdelning; försvunnen preliminär efter 10 dagar → removed; CSV-dubbletter ignoreras", "satisfies": ["KK-9-A", "KK-9-B", "KK-9-C", "KK-10-B"] },
+    { "id": "V-u-reconcile", "title": "domain/reconcile: dedup och PDNG→BOOK (TDD + fast-check)", "type": "unit", "given": "syntetiska serier från fixture-fabriken", "when": "samma batch importeras 1–n gånger, i olika ordning, med id-byte vid bokföring", "then": "exakt en rad per verklig transaktion; preliminär ersätts och behåller kategori och uppdelning; försvunnen preliminär efter 10 dagar → removed", "satisfies": ["KK-9-A", "KK-9-B", "KK-9-C"] },
     { "id": "V-u-transfers", "title": "domain/transfers: interna överföringar och kortfaktura", "type": "unit", "given": "−5 000 kr från privatkonto och +5 000 kr på sparkonto samma dag; betalning till Visa", "when": "classify körs", "then": "båda markeras interna och räknas inte i budgetutfall", "satisfies": ["KK-20-C"] },
     { "id": "V-u-categorize", "title": "domain/normalize + categorize: regler och inlärning", "type": "unit", "given": "\"ICA NARA SOFO STHLM\", \"K*ICA KVANTUM\", manuellt kategoriserad ICA-rad", "when": "en regel lärs in och appliceras bakåt", "then": "normaliseras till ICA och regeln matchar; den manuella raden ändras inte; prioritet manuell > inlärd > mall", "satisfies": ["KK-18-B", "KK-18-C"] },
     { "id": "V-u-template", "title": "Kategorimall: två nivåer, redigerbar", "type": "unit", "given": "seed-mallen", "when": "byt namn, slå ihop, arkivera", "then": "12 huvudkategorier med underkategorier; vid sammanslagning flyttas transaktioner och regler", "satisfies": ["KK-18-A"] },
@@ -1627,7 +1590,6 @@
     { "id": "V-u-consent", "title": "domain/consent + notify-rules", "type": "unit", "given": "expires_on och dagens datum; kategori som passerar 100 %", "when": "regler utvärderas", "then": "expiring vid ≤ 14 dagar; påminnelser 14/3/0; budgetnotis en gång per kategori och period, utan transaktionsbelopp", "satisfies": ["KK-8-A", "KK-27-A", "KK-27-B"] },
     { "id": "V-u-logger", "title": "Logger med vitlista (redaction)", "type": "unit", "given": "ett loggobjekt med amount, counterparty och iban", "when": "det loggas", "then": "endast vitlistade fält skrivs ut, övrigt blir [redacted]", "satisfies": ["KK-13-A"] },
     { "id": "V-u-jwt", "title": "adapter-enablebanking: JWT via WebCrypto", "type": "unit", "given": "genererat testnyckelpar (aldrig riktig nyckel)", "when": "JWT byggs", "then": "RS256, kid = app id, exp − iat ≤ 300 s, verifierbar med publik nyckel", "satisfies": ["KK-5-B"] },
-    { "id": "V-u-csv", "title": "adapter-csv: parser och mappning", "type": "unit", "given": "syntetisk CSV (semikolon, komma-decimal, BOM)", "when": "dry_run + import", "then": "rätt antal nya och dubbletter, belopp i öre", "satisfies": ["KK-10-A"] },
     { "id": "V-u-xss", "title": "Rendering av opålitliga banktexter", "type": "unit", "given": "fixture med motpart `<img src=x onerror=alert(1)>`", "when": "TransactionRow renderas (Vitest + Testing Library)", "then": "texten visas som ren text och inget img-element skapas", "satisfies": ["KK-30-A"] },
     { "id": "V-i-access", "title": "Worker: Access-JWT-validering", "type": "integration", "given": "vitest-pool-workers med testad JWKS", "when": "anrop med giltig, fel aud, utgången och saknad JWT", "then": "200 / 401 / 401 / 401; inget innehåll loggas", "satisfies": ["KK-2-B"] },
     { "id": "V-i-csrf", "title": "Worker: CSRF och bank-state", "type": "integration", "given": "inloggad användare", "when": "POST utan X-Kronkoll, callback med återanvänt eller utgånget state", "then": "403 respektive 400; ingen session skapas", "satisfies": ["KK-29-A", "KK-29-B"] },
@@ -1636,7 +1598,7 @@
     { "id": "V-i-delete", "title": "Radering med och utan purge", "type": "integration", "given": "koppling med konton, transaktioner och uppdelningar i D1", "when": "DELETE ?purge=true", "then": "fejkad EB får DELETE /sessions; 0 kvarvarande rader för kopplingen; svaret anger att backup förfaller efter 7 dagar", "satisfies": ["KK-11-A", "KK-11-B", "KK-32-A"] },
     { "id": "V-i-storage", "title": "Lagringsminimering", "type": "integration", "given": "en import från fejkad EB med fullt rått svar", "when": "D1 inspekteras", "then": "inga råa JSON-kolumner; kontonummer maskerat; session_id krypterat och inte i klartext", "satisfies": ["KK-11-C"] },
     { "id": "V-i-push", "title": "adapter-webpush mot lokal mottagare", "type": "integration", "given": "testprenumeration med kända nycklar", "when": "Notifier.send körs", "then": "giltig VAPID-JWT och dekrypterbar aes128gcm-payload; 410 tar bort prenumerationen", "satisfies": ["KK-27-A"] },
-    { "id": "V-c-provider", "title": "Kontraktssvit BankDataProvider (sandbox + CSV)", "type": "integration", "given": "Enable Banking sandbox (Mock ASPSP) och CSV-adapter", "when": "samma svit körs mot båda", "then": "båda ger giltiga ImportedTransaction; EB-adaptern anropar bara AIS-endpoints (spionerande fetch); initial hämtning använder bankens maxhistorik", "satisfies": ["KK-14-B", "KK-5-A", "KK-5-C"] },
+    { "id": "V-c-provider", "title": "Kontraktssvit BankDataProvider (sandbox)", "type": "integration", "given": "Enable Banking sandbox (Mock ASPSP)", "when": "den gemensamma sviten (runProviderContract) körs mot adaptern", "then": "giltiga ImportedTransaction; EB-adaptern anropar bara AIS-endpoints (spionerande fetch); initial hämtning använder bankens maxhistorik", "satisfies": ["KK-14-B", "KK-5-A", "KK-5-C"] },
     { "id": "V-a-arch", "title": "Arkitekturtest (dependency-cruiser)", "type": "unit", "given": "kodbasen", "when": "CI kör depcruise", "then": "domain importerar inget utanför sig självt; inga @cloudflare-typer i domain; ingen sträng /payments i adaptrar", "satisfies": ["KK-14-A", "KK-5-A"] },
     { "id": "V-ci-gates", "title": "CI: grindar blockerar deploy", "type": "integration", "given": "en PR som sänker coverage i domain till 85 %", "when": "CI körs", "then": "coverage-steget faller och deploy körs inte; deploy.yml har needs på alla grindar; tsc strict körs för alla paket", "satisfies": ["KK-16-A", "KK-16-B", "KK-3-A", "KK-1-C"] },
     { "id": "V-ci-mutation", "title": "Stryker på domain", "type": "integration", "given": "nattlig full körning", "when": "mutation score < 85 % (D-mutation)", "then": "jobbet fallerar och deploy av domain-ändringar blockeras", "satisfies": ["KK-16-A", "KK-15-A"] },
@@ -1661,7 +1623,6 @@
     { "id": "V-u-iconbutton", "title": "Ikonknappar har namn", "type": "unit", "given": "en ikonknapp", "when": "den ritas", "then": "den har sin etikett som aria-label och title och ingen synlig text; axe i E2E hittar inga knappar utan namn", "satisfies": ["KK-26-E"] },
     { "id": "V-e2e-csp", "title": "Säkerhetsheaders", "type": "e2e", "given": "preview-deploy", "when": "hämta / och /api/overview", "then": "CSP enligt KK-30-B, no-store på API", "satisfies": ["KK-30-B"] },
     { "id": "V-e2e-logout", "title": "Logga ut rensar enheten", "type": "e2e", "given": "inloggad med cachad översikt", "when": "Logga ut och rensa enheten", "then": "Cache Storage och IndexedDB tomma; omdirigering till Access", "satisfies": ["KK-35-A"] },
-    { "id": "V-e2e-csv", "title": "E2E: CSV-import", "type": "e2e", "given": "syntetisk Amex-CSV", "when": "importera två gånger", "then": "första gången 142 nya; andra gången 0 nya och 142 dubbletter", "satisfies": ["KK-10-A", "KK-10-B"] },
     { "id": "V-m-spike", "title": "Spike-protokoll Skandia", "type": "manual", "given": "EB sandbox + Restricted Production", "when": "ASPSP-lista, koppling och hämtning", "then": "protokollet besvarar KK-6-A; Amex-notisen finns i UI och plan", "satisfies": ["KK-6-A", "KK-6-B"] },
     { "id": "V-m-access", "title": "Manuell Access-kontroll", "type": "manual", "given": "en icke inbjuden e-post", "when": "öppna kronkoll-25e.pages.dev", "then": "nekad; inga /api-anrop når Workern (kontrollera Workers-analytics)", "satisfies": ["KK-2-A"] },
     { "id": "V-m-cost", "title": "Kostnads- och kvotkontroll", "type": "monitor", "given": "Cloudflare- och GitHub-dashboards", "when": "månadsvis, och efter första initiala importen", "then": "< 10 % av anrops-, läs- och skrivkvoter; inga betalda tillägg aktiverade; inga fakturor med belopp; betalkort registrerat bara för Zero Trust free (krävs, A-3)", "satisfies": ["KK-1-A", "KK-1-B"] },
