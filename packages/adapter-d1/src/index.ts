@@ -22,3 +22,4 @@ export { ruleRepository } from "./rules.ts";
 export { splitRepository } from "./splits.ts";
 export { budgetRepository, type BudgetSource } from "./budget.ts";
 export { overviewRepository, type ConnectionAccount, type OverviewAccountRow, type OverviewConnection, type SyncRunRow } from "./overview.ts";
+export { goalRepository, type GoalRecord, type NewGoal } from "./goals.ts";
