@@ -30,6 +30,9 @@ beforeAll(async () => {
   const accounts = accountRepository(db, keys);
   await accounts.upsertFromBank({ connectionId: "c1", providerUid: "u1", iban: null, name: "Privatkonto", type: "checking", balanceMinor: 4831240 }, () => "acc_1");
   await accounts.upsertFromBank({ connectionId: "c1", providerUid: "u2", iban: null, name: "Spar", type: "savings", balanceMinor: 7400000 }, () => "acc_2");
+  await accounts.upsertFromBank({ connectionId: "c1", providerUid: "u3", iban: null, name: "Kort", type: "credit_card", balanceMinor: null }, () => "acc_3");
+  await db.prepare(`INSERT INTO accounts (id, connection_id, display_name, type, balance_minor, included) VALUES ('acc_4', 'c1', 'Lån', 'loan', -200000000, 0)`).run();
+  await db.prepare(`UPDATE accounts SET nickname = 'Vardag' WHERE id = 'acc_1'`).run();
   const rows: [string, string, number, string | null, number][] = [
     ["lon", "2026-11-01", 4125000, "inkomst-lon", 0],
     ["ica", "2026-11-03", -41250, "mat-livsmedel", 0],
@@ -74,7 +77,7 @@ describe("GET /api/overview (KK-17)", () => {
     const res = await call("/api/overview");
     expect(res.status).toBe(200);
     const body = await res.json<Overview>();
-    expect({ ...body, trend: undefined }).toEqual({
+    expect({ ...body, trend: undefined, accounts: undefined }).toEqual({
       period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
       balance_minor: 12231240,
       income_minor: 4125000,
@@ -89,7 +92,18 @@ describe("GET /api/overview (KK-17)", () => {
       last_sync_at: "2026-11-15T05:02:11.000Z",
       connections: [{ id: "c1", bank: "Skandia", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
       trend: undefined,
+      accounts: undefined,
     });
+  });
+
+  it("listar varje valt konto med namn, bank och saldo, och totalen är summan av dem som har saldo (KK-38)", async () => {
+    const body = await (await call("/api/overview")).json<Overview>();
+    expect(body.accounts).toEqual([
+      { id: "acc_3", name: "Kort", bank: "Skandia", balance_minor: null },
+      { id: "acc_2", name: "Spar", bank: "Skandia", balance_minor: 7400000 },
+      { id: "acc_1", name: "Vardag", bank: "Skandia", balance_minor: 4831240 },
+    ]);
+    expect(body.balance_minor).toBe(7400000 + 4831240);
   });
 
   it("har trenden för de 12 senaste perioderna, äldst först (KK-17-C)", async () => {

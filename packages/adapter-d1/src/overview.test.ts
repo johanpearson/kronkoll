@@ -26,15 +26,15 @@ afterAll(async () => {
   await dispose();
 });
 
-describe("översikten i D1 (KK-17)", () => {
-  it("ger kontonas saldon, noll för ett konto utan saldo, och om de räknas in", async () => {
-    expect(await overviewRepository(db).accounts()).toEqual(
-      expect.arrayContaining([
-        { balanceMinor: 4831240, included: true },
-        { balanceMinor: 0, included: true },
-        { balanceMinor: -200000000, included: false },
-      ]),
-    );
+describe("översikten i D1 (KK-17, KK-38)", () => {
+  it("ger kontonas namn, bank, saldo (null utan saldo från banken) och om de räknas in", async () => {
+    await db.prepare(`UPDATE accounts SET nickname = 'Vardag' WHERE id = 'acc_1'`).run();
+    expect(await overviewRepository(db).accounts()).toEqual([
+      { id: "acc_2", name: "Kort", bank: "Skandia", balanceMinor: null, included: true },
+      { id: "acc_3", name: "Lån", bank: "Skandia", balanceMinor: -200000000, included: false },
+      { id: "acc_1", name: "Vardag", bank: "Skandia", balanceMinor: 4831240, included: true },
+    ]);
+    await db.prepare(`UPDATE accounts SET nickname = NULL WHERE id = 'acc_1'`).run();
   });
 
   it("ger kopplingarnas bank, status, samtyckets slut, senaste lyckade synk, fel i rad och antal konton", async () => {

@@ -9,6 +9,13 @@ import { asc, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { accounts, bankConnections, syncRuns } from "./schema.ts";
 
+export interface OverviewAccountRow extends OverviewAccount {
+  readonly id: string;
+  /** Eget namn om det finns, annars bankens maskerade (KK-37). */
+  readonly name: string;
+  readonly bank: string | null;
+}
+
 export interface OverviewConnection {
   readonly id: string;
   readonly bank: string | null;
@@ -24,10 +31,15 @@ export interface OverviewConnection {
 export function overviewRepository(d1: D1Database) {
   const db = drizzle(d1);
   return {
-    /** Saldo och om kontot räknas in. Ett konto utan saldo från banken räknas som noll. */
-    async accounts(): Promise<OverviewAccount[]> {
-      const rows = await db.select({ balanceMinor: accounts.balanceMinor, included: accounts.included }).from(accounts).all();
-      return rows.map((r) => ({ balanceMinor: r.balanceMinor ?? 0, included: r.included }));
+    /** Kontona med namn som de visas, bank, saldo (null om banken inte har lämnat något) och om de räknas in (KK-38). */
+    async accounts(): Promise<OverviewAccountRow[]> {
+      const name = sql<string>`coalesce(${accounts.nickname}, ${accounts.displayName})`;
+      return db
+        .select({ id: accounts.id, name, bank: bankConnections.aspspName, balanceMinor: accounts.balanceMinor, included: accounts.included })
+        .from(accounts)
+        .innerJoin(bankConnections, eq(accounts.connectionId, bankConnections.id))
+        .orderBy(asc(bankConnections.aspspName), asc(name), asc(accounts.id))
+        .all();
     },
 
     async connections(): Promise<OverviewConnection[]> {

@@ -26,6 +26,14 @@ describe("saldo (KK-17-A)", () => {
     ])).toBe(930050);
   });
 
+  it("räknar bara konton som har saldo från banken (KK-38-B)", () => {
+    expect(totalBalance([
+      { balanceMinor: 1852790, included: true },
+      { balanceMinor: null, included: true },
+      { balanceMinor: 3299800, included: true },
+    ])).toBe(5152590);
+  });
+
   it("ger noll utan konton och avvisar belopp som inte är heltal öre", () => {
     expect(totalBalance([])).toBe(0);
     expect(() => totalBalance([{ balanceMinor: 1.5, included: true }])).toThrow("Belopp måste vara ett heltal i öre");

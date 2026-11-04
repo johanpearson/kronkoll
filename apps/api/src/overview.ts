@@ -1,4 +1,4 @@
-// Översikten (#31, KK-17): GET /api/overview?period=ÅÅÅÅ-MM. Saldo över valda konton, periodens in, ut
+// Översikten (#31, KK-17, KK-38): GET /api/overview?period=ÅÅÅÅ-MM. Saldo över valda konton och per konto, periodens in, ut
 // och netto, kvar att spendera med kvar per dag, trenden för de 12 senaste perioderna och
 // kopplingarnas status. Allt räknas i domänen (`domain/overview`) med samma regler som budgeten:
 // interna överföringar räknas varken som in eller ut.
@@ -69,6 +69,8 @@ export async function getOverview(request: Request, env: { DB: D1Database }, syn
         days_left: left.daysLeft,
         over: left.over,
         last_sync_at: syncs.at(-1) ?? null,
+        // Konton som användaren har valt bort ur översikten listas inte, så listan summerar till saldot (KK-38-A).
+        accounts: accounts.filter((a) => a.included).map((a) => ({ id: a.id, name: a.name, bank: a.bank, balance_minor: a.balanceMinor })),
         connections: connections.map((c) => ({
           id: c.id,
           bank: c.bank,
