@@ -2,13 +2,14 @@
 // underkategorierna summeras alltid uppåt, och underkategorierna visas när man fäller ut en rad. Varje
 // rad visar budget, utfall, kvar och andel, och en överskriden budget syns med både färg och text
 // (KK-20-B). Huvudkategorier med utgifter men utan budget visas också. Överföringar mellan egna konton
-// räknas inte (KK-20-C). Budgeten sätts i BudgetEditor (KK-20-A). Ett tryck på en kategori visar
-// transaktionerna bakom utgifterna.
+// räknas inte (KK-20-C). Budgeten sätts i BudgetEditor (KK-20-A) och tas bort i DeleteBudget (KK-40). Ett
+// tryck på en kategori visar transaktionerna bakom utgifterna.
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { BudgetEditor } from "./BudgetEditor.tsx";
+import { DeleteBudget } from "./DeleteBudget.tsx";
 import { fetchCategories, NO_CATEGORIES, shiftPeriodKey, toPeriod, type Categories, type Period } from "../transactions/TransactionsView.tsx";
 
 interface Figures {
@@ -126,6 +127,7 @@ export function BudgetView() {
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [reload, setReload] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -155,6 +157,7 @@ export function BudgetView() {
   const go = (months: number) => {
     if (budget) setKey(shiftPeriodKey(budget.period.key, months));
     setEditing(false);
+    setNotice(null);
   };
   const toggle = (id: string) => {
     const next = new Set(open);
@@ -207,13 +210,27 @@ export function BudgetView() {
               onClose={() => { setEditing(false); }}
             />
           ) : (
-            <p>
-              <button type="button" className="primary" onClick={() => { setEditing(true); }}>
-                {budget.lines.length === 0 ? "Sätt budget" : "Ändra budget"}
-              </button>
-            </p>
+            <>
+              <p>
+                <button type="button" className="primary" onClick={() => { setEditing(true); setNotice(null); }}>
+                  {budget.lines.length === 0 ? "Sätt budget" : "Ändra budget"}
+                </button>
+              </p>
+              {budget.lines.length > 0 && (
+                <DeleteBudget
+                  key={budget.period.key}
+                  periodKey={budget.period.key}
+                  lineCount={budget.lines.length}
+                  onDeleted={() => {
+                    setNotice("Budgeten för perioden är borttagen.");
+                    setReload((n) => n + 1);
+                  }}
+                />
+              )}
+            </>
           )}
           {budget.lines.length === 0 && <p>Ingen budget är satt för perioden än.</p>}
+          {notice && <p role="status">{notice}</p>}
           {budget.groups.length > 0 && (
             <ul aria-label="Kategorier">
               {budget.groups.flatMap((g) => [

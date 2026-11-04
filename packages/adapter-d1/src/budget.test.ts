@@ -88,4 +88,13 @@ describe("budget i D1 (KK-20)", () => {
     await expect(repo.replace("2026-11", [{ categoryId: "mat", amountMinor: -1 }], "manual")).rejects.toThrow();
     expect(await repo.lines("2026-11")).toEqual([{ categoryId: "mat", amountMinor: 630000 }]);
   });
+
+  it("tar bort en periods budget utan att röra andra perioder (KK-40)", async () => {
+    const repo = budgetRepository(db);
+    await repo.replace("2026-10", [{ categoryId: "boende", amountMinor: 1200000 }], "manual");
+    await repo.replace("2026-11", [{ categoryId: "mat", amountMinor: 630000 }], "manual");
+    await repo.remove("2026-11");
+    expect(await repo.lines("2026-11")).toEqual([]);
+    expect(await repo.lines("2026-10")).toEqual([{ categoryId: "boende", amountMinor: 1200000 }]);
+  });
 });
