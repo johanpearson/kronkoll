@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { asset, assetUrls, navigate, precacheShell, removeOldShells, route, SHELL_CACHE, type SwEnv } from "./shell.ts";
+import { asset, assetUrls, data, DATA_CACHE, DATA_MAX_AGE_MS, navigate, precacheShell, pruneData, removeOldShells, route, SHELL_CACHE, type SwEnv } from "./shell.ts";
 
 const ORIGIN = "https://kronkoll.test";
+const NOW = Date.parse("2026-11-15T06:02:00.000Z");
 const INDEX = `<script type="module" src="/assets/index-abc.js"></script><link rel="stylesheet" href="/assets/index-def.css"><link rel="icon" href="/icons/icon.svg">`;
 
 /** Cache Storage i minnet, med samma beteende som webbläsarens för det service workern använder. */
@@ -22,6 +23,8 @@ function fakeCaches() {
           for (const url of urls) store.set(key(url), new Response(`innehåll i ${url}`));
           return Promise.resolve();
         },
+        keys: () => Promise.resolve([...store.keys()].map((url) => new Request(url))),
+        delete: (request: Request | string) => Promise.resolve(store.delete(key(request))),
       });
     },
     keys: () => Promise.resolve([...stores.keys()]),
@@ -33,8 +36,10 @@ function fakeCaches() {
 function environment(respond: (url: string) => Response | Error) {
   const { caches, stores } = fakeCaches();
   const calls: string[] = [];
+  const clock = { now: NOW };
   const env: SwEnv = {
     caches,
+    now: () => clock.now,
     fetch: (request) => {
       const url = new URL(typeof request === "string" ? request : request.url, ORIGIN).href;
       calls.push(url);
@@ -42,7 +47,7 @@ function environment(respond: (url: string) => Response | Error) {
       return result instanceof Error ? Promise.reject(result) : Promise.resolve(result);
     },
   };
-  return { env, stores, calls };
+  return { env, stores, calls, clock };
 }
 
 const redirected = () => {
@@ -54,14 +59,17 @@ const redirected = () => {
 describe("route", () => {
   const request = (url: string, mode: RequestMode = "cors", method = "GET") => ({ url: `${ORIGIN}${url}`, mode, method });
 
-  it("tar sidladdningar och filerna i /assets/", () => {
+  it("tar sidladdningar, filerna i /assets/ och översikten", () => {
     expect(route(request("/transaktioner", "navigate"), ORIGIN)).toBe("navigate");
     expect(route(request("/assets/index-abc.js", "no-cors"), ORIGIN)).toBe("asset");
+    expect(route(request("/api/overview"), ORIGIN)).toBe("data");
   });
 
-  it("lämnar API:t, Access, andra metoder, andra filer och andra origin åt webbläsaren", () => {
-    expect(route(request("/api/overview"), ORIGIN)).toBeNull();
-    expect(route(request("/api/overview", "navigate"), ORIGIN)).toBeNull();
+  it("lämnar resten av API:t, Access, andra metoder, andra filer och andra origin åt webbläsaren", () => {
+    expect(route(request("/api/transactions"), ORIGIN)).toBeNull();
+    expect(route(request("/api/overview?period=2026-10"), ORIGIN)).toBeNull();
+    expect(route(request("/api/overview", "cors", "POST"), ORIGIN)).toBeNull();
+    expect(route(request("/api/transactions", "navigate"), ORIGIN)).toBeNull();
     expect(route(request("/cdn-cgi/access/logout", "navigate"), ORIGIN)).toBeNull();
     expect(route(request("/assets/index-abc.js", "cors", "POST"), ORIGIN)).toBeNull();
     expect(route(request("/manifest.webmanifest"), ORIGIN)).toBeNull();
@@ -146,5 +154,65 @@ describe("asset", () => {
     expect(await (await asset(file, env)).text()).toBe("nät");
     expect((await asset(new Request(`${ORIGIN}/assets/saknas.js`), env)).status).toBe(404);
     expect([...(stores.get(SHELL_CACHE)?.keys() ?? [])]).toEqual([`${ORIGIN}/assets/index-abc.js`]);
+  });
+});
+
+describe("data: översikten utan nät (KK-25-B)", () => {
+  const overview = new Request(`${ORIGIN}/api/overview`);
+  const OVERVIEW = { balance_minor: 4831240 };
+  const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+  const HOUR = 60 * 60 * 1000;
+
+  it("hämtar från nätet, ger svaret oförändrat och sparar en kopia med tidsstämpel", async () => {
+    const { env, stores } = environment(() => json(OVERVIEW));
+    expect(await (await data(overview, env)).json()).toEqual(OVERVIEW);
+    const saved = stores.get(DATA_CACHE)?.get(`${ORIGIN}/api/overview`);
+    expect(await saved?.clone().json()).toEqual(OVERVIEW);
+    expect(saved?.headers.get("x-kronkoll-saved-at")).toBe(String(NOW));
+  });
+
+  it("sparar inte fel eller Access-inloggningen", async () => {
+    for (const response of [new Response("", { status: 503 }), redirected()]) {
+      const { env, stores } = environment(() => response);
+      expect(await data(overview, env)).toBe(response);
+      expect(stores.get(DATA_CACHE)?.size ?? 0).toBe(0);
+    }
+  });
+
+  it("utan nät visas kopian med när den sparades, så länge den är yngre än 24 timmar", async () => {
+    let online = true;
+    const { env, clock } = environment(() => (online ? json(OVERVIEW) : new TypeError("offline")));
+    await data(overview, env);
+    online = false;
+    clock.now = NOW + DATA_MAX_AGE_MS - 1;
+    expect(await (await data(overview, env)).json()).toEqual({ ...OVERVIEW, offline_saved_at: "2026-11-15T06:02:00.000Z" });
+  });
+
+  it("en kopia som är 24 timmar gammal tas bort och nätverksfelet ges vidare", async () => {
+    let online = true;
+    const { env, clock, stores } = environment(() => (online ? json(OVERVIEW) : new TypeError("offline")));
+    await data(overview, env);
+    online = false;
+    clock.now = NOW + DATA_MAX_AGE_MS;
+    await expect(data(overview, env)).rejects.toThrow("offline");
+    expect(stores.get(DATA_CACHE)?.size).toBe(0);
+  });
+
+  it("utan nät och utan kopia ges nätverksfelet vidare", async () => {
+    const { env } = environment(() => new TypeError("offline"));
+    await expect(data(overview, env)).rejects.toThrow("offline");
+  });
+
+  it("när appen öppnas tas gammal bankdata bort, även med nät, men inte yngre", async () => {
+    const { env, clock, stores } = environment(() => new Response("sida"));
+    const cache = await env.caches.open(DATA_CACHE);
+    await cache.put(`${ORIGIN}/api/overview`, new Response("{}", { headers: { "x-kronkoll-saved-at": String(NOW - 25 * HOUR) } }));
+    await cache.put(`${ORIGIN}/api/annan`, new Response("{}", { headers: { "x-kronkoll-saved-at": String(NOW - HOUR) } }));
+    await cache.put(`${ORIGIN}/api/utan-tid`, new Response("{}"));
+    await navigate(new Request(`${ORIGIN}/`), env);
+    expect([...(stores.get(DATA_CACHE)?.keys() ?? [])]).toEqual([`${ORIGIN}/api/annan`]);
+    clock.now = NOW + 23 * HOUR;
+    await pruneData(env);
+    expect(stores.get(DATA_CACHE)?.size).toBe(0);
   });
 });

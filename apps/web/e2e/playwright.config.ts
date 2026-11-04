@@ -17,6 +17,9 @@ export default defineConfig({
     locale: "sv-SE",
     timezoneId: "Europe/Stockholm",
     trace: "retain-on-failure",
+    // Service workern hanterar /api/overview, och sidans påhittade API (page.route) ser inte dess
+    // anrop. Den är därför avstängd i alla tester utom pwa.spec.ts, som slår på den själv.
+    serviceWorkers: "block",
   },
   projects: [{ name: "mobil", use: { ...devices["Pixel 7"] } }],
   webServer: {

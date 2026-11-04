@@ -90,6 +90,14 @@ describe("översikten (#31, KK-17)", () => {
     expect(text()).toContain(formatSek(858200));
     expect(text()).toContain(`≈ ${formatSek(53637)} per dag i 16 dagar`);
     expect(text()).toContain("73 % av periodens budget är använd");
+    expect(screen.queryByRole("note")).toBeNull();
+  });
+
+  it("säger tydligt när siffrorna är en sparad kopia utan nät, och från när (KK-25-B)", async () => {
+    api({ overview: () => [200, overview({ offline_saved_at: "2026-11-15T05:02:00.000Z" })] });
+    await open();
+    expect(screen.getByRole("note").textContent).toBe("Offline – visar data från 15 nov. 06:02.");
+    expect(text()).toContain(formatSek(858200));
   });
 
   it("över budget står i text, och utan budget finns en länk till Budget", async () => {
