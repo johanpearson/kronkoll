@@ -531,6 +531,10 @@
         {
           "id": "KK-26-D",
           "text": "Varje huvudkategori har en egen färg som visas som en liten prick vid kategorin i transaktionslistan och budgeten. Namnet står alltid kvar, så färgen är aldrig enda ledtråden, och prickarna har minst 3:1 kontrast mot ytan i både ljust och mörkt läge."
+        },
+        {
+          "id": "KK-26-E",
+          "text": "Vanliga åtgärder som upprepas i listor och vyer (byta period, söka, synka, ändra, dela upp och stänga) visas som ikonknappar utan text. Varje ikonknapp har en etikett för skärmläsare och som tooltip. Huvudåtgärder och åtgärder som sparar, avbryter eller tar bort något behåller sin text."
         }
       ]
     },

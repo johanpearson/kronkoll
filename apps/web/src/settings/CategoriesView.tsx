@@ -1,8 +1,10 @@
 // Kategorier (#34, KK-18-A): huvudkategorier med sina underkategorier, per typ. Byt namn, lägg till,
 // arkivera och slå ihop. Reglerna (två nivåer, unika namn, samma nivå och typ vid sammanslagning) finns
 // i domänen på servern, och dess förklaring visas som den är. Arkiverade visas inte.
+import { Pencil, X } from "lucide-react";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson, patchJson, postJson, type ApiResult } from "../api.ts";
+import { IconButton } from "../icon-button.tsx";
 import { Link } from "../router.tsx";
 
 interface Category {
@@ -136,11 +138,7 @@ export function CategoriesView() {
       <li key={c.id} className={c.parentId === null ? "tx" : "tx sub"}>
         <div className="tx-main">
           <span className="tx-name">{c.name}</span>
-          {editing === null && (
-            <button type="button" className="small" aria-label={`Ändra ${c.name}`} onClick={() => { setEdit({ id: c.id, mode: "menu" }); }}>
-              Ändra
-            </button>
-          )}
+          {editing === null && <IconButton label={`Ändra ${c.name}`} icon={Pencil} onClick={() => { setEdit({ id: c.id, mode: "menu" }); }} />}
         </div>
         {/* Åtgärderna visas först när raden öppnas, så att listan är lätt att läsa. */}
         {editing === "menu" && (
@@ -159,9 +157,7 @@ export function CategoriesView() {
             <button type="button" className="small" aria-label={`Arkivera ${c.name}`} onClick={() => { setEdit({ id: c.id, mode: "archive" }); }}>
               Arkivera
             </button>
-            <button type="button" className="small" onClick={close}>
-              Stäng
-            </button>
+            <IconButton label="Stäng" icon={X} onClick={close} />
           </div>
         )}
         {editing === "rename" && <InlineForm label="Nytt namn" submit="Spara" initial={c.name} onSubmit={(name) => done(patchJson(path, { name }))} onClose={close} />}

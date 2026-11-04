@@ -4,11 +4,12 @@
 // (KK-20-B). Huvudkategorier med utgifter men utan budget visas också. Överföringar mellan egna konton
 // räknas inte (KK-20-C). Budgeten sätts i BudgetEditor (KK-20-A) och tas bort i DeleteBudget (KK-40). Ett
 // tryck på en kategori visar transaktionerna bakom utgifterna.
-import { formatDateShort, formatSek } from "@kronkoll/domain";
+import { formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { CategoryDot } from "../category-color.tsx";
+import { PeriodNav } from "../icon-button.tsx";
 import { useToast } from "../toast.tsx";
 import { BudgetEditor } from "./BudgetEditor.tsx";
 import { DeleteBudget } from "./DeleteBudget.tsx";
@@ -173,21 +174,11 @@ export function BudgetView() {
   return (
     <main>
       <h1>Budget</h1>
-      <p>
-        <button type="button" disabled={!budget} onClick={() => { go(-1); }}>
-          Föregående period
-        </button>{" "}
-        <button type="button" disabled={!budget} onClick={() => { go(1); }}>
-          Nästa period
-        </button>
-      </p>
+      <PeriodNav period={budget?.period ?? null} onGo={go} />
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta budgeten. Försök igen om en stund.</p>}
       {budget && (
         <>
-          <p>
-            Period {formatDateShort(budget.period.start)} – {formatDateShort(budget.period.end)}
-          </p>
           <dl className="card stats">
             <div>
               <dt>Budget</dt>

@@ -3,10 +3,12 @@
 // "Mat › Livsmedel". Kategorin kan bytas och transaktionen delas upp direkt i listan. Från budgeten kan
 // listan öppnas filtrerad på en kategori med underkategorier (?period=…&kategori=…, KK-20).
 import { formatDateShort, formatSek } from "@kronkoll/domain";
+import { Pencil, Search, Split } from "lucide-react";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { CategoryDot } from "../category-color.tsx";
+import { IconButton, PeriodNav } from "../icon-button.tsx";
 import { useToast } from "../toast.tsx";
 import { CategoryEditor, type CategoryOption } from "./CategoryEditor.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
@@ -201,12 +203,8 @@ function Row(props: {
       )}
       {props.mode === null && (
         <div className="tx-actions">
-          <button type="button" className="small" aria-label={`Ändra kategori för ${name}`} onClick={() => { props.onOpen("category"); }}>
-            Ändra
-          </button>
-          <button type="button" className="small" aria-label={`Dela upp ${name}`} onClick={() => { props.onOpen("split"); }}>
-            Dela upp
-          </button>
+          <IconButton label={`Ändra kategori för ${name}`} icon={Pencil} onClick={() => { props.onOpen("category"); }} />
+          <IconButton label={`Dela upp ${name}`} icon={Split} onClick={() => { props.onOpen("split"); }} />
         </div>
       )}
       {props.mode === "split" && (
@@ -305,18 +303,10 @@ export function TransactionsView() {
           </button>
         </p>
       )}
-      <p>
-        <button type="button" disabled={!period} onClick={() => { go(-1); }}>
-          Föregående period
-        </button>{" "}
-        <button type="button" disabled={!period} onClick={() => { go(1); }}>
-          Nästa period
-        </button>
-      </p>
-      {period && <p>Period {formatDateShort(period.start)} – {formatDateShort(period.end)}</p>}
+      <PeriodNav period={period} onGo={go} />
       <form role="search" onSubmit={onSearch}>
         <input type="search" aria-label="Sök" placeholder="Sök motpart eller beskrivning" value={search} onChange={(e) => { setSearch(e.target.value); }} />{" "}
-        <button type="submit">Sök</button>
+        <IconButton type="submit" label="Sök" icon={Search} />
       </form>
       <label>
         <input

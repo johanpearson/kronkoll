@@ -5,6 +5,7 @@
 import { RefreshCw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { field, getJson, postJson } from "../api.ts";
+import { IconButton } from "../icon-button.tsx";
 import { useToast } from "../toast.tsx";
 
 /** Hur ofta knappen frågar om synken är klar. */
@@ -60,10 +61,5 @@ export function SyncButton(props: { onDone: () => void }) {
     setRunning(false);
   };
 
-  return (
-    <button type="button" className="sync-button" disabled={running} aria-busy={running} onClick={() => void start()}>
-      <RefreshCw aria-hidden="true" size={18} strokeWidth={2} className={running ? "spin" : undefined} />
-      {running ? "Synkar…" : "Synka nu"}
-    </button>
-  );
+  return <IconButton label={running ? "Synkar…" : "Synka nu"} icon={RefreshCw} disabled={running} busy={running} spin={running} onClick={() => void start()} />;
 }
