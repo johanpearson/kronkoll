@@ -29,6 +29,9 @@ function transaction(id: string, date: string, amountMinor: number, counterparty
   };
 }
 
+/** Bankens inloggning i testerna. connect.spec.ts fångar adressen och skickar tillbaka till appen. */
+export const FAKE_BANK = "https://bank.example.test";
+
 const OVERVIEW = {
   period: NOVEMBER,
   balance_minor: 4831240,
@@ -41,7 +44,7 @@ const OVERVIEW = {
   days_left: 16,
   over: false,
   last_sync_at: "2026-11-15T05:02:11.000Z",
-  connections: [{ bank: "Exempelbanken", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
+  connections: [{ id: "c1", bank: "Exempelbanken", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
   // Ett konto utan saldo, så att axe och Lighthouse även granskar "Saldo saknas" (KK-38-B).
   accounts: [
     { id: "acc_1", name: "Vardag", bank: "Exempelbanken", balance_minor: 1852790 },
@@ -93,7 +96,10 @@ function scaleAmounts(value: unknown, scale: number): unknown {
 }
 
 /** Svarar på alla /api/*-anrop från sidan, eller från alla flikar i en webbläsare, med påhittad data. */
-export async function useFakeApi(page: Page | BrowserContext, options: { scale?: number } = {}): Promise<FakeApi> {
+export async function useFakeApi(
+  page: Page | BrowserContext,
+  options: { scale?: number; connected?: boolean; consentDaysLeft?: number } = {},
+): Promise<FakeApi> {
   const transactions = [
     transaction("t1", "2026-11-12", -41250, "Hörnbutiken Exempelvägen"),
     transaction("t2", "2026-11-05", -18900, "Hörnbutiken Exempelvägen"),
@@ -101,6 +107,12 @@ export async function useFakeApi(page: Page | BrowserContext, options: { scale?:
   ];
   const budgets = new Map<string, { category_id: string; budget_minor: number }[]>();
   const state: FakeApi = { rules: [], budgetPuts: [] };
+  // Utan bank visar översikten välkomstsidan. Kopplingen görs klar med koden som banken skickar tillbaka.
+  let connected = options.connected ?? true;
+  const overview = () =>
+    connected
+      ? { ...OVERVIEW, connections: OVERVIEW.connections.map((c) => ({ ...c, consent_days_left: options.consentDaysLeft ?? c.consent_days_left })) }
+      : { ...OVERVIEW, connections: [], accounts: [], last_sync_at: null };
 
   const budget = (key: string) => {
     const lines = budgets.get(key) ?? [];
@@ -129,9 +141,15 @@ export async function useFakeApi(page: Page | BrowserContext, options: { scale?:
   };
 
   const handle = (method: string, path: string, body: Record<string, unknown>): [number, unknown] => {
-    if (path === "/api/overview") return [200, OVERVIEW];
+    if (path === "/api/overview") return [200, overview()];
     if (path === "/api/categories") return [200, { items: CATEGORIES }];
     if (path === "/api/rules") return [200, { items: state.rules }];
+    if (path === "/api/connections" && method === "POST") return [200, { redirect_url: `${FAKE_BANK}/auth?state=s-1` }];
+    if (path === "/api/connections/callback" && method === "POST") {
+      if (body["code"] !== "c-1" || body["state"] !== "s-1") return [400, { error: "invalid_state" }];
+      connected = true;
+      return [201, { connection_id: "c1", accounts: 3, initial_sync: "started", renewed: false }];
+    }
     if (path === "/api/connections") return [200, { items: [CONNECTION] }];
     if (path === "/api/accounts") return [200, { items: ACCOUNTS }];
     if (path === "/api/settings") return [200, { budget_period_start_day: 1, current_period: NOVEMBER }];

@@ -134,7 +134,9 @@ pnpm --filter @kronkoll/<paket> test:coverage
   `packages/domain/src/provider-contract.ts`, och en ny leverantör kör `runProviderContract` i sina tester
   (KK-14-B). Rester i koden: `provider = 'csv'` i databasens CHECK och i synken som hoppar över sådana
   kopplingar. De är ofarliga och kan tas bort i en egen PR med migrering.
-- Kvar i M1: E2E för att koppla bank (V-e2e-connect, KK-15-B).
+- E2E för att koppla bank finns i `apps/web/e2e/connect.spec.ts` med påhittat API. Bankens sida ersätts av
+  en 302 tillbaka till `/koppla/klar?code=c-1&state=s-1` (`FAKE_BANK` i fake-api.ts). Kvar för KK-15-B är
+  E2E för sparmål, som byggs i M2.
 - KK-39 Räknas inte bygger på `manual_transfer` från #120 (ägarens beslut 2026-11-04). Regler med
   `action = 'exclude'` är steg 4 i `classifyTransfers`, så de gäller hela historiken och omräkningen
   (`recomputeTransfers`) måste köras när en sådan regel sparas, ändras eller tas bort.
