@@ -6,10 +6,12 @@
 // historiken efter en fråga, och Synka nu hämtar nytt från banken och kategoriserar.
 // En regel kan också ha åtgärden Räkna inte (KK-39-C): den gäller hela historiken direkt, så vyn visar
 // först hur många den träffar och sparar när användaren bekräftar. Egna val ändras aldrig.
+import { Pencil, X } from "lucide-react";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { deleteJson, field, getJson, patchJson, postJson, type ApiResult } from "../api.ts";
 import { Link } from "../router.tsx";
 import { SyncButton } from "../sync/SyncButton.tsx";
+import { IconButton } from "../icon-button.tsx";
 import { useToast } from "../toast.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "../transactions/TransactionsView.tsx";
 import { RuleMatches } from "./RuleMatches.tsx";
@@ -303,9 +305,7 @@ export function RulesView() {
                 <div className="tx-main">
                   <span className="tx-name">{r.pattern}</span>
                   {open === null && (
-                    <button type="button" className="small" aria-label={`Ändra regeln ${r.pattern}`} onClick={() => { setMode({ kind: "menu", id: r.id }); }}>
-                      Ändra
-                    </button>
+                    <IconButton label={`Ändra regeln ${r.pattern}`} icon={Pencil} onClick={() => { setMode({ kind: "menu", id: r.id }); }} />
                   )}
                 </div>
                 <small className="tx-notes">
@@ -325,18 +325,14 @@ export function RulesView() {
                     <button type="button" className="small" onClick={() => { setMode({ kind: "delete", id: r.id }); }}>
                       Ta bort
                     </button>
-                    <button type="button" className="small" onClick={() => { setMode(null); }}>
-                      Stäng
-                    </button>
+                    <IconButton label="Stäng" icon={X} onClick={() => { setMode(null); }} />
                   </div>
                 )}
                 {open === "matches" && (
                   <div className="tx-editor">
                     <RuleMatches ruleId={r.id} />
                     <p>
-                      <button type="button" className="small" onClick={() => { setMode(null); }}>
-                        Stäng
-                      </button>
+                      <IconButton label="Stäng" icon={X} onClick={() => { setMode(null); }} />
                     </p>
                   </div>
                 )}

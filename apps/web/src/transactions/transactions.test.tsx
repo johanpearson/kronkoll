@@ -95,7 +95,7 @@ describe("Transaktioner (#32, KK-4, KK-9, KK-30)", () => {
     expect(within(days[0] as HTMLElement).getByRole("heading").textContent).toBe(formatDateShort("2026-11-03"));
     expect(screen.getByText("ARBETSGIVAREN AB").closest("li")?.textContent).toContain(formatSek(2500000));
     expect(screen.getByText("ICA Nära Sofo").closest("li")?.textContent).toContain(formatSek(-41250));
-    expect(screen.getByText(`Period ${formatDateShort("2026-11-01")} – ${formatDateShort("2026-11-30")}`)).toBeDefined();
+    expect(screen.getByText(`${formatDateShort("2026-11-01")} – ${formatDateShort("2026-11-30")}`)).toBeDefined();
   });
 
   it("märker preliminära, interna överföringar, uppdelade och okategoriserade", async () => {

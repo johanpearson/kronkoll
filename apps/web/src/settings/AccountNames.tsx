@@ -1,7 +1,9 @@
 // Egna namn på konton (#34, KK-37). Varje konto visar sitt namn och, under, bankens maskerade namn och
 // banken, så att det går att känna igen. Namnet är användarens text och renderas som text (KK-37-C).
+import { Pencil } from "lucide-react";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { field, getJson, patchJson } from "../api.ts";
+import { IconButton } from "../icon-button.tsx";
 
 /** Samma gräns som API:t. */
 const MAX_LENGTH = 40;
@@ -106,11 +108,7 @@ export function AccountNames() {
         <li key={a.id} className="tx">
           <div className="tx-main">
             <span className="tx-name">{a.name}</span>
-            {editing !== a.id && (
-              <button type="button" className="small" aria-label={`Byt namn på ${a.name}`} onClick={() => { setEditing(a.id); }}>
-                Byt namn
-              </button>
-            )}
+            {editing !== a.id && <IconButton label={`Byt namn på ${a.name}`} icon={Pencil} onClick={() => { setEditing(a.id); }} />}
           </div>
           {notes !== "" && <small className="tx-notes">{notes}</small>}
           {editing === a.id && <NameForm account={a} onSaved={(nickname) => { saved(a.id, nickname); }} onClose={() => { setEditing(null); }} />}
