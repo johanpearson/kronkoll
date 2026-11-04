@@ -1,4 +1,4 @@
-import { ProviderError } from "@kronkoll/domain";
+import { ProviderError, runProviderContract } from "@kronkoll/domain";
 import { describe, expect, it } from "vitest";
 import { createEnableBankingProvider } from "./provider.ts";
 
@@ -197,5 +197,27 @@ describe("fel utan svarstext (KK-13)", () => {
     await expect(html.balance("a")).rejects.toEqual(new ProviderError("BAD_RESPONSE"));
     const list = createEnableBankingProvider({ signer: { sign: () => Promise.resolve("x") }, fetch: () => Promise.resolve(new Response("[]")) });
     await expect(list.balance("a")).rejects.toEqual(new ProviderError("BAD_RESPONSE"));
+  });
+});
+
+describe("kontraktssviten (KK-14-B, V-c-provider)", () => {
+  it("adaptern klarar den gemensamma sviten med svar i Enable Bankings format", async () => {
+    const { provider } = fakeApi({
+      "/sessions/s1": { accounts: ["acc-1", "card-1"] },
+      "/accounts/acc-1/details": { name: "Privatkonto", cash_account_type: "CACC" },
+      "/accounts/card-1/details": { product: "Visa", cash_account_type: "CARD" },
+      "/accounts/acc-1/balances": { balances: [{ balance_type: "CLBD", balance_amount: { currency: "SEK", amount: "10.00" } }] },
+      "/accounts/card-1/balances": { balances: [] },
+      "/accounts/acc-1/transactions": { transactions: [tx({}), tx({ entry_reference: "ref-2", status: "PDNG", booking_date: null })], continuation_key: "sida2" },
+      "/accounts/acc-1/transactions?sida2": { transactions: [tx({ entry_reference: "ref-3", transaction_date: "2026-08-01" })] },
+      "/accounts/card-1/transactions": { transactions: [tx({ status: "INFO" })] },
+    });
+    expect(await runProviderContract(provider, "s1")).toEqual({
+      accounts: [
+        { type: "checking", hasBalance: true, pages: 2, booked: 2, pending: 1, oldest: "2026-08-01" },
+        { type: "credit_card", hasBalance: false, pages: 1, booked: 0, pending: 0, oldest: null },
+      ],
+      failures: [],
+    });
   });
 });

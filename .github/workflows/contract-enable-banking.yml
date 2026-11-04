@@ -12,6 +12,7 @@ on:
     paths:
       - packages/adapter-enablebanking/src/**
       - packages/domain/src/bank.ts
+      - packages/domain/src/provider-contract.ts
       - scripts/contract-enable-banking.ts
   workflow_dispatch:
 

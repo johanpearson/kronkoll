@@ -124,6 +124,12 @@ export {
   type SyncRunLog,
 } from "./sync-connection.ts";
 export {
+  runProviderContract,
+  type ContractAccountReport,
+  type ContractOptions,
+  type ContractReport,
+} from "./provider-contract.ts";
+export {
   DEFAULT_MAX_PAGES,
   FIRST_SYNC_DAYS,
   syncAccount,

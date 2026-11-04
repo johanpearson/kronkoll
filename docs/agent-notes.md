@@ -125,7 +125,9 @@ pnpm --filter @kronkoll/<paket> test:coverage
   nytt konto. Matcha på namn och typ inom kopplingen om det händer.
 - "Bara okategoriserade" i Transaktioner visar även okategoriserade insättningar, medan budgetens belopp bara
   räknar utbetalningar (#153).
-- Kvar i M1: #29 (CSV-import, kanske stryks) och #24 (avsluta spiken).
+- Kvar i M1: #29 (CSV-import, kanske stryks; ägaren beslutar senare). Kontraktssviten för porten finns i
+  `packages/domain/src/provider-contract.ts`. En ny adapter (CSV eller annan bank) kör `runProviderContract`
+  i sina tester. KK-14-B är bara delvis uppfyllt tills en andra adapter klarar den.
 - KK-39 Räknas inte bygger på `manual_transfer` från #120 (ägarens beslut 2026-11-04). Regler med
   `action = 'exclude'` är steg 4 i `classifyTransfers`, så de gäller hela historiken och omräkningen
   (`recomputeTransfers`) måste köras när en sådan regel sparas, ändras eller tas bort.
