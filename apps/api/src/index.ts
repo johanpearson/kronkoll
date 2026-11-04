@@ -12,6 +12,7 @@ import { createCategory, listCategories, mergeCategory, patchCategory } from "./
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
 import { addContribution, createGoal, getGoal, listGoals } from "./goals.ts";
+import { createLeavePeriod, deleteLeavePeriod, listLeavePeriods } from "./leave.ts";
 import { getOverview } from "./overview.ts";
 import { getSettings, patchSettings } from "./settings.ts";
 import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule } from "./rules.ts";
@@ -178,6 +179,16 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/goals") {
     if (request.method === "GET") return listGoals(env, context.sync);
     if (request.method === "POST") return createGoal(request, env, context.sync);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
+  }
+  const leaveMatch = /^\/api\/leave-periods\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (leaveMatch?.[1]) {
+    if (request.method !== "DELETE") return json({ error: "method_not_allowed" }, 405, { allow: "DELETE" });
+    return deleteLeavePeriod(env, leaveMatch[1]);
+  }
+  if (pathname === "/api/leave-periods") {
+    if (request.method === "GET") return listLeavePeriods(env, context.sync);
+    if (request.method === "POST") return createLeavePeriod(request, env, context.sync);
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
   }
 
