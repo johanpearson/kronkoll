@@ -93,6 +93,13 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Normaliseringen tar bort ort efter sista kommatecknet, ordernummer efter `*`, ord med siffror på flera
   ställen (koder) och delar av butiksnummer som sitter ihop med namnet. Se `packages/domain/src/normalize.ts`.
 - Alla fyra konton har typen `checking`; två av dem hör till kort. Samtycket går ut 2027-05-01.
+- Skandia skickar preliminära (PDNG) och sätter `booking_date` även på dem. Status är det enda som skiljer.
+- Enable Banking har `strategy=longest` på `GET /accounts/{id}/transactions` för längsta möjliga historik
+  (KK-5-C). Första synken ber i dag bara om 90 dagar (`FIRST_SYNC_DAYS`).
+- En hel synk tar runt 100 ms CPU (mätt med `wrangler tail kronkoll-api --format json`, fältet `cpuTime`),
+  långt över 10 ms. Cloudflare har inte stoppat den hittills (R-3).
+- Vill ägaren veta vilket konto-id som är vilket konto kör ägaren `SELECT id, COALESCE(nickname, display_name)
+  FROM accounts` själv och svarar bara med id.
 - Använd aldrig riktig bankdata i tester, loggar eller PR-texter (KK-13). Testtexter ska vara påhittade men
   i samma format.
 

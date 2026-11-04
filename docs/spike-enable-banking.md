@@ -22,16 +22,22 @@ eget konto och Restricted Production är gratis för privat bruk. CSV-import beh
 Detta verifierar antagande A-1 och Skandia-delen av A-2, och besvarar de öppna frågorna `Q-skandia`
 och `Q-eb-terms` i planen (#62).
 
-## Frågor som flyttas vidare
+## Svar från produktion (#24)
 
-Följande går bara att besvara när koden hämtar transaktioner från produktions-API:t. Det ska
-göras från Workern, så att produktionsnyckeln aldrig lämnar Cloudflare (D-secrets).
+Tre frågor gick bara att besvara när Workern hämtade riktiga transaktioner. Kopplingen gjordes
+2026-11-02 och svaren togs fram 2026-11-04. Johan körde frågor mot produktionsdatabasen och
+`wrangler tail` i sin egen miljö. Frågorna gav bara status, antal, datum och CPU-tid, aldrig banktext.
+
+| Fråga | Svar | Hur det kontrollerades |
+|---|---|---|
+| Levereras preliminära (PDNG) transaktioner för konto och kort? | **Ja.** Ett av de två konton som korten är kopplade till hade tre preliminära transaktioner. Det andra hade inga just då, vilket inte säger att de saknas. Skandia skickar `booking_date` även på preliminära, så den kan inte användas för att skilja dem från bokförda. | `transactions` grupperat per konto och status |
+| Hur långt bakåt går historiken vid första kopplingen? | **Minst 90 dagar, men det är så långt vi ber om.** Första synken frågar efter 90 dagar (`FIRST_SYNC_DAYS`), och de aktiva kontona har transaktioner ända från första dagen i fönstret. Hur mycket mer Skandia ger är inte prövat. Enable Banking kan hämta längsta möjliga period med `strategy=longest`, vilket KK-5-C kräver. | Äldsta `transaction_date` per konto jämfört med första körningen i `sync_runs` |
+| CPU-tid i Workern (risk R-3, gränsen 10 ms) | **En hel synk tar runt 100 ms CPU**, alltså långt över 10 ms. En manuell synk av fyra konton tog 108 ms CPU och 11 s väggtid och slutade ändå med `outcome: ok`. Vanliga API-anrop tar 0–7 ms. Första synken (500 transaktioner) gick klart, och ingen körning i `sync_runs` har blivit hängande. CPU-tid per sida går inte att mäta separat, eftersom hela synken körs i ett anrop. Risken R-3 är alltså inte borta: Cloudflare har inte stoppat anropen hittills, men gränsen är överskriden. | `wrangler tail kronkoll-api --format json` under "Synka nu", och `sync_runs` |
+
+## Frågor som flyttas vidare
 
 | Fråga | Besvaras i |
 |---|---|
-| Levereras preliminära (PDNG) transaktioner för konto och kort? | #24 (Enable Banking-adaptern) |
-| Hur långt bakåt går historiken vid första kopplingen? | #24 |
-| CPU-tid i Workern för att importera en sida transaktioner (risk R-3, gränsen 10 ms) | #24 |
 | Hur syns Försäkringskassan och lön som motpart (antagande A-6)? | #37 (inkomstklassning) |
 
 ## Så körs spiken igen
