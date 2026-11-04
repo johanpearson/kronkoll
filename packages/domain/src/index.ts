@@ -81,6 +81,7 @@ export {
   type LeavePeriod,
   type MonthComparison,
 } from "./income-forecast.ts";
+export { leaveImpact, type GoalImpact, type ImpactGoal, type LeaveImpact, type LeaveImpactInput, type MonthImpact } from "./leave-impact.ts";
 export {
   CATEGORY_TEMPLATE,
   TEMPLATE_RULES,

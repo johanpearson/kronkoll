@@ -123,6 +123,8 @@ pnpm --filter @kronkoll/<paket> test:coverage
   tappade sina `\d`. Använd redigeringsverktyget för kod med backslash, och läs tillbaka raden efteråt.
 - Windows PowerShell 5: `Get-Content`/`Set-Content` utan `-Encoding` förstör å, ä och ö i UTF-8-filer, och
   `-Encoding utf8` lägger till BOM. Använd redigeringsverktyget.
+- PR-text till `gh pr create --body-file`: skriv filen utan BOM, t.ex. `[IO.File]::WriteAllText($p, $text,
+  (New-Object Text.UTF8Encoding $false))`. Med BOM känner `pr-description` inte igen första rubriken.
 
 ## Öppna trådar
 
