@@ -1,8 +1,9 @@
-// Appens skal (#30): sidorna och huvudmenyn. Menyn har de vyer som finns; Sparmål och Inkomst
-// läggs till när de byggs. Service workern (sw/) ger offline-skal och senaste översikten i högst 24 h.
-import { House, PiggyBank, ReceiptText, Settings } from "lucide-react";
+// Appens skal (#30): sidorna och huvudmenyn. Menyn har de vyer som finns; Inkomst läggs till när den
+// byggs. Service workern (sw/) ger offline-skal och senaste översikten i högst 24 h.
+import { Goal, House, PiggyBank, ReceiptText, Settings } from "lucide-react";
 import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
+import { GoalsView } from "./goals/GoalsView.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
 import { Link, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
@@ -28,6 +29,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/": OverviewView,
   "/transaktioner": TransactionsView,
   "/budget": BudgetView,
+  "/sparmal": GoalsView,
   "/installningar": SettingsView,
   "/installningar/kategorier": CategoriesView,
   "/installningar/regler": RulesView,
@@ -41,6 +43,7 @@ const TABS = [
   { to: "/", label: "Översikt", Icon: House, owns: (path: string) => path === "/" },
   { to: "/transaktioner", label: "Transaktioner", Icon: ReceiptText, owns: (path: string) => path === "/transaktioner" || path.startsWith("/transaktioner/") },
   { to: "/budget", label: "Budget", Icon: PiggyBank, owns: (path: string) => path === "/budget" },
+  { to: "/sparmal", label: "Sparmål", Icon: Goal, owns: (path: string) => path === "/sparmal" || path.startsWith("/sparmal/") },
   { to: "/installningar", label: "Inställningar", Icon: Settings, owns: (path: string) => path === "/installningar" || path.startsWith("/installningar/") || path.startsWith("/koppla") },
 ];
 

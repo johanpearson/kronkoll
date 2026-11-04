@@ -25,7 +25,7 @@ describe("navigering (#30, KK-25)", () => {
   it("visar huvudmenyn på varje sida och markerar sidan man är på", () => {
     at("/transaktioner");
     const links = within(nav()).getAllByRole("link");
-    expect(links.map((l) => l.textContent)).toEqual(["Översikt", "Transaktioner", "Budget", "Inställningar"]);
+    expect(links.map((l) => l.textContent)).toEqual(["Översikt", "Transaktioner", "Budget", "Sparmål", "Inställningar"]);
     expect(within(nav()).getByRole("link", { name: "Transaktioner" }).getAttribute("aria-current")).toBe("page");
     expect(within(nav()).getByRole("link", { name: "Översikt" }).getAttribute("aria-current")).toBeNull();
   });

@@ -157,6 +157,13 @@ main form[role="search"] input {
   flex: none;
 }
 
+/* Fem flikar på en smal mobil: "Transaktioner" ska få plats, i samma storlek som i iPhones egna flikrader (10 pt). */
+@media (max-width: 380px) {
+  .tabbar a {
+    font-size: 0.625rem;
+  }
+}
+
 /* Detaljsidan: stort belopp, fakta som etikett och värde, och åtgärder på en rad. */
 .amount.big {
   margin: calc(-1 * var(--space-3)) 0 var(--space-5);
