@@ -71,7 +71,7 @@ async function call(method: string, path = "/api/rules", body?: unknown, env: Pa
   return handle(new Request(`${ORIGIN}${path}`, init), configuredEnv({ DB: db, ...env }), guardDeps, context);
 }
 
-type Item = { id: string; pattern: string; category_id: string; source: string; hits: number; category_archived: boolean };
+type Item = { id: string; pattern: string; category_id: string | null; source: string; action: string; hits: number; category_archived: boolean };
 const items = async () => (await (await call("GET")).json<{ items: Item[] }>()).items;
 const broken = { prepare: () => { throw new Error("D1 nere"); } } as unknown as D1Database;
 
@@ -79,7 +79,7 @@ describe("GET /api/rules (KK-18)", () => {
   it("listar reglerna sorterade på mönster, med träffar och om kategorin är arkiverad", async () => {
     await db.prepare(`UPDATE categories SET archived = 1 WHERE id = 'abonnemang-streaming'`).run();
     const all = await items();
-    expect(all.find((r) => r.id === "mall-ica")).toEqual({ id: "mall-ica", match: "counterparty_prefix", pattern: "ICA", category_id: "mat-livsmedel", source: "template", hits: 1, category_archived: false });
+    expect(all.find((r) => r.id === "mall-ica")).toEqual({ id: "mall-ica", match: "counterparty_prefix", pattern: "ICA", category_id: "mat-livsmedel", source: "template", action: "categorize", hits: 1, category_archived: false });
     expect(all.find((r) => r.id === "mall-spotify")).toMatchObject({ hits: 0, category_archived: true });
     expect(all.map((r) => r.pattern)).toEqual([...all.map((r) => r.pattern)].sort((a, b) => a.localeCompare(b, "sv")));
   });
@@ -98,7 +98,7 @@ describe("POST /api/rules (KK-18-B)", () => {
     expect(res.status).toBe(201);
     // k1 och k2 får kategorin om den appliceras; k3 är manuellt vald och ändras aldrig.
     expect(await res.json()).toEqual({
-      rule: { id: "r-1", match: "counterparty_prefix", pattern: "IKEA", category_id: "hushall-forbrukning", source: "learned" },
+      rule: { id: "r-1", match: "counterparty_prefix", pattern: "IKEA", category_id: "hushall-forbrukning", source: "learned", action: "categorize" },
       retroactive_candidates: 2,
       protected_manual: 1,
     });
@@ -161,6 +161,63 @@ describe("PATCH och DELETE /api/rules/{id} (KK-18)", () => {
     const res = await call("GET", "/api/rules/mall-ica");
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toBe("PATCH, DELETE");
+  });
+});
+
+describe("regler med åtgärden Räkna inte (KK-39-C)", () => {
+  /** Vilka transaktioner som inte räknas just nu. */
+  const notCounted = async () => (await db.prepare(`SELECT id FROM transactions WHERE is_internal_transfer = 1 ORDER BY id`).all<{ id: string }>()).results.map((r) => r.id);
+  const create = async (body: Record<string, unknown>) => call("POST", undefined, { action: "exclude", ...body });
+
+  it("förhandsvisar hur många den träffar utan att spara något", async () => {
+    const res = await create({ pattern: "ikea", preview: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ matches: 3 });
+    expect((await items()).some((r) => r.pattern === "IKEA")).toBe(false);
+    expect(await notCounted()).toEqual([]);
+  });
+
+  it("sparar regeln och slutar räkna alla träffar direkt, gamla som nya, men inte ett eget val", async () => {
+    await db.prepare(`UPDATE transactions SET manual_transfer = 0 WHERE id = 'k3'`).run();
+    const res = await create({ pattern: " ikea " });
+    expect(res.status).toBe(201);
+    const created = await res.json<{ rule: { id: string } }>();
+    expect(created).toEqual({ rule: { id: created.rule.id, match: "counterparty_prefix", pattern: "IKEA", category_id: null, source: "learned", action: "exclude" }, matches: 3 });
+    expect(await notCounted()).toEqual(["k1", "k2"]);
+    expect((await items()).find((r) => r.id === created.rule.id)).toEqual({ ...created.rule, hits: 3, category_archived: false });
+    // Samma mönster igen ger samma regel, inte en till.
+    const again = await create({ pattern: "IKEA" });
+    expect(again.status).toBe(200);
+    expect((await items()).filter((r) => r.pattern === "IKEA")).toHaveLength(1);
+  });
+
+  it("ett ändrat mönster räknas om direkt, och en borttagen regel gör att träffarna räknas igen", async () => {
+    const { rule } = await (await create({ pattern: "IKEA" })).json<{ rule: { id: string } }>();
+    const patched = await call("PATCH", `/api/rules/${rule.id}`, { pattern: "ikea kungens" });
+    expect(patched.status).toBe(200);
+    expect(await patched.json()).toMatchObject({ rule: { pattern: "IKEA KUNGENS", action: "exclude" }, matches: 1 });
+    expect(await notCounted()).toEqual(["k2"]);
+    expect((await call("PATCH", `/api/rules/${rule.id}`, { category_id: "mat" })).status).toBe(400);
+    expect((await call("DELETE", `/api/rules/${rule.id}`)).status).toBe(204);
+    expect(await notCounted()).toEqual([]);
+  });
+
+  it.each([
+    ["en okänd åtgärd", { pattern: "IKEA", action: "dölj" }],
+    ["en kategori på en Räkna inte-regel", { pattern: "IKEA", category_id: "mat" }],
+    ["preview som inte är sant eller falskt", { pattern: "IKEA", preview: "ja" }],
+    ["ett tomt mönster", { pattern: " 123 " }],
+  ])("%s ger 400 och sparar ingenting", async (_, body) => {
+    const res = await call("POST", undefined, { action: "exclude", ...body });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "invalid_request" });
+    expect((await items()).some((r) => r.pattern === "IKEA")).toBe(false);
+  });
+
+  it("svarar 503 utan detaljer när databasen inte går att nå", async () => {
+    const res = await call("POST", undefined, { action: "exclude", pattern: "X" }, { DB: broken });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "unavailable" });
   });
 });
 

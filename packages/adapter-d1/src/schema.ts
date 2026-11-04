@@ -202,6 +202,8 @@ export const transactionSplits = sqliteTable(
 );
 
 const RULE_MATCH = ["counterparty_prefix", "counterparty_exact", "description_contains", "amount_range"] as const;
+/** Vad en regel gör med sina träffar: sätter kategori, eller Räkna inte (KK-39-C). */
+const RULE_ACTION = ["categorize", "exclude"] as const;
 
 export const categoryRules = sqliteTable(
   "category_rules",
@@ -214,11 +216,14 @@ export const categoryRules = sqliteTable(
     source: text("source", { enum: ["template", "learned"] }).notNull(),
     priority: integer("priority").notNull().default(0),
     hits: integer("hits").notNull().default(0),
+    action: text("action", { enum: RULE_ACTION }).notNull().default("categorize"),
   },
   () => [
     check("category_rules_match", oneOf("match", RULE_MATCH)),
     check("category_rules_source", oneOf("source", ["template", "learned"])),
-    check("category_rules_target", sql`category_id IS NOT NULL OR income_type IS NOT NULL`),
+    check("category_rules_action", oneOf("action", RULE_ACTION)),
+    // En regel sätter kategori eller inkomsttyp, eller är en Räkna inte-regel utan kategori.
+    check("category_rules_target", sql`(action = 'categorize' AND (category_id IS NOT NULL OR income_type IS NOT NULL)) OR (action = 'exclude' AND category_id IS NULL)`),
   ],
 );
 

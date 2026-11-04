@@ -4,8 +4,8 @@
  * bara sätter inkomsttyp, KK-22) hoppas över här, så att de aldrig ger fel kategori.
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import type { CategoryRule } from "@kronkoll/domain";
-import { eq } from "drizzle-orm";
+import type { CategoryRule, ExcludeRule } from "@kronkoll/domain";
+import { and, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { categoryRules } from "./schema.ts";
 
@@ -15,7 +15,7 @@ export function ruleRepository(d1: D1Database) {
   const db = drizzle(d1);
   return {
     async list(): Promise<CategoryRule[]> {
-      const rows = await db.select().from(categoryRules).all();
+      const rows = await db.select().from(categoryRules).where(eq(categoryRules.action, "categorize")).all();
       return rows.flatMap((row): CategoryRule[] =>
         row.categoryId !== null && SUPPORTED_MATCH.has(row.match)
           ? [{ id: row.id, match: row.match as CategoryRule["match"], pattern: row.pattern, categoryId: row.categoryId, source: row.source }]
@@ -40,6 +40,30 @@ export function ruleRepository(d1: D1Database) {
     /** Tar bort en regel. Transaktioner den har kategoriserat behåller sin kategori. Falskt om den inte finns. */
     async remove(id: string): Promise<boolean> {
       return (await db.delete(categoryRules).where(eq(categoryRules.id, id)).returning({ id: categoryRules.id }).all()).length > 0;
+    },
+
+    /** Regler med åtgärden Räkna inte (KK-39-C), i domänens form. */
+    async excludeRules(): Promise<ExcludeRule[]> {
+      const rows = await db
+        .select({ id: categoryRules.id, match: categoryRules.match, pattern: categoryRules.pattern })
+        .from(categoryRules)
+        .where(eq(categoryRules.action, "exclude"))
+        .all();
+      return rows.flatMap((row): ExcludeRule[] => (SUPPORTED_MATCH.has(row.match) ? [{ ...row, match: row.match as ExcludeRule["match"] }] : []));
+    },
+    /** Sparar en Räkna inte-regel. Den har ingen kategori. */
+    async saveExclude(rule: ExcludeRule): Promise<void> {
+      await db.insert(categoryRules).values({ id: rule.id, match: rule.match, pattern: rule.pattern, categoryId: null, source: "learned", action: "exclude" });
+    },
+    /** Byter mönster på en Räkna inte-regel. Falskt om den inte finns eller är en kategoriregel. */
+    async updateExclude(rule: Pick<ExcludeRule, "id" | "pattern">): Promise<boolean> {
+      const updated = await db
+        .update(categoryRules)
+        .set({ pattern: rule.pattern })
+        .where(and(eq(categoryRules.id, rule.id), eq(categoryRules.action, "exclude")))
+        .returning({ id: categoryRules.id })
+        .all();
+      return updated.length > 0;
     },
   };
 }
