@@ -523,6 +523,10 @@
         {
           "id": "KK-26-B",
           "text": "Animationer är korta (≤ 250 ms) och stängs av vid prefers-reduced-motion."
+        },
+        {
+          "id": "KK-26-C",
+          "text": "Bekräftelser (t.ex. efter synk, sparad regel eller ändrad kategori) visas som en kort notis ovanför menyn som försvinner av sig själv efter cirka 4 sekunder. Fel ligger kvar tills användaren stänger dem eller försöker igen."
         }
       ]
     },

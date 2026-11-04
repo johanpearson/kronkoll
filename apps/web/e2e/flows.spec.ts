@@ -73,6 +73,8 @@ test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {
   await dialog.getByRole("button", { name: "Ta bort budget" }).click();
   await expect(page.getByRole("status")).toHaveText("Budgeten för perioden är borttagen.");
   await expect(page.getByRole("button", { name: "Sätt budget" })).toBeVisible();
+  // Bekräftelsen är en notis som försvinner av sig själv (KK-26-C).
+  await expect(page.getByRole("status")).toBeHidden({ timeout: 6000 });
   await page.reload();
   await expect(page.getByText("Ingen budget är satt för perioden än.")).toBeVisible();
 });

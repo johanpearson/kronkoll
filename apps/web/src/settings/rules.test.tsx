@@ -171,12 +171,12 @@ describe("regler i Inställningar (#34, KK-18-B, KK-18-C)", () => {
     await open();
     await fillNewRule("ikea", "hushall");
     await click("Applicera på dem");
-    expect(screen.getByRole("status").textContent).toBe("Det gick inte att applicera regeln. Försök igen.");
+    expect(screen.getByRole("alert").textContent).toBe("Det gick inte att applicera regeln. Försök igen.");
     await click("Ändra regeln IKEA");
     await click("Ta bort");
     fireEvent.click(within(rows()[1] as HTMLElement).getAllByRole("button", { name: "Ta bort" })[0] as HTMLElement);
     await settle();
-    expect(screen.getByRole("status").textContent).toBe("Det gick inte att ta bort regeln. Försök igen.");
+    expect(screen.getByRole("alert").textContent).toBe("Det gick inte att ta bort regeln. Försök igen.");
     cleanup();
     api({ rules: [503, {}] });
     await open();

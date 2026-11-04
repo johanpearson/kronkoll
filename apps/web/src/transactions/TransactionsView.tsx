@@ -6,6 +6,7 @@ import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
+import { useToast } from "../toast.tsx";
 import { CategoryEditor, type CategoryOption } from "./CategoryEditor.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
 
@@ -231,7 +232,7 @@ export function TransactionsView() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
   const [categories, setCategories] = useState<Categories>(NO_CATEGORIES);
   const [editing, setEditing] = useState<{ id: string; mode: "category" | "split" } | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     let current = true;
@@ -268,7 +269,7 @@ export function TransactionsView() {
   };
   // Hämtar om samma period, så att transaktioner som regeln ändrade visar sin nya kategori.
   const applied = (updated: number) => {
-    setNotice(`${String(updated)} transaktioner fick den nya kategorin.`);
+    toast.done(`${String(updated)} transaktioner fick den nya kategorin.`);
     setEditing(null);
     setFilters({ ...filters, period: period?.key ?? filters.period });
   };
@@ -320,7 +321,6 @@ export function TransactionsView() {
         Bara okategoriserade
       </label>
 
-      {notice && <p role="status">{notice}</p>}
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta transaktionerna. Försök igen om en stund.</p>}
       {state.kind === "ready" && state.items.length === 0 && <p>Inga transaktioner i perioden.</p>}
