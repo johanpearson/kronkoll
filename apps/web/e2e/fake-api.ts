@@ -83,8 +83,17 @@ export interface FakeApi {
   readonly budgetPuts: unknown[];
 }
 
+/** Gör alla belopp (fält som slutar på _minor) `scale` gånger större, för att pröva långa belopp i UI:t. */
+function scaleAmounts(value: unknown, scale: number): unknown {
+  if (Array.isArray(value)) return value.map((v) => scaleAmounts(v, scale));
+  if (value === null || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([k, v]) => [k, k.endsWith("_minor") && typeof v === "number" ? v * scale : scaleAmounts(v, scale)]),
+  );
+}
+
 /** Svarar på alla /api/*-anrop från sidan, eller från alla flikar i en webbläsare, med påhittad data. */
-export async function useFakeApi(page: Page | BrowserContext): Promise<FakeApi> {
+export async function useFakeApi(page: Page | BrowserContext, options: { scale?: number } = {}): Promise<FakeApi> {
   const transactions = [
     transaction("t1", "2026-11-12", -41250, "Hörnbutiken Exempelvägen"),
     transaction("t2", "2026-11-05", -18900, "Hörnbutiken Exempelvägen"),
@@ -165,7 +174,7 @@ export async function useFakeApi(page: Page | BrowserContext): Promise<FakeApi> 
     const request = route.request();
     const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
     const [status, json] = handle(request.method(), new URL(request.url()).pathname, body);
-    await route.fulfill(status === 204 ? { status } : { status, json });
+    await route.fulfill(status === 204 ? { status } : { status, json: scaleAmounts(json, options.scale ?? 1) });
   });
   return state;
 }
