@@ -1,5 +1,5 @@
 // Appens skal (#30): sidorna och huvudmenyn. Menyn har de vyer som finns; Sparmål och Inkomst
-// läggs till när de byggs. Service workern finns i sw/; offline-data kommer i en egen PR.
+// läggs till när de byggs. Service workern (sw/) ger offline-skal och senaste översikten i högst 24 h.
 import { House, PiggyBank, ReceiptText, Settings } from "lucide-react";
 import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";

@@ -71,7 +71,12 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Egen liten service worker utan beroenden (ägarens val 2026-11-04, i stället för vite-plugin-pwa). Logiken
   finns i `apps/web/src/sw/shell.ts` med tester, och `src/sw/sw.ts` byggs av Vite till `/sw.js` utan hash.
   sw.js får inte innehålla `import`, eftersom den registreras som klassiskt skript.
-- Service workern rör aldrig `/api/` eller `/cdn-cgi/`, och sparar aldrig en omdirigering (Access-inloggningen).
+- Service workern rör aldrig `/cdn-cgi/` och sparar aldrig en omdirigering (Access-inloggningen). Av API:t
+  sparas bara `GET /api/overview`, med tidsstämpel, och den visas utan nät i högst 24 h (KK-25-B). Äldre
+  kopior tas bort varje gång appen öppnas. Ska fler vyer fungera offline läggs de i `OFFLINE_DATA`.
+- I E2E är service workers avstängda (`serviceWorkers: "block"`), eftersom sidans `page.route` inte ser
+  service workerns anrop. `pwa.spec.ts` slår på dem och lägger fake-API:t på kontexten. Playwrights routes
+  svarar även i offline-läge, så testet tar bort dem (`unrouteAll`) innan det går offline.
 - Manifestet länkas med `crossorigin="use-credentials"`, annars hämtas det utan Access-cookie och stoppas.
 - Ikonerna ritas från `public/icons/icon.svg` med `node scripts/icons.ts` i `apps/web`.
 

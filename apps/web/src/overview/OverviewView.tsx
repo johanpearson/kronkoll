@@ -41,6 +41,8 @@ interface Overview {
   readonly perDayMinor: number | null;
   readonly daysLeft: number;
   readonly lastSyncAt: string | null;
+  /** Satt när service workern visar en sparad kopia utan nät (KK-25-B). */
+  readonly offlineSavedAt: string | null;
   readonly connections: readonly Connection[];
   readonly accounts: readonly Account[];
   readonly trend: readonly TrendPoint[];
@@ -55,6 +57,7 @@ async function fetchOverview(): Promise<Overview | null> {
   if (status !== 200 || !period) return null;
   const perDay = field(body, "left_per_day_minor");
   const lastSync = field(body, "last_sync_at");
+  const offline = field(body, "offline_saved_at");
   return {
     period,
     balanceMinor: minor(field(body, "balance_minor")),
@@ -65,6 +68,7 @@ async function fetchOverview(): Promise<Overview | null> {
     perDayMinor: typeof perDay === "number" ? perDay : null,
     daysLeft: minor(field(body, "days_left")),
     lastSyncAt: typeof lastSync === "string" ? lastSync : null,
+    offlineSavedAt: typeof offline === "string" ? offline : null,
     connections: list(field(body, "connections")).map((c) => {
       const days = field(c, "consent_days_left");
       const bank = field(c, "bank");
@@ -200,6 +204,11 @@ export function OverviewView() {
     <main>
       <h1>Översikt</h1>
       <p>{monthOf(o.period.key, monthName).replace(/^./u, (c) => c.toUpperCase())}</p>
+      {o.offlineSavedAt && (
+        <p className="note" role="note">
+          Offline – visar data från {syncTime.format(new Date(o.offlineSavedAt))}.
+        </p>
+      )}
       <SyncRow lastSyncAt={o.lastSyncAt} onDone={() => { setReload((n) => n + 1); }} />
       {expiring.map((c) => (
         <p key={c.id} role="alert">
