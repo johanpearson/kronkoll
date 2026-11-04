@@ -100,6 +100,7 @@ describe("GET /api/transactions (#32, KK-9, KK-18, KK-34)", () => {
         category_id: null,
         category_source: "none",
         is_internal_transfer: false,
+        manual_transfer: null,
         split: false,
       },
     ]);

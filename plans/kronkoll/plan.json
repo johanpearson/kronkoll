@@ -148,7 +148,8 @@
         { "id": "learn", "type": "checkbox", "label": "Gör alltid så för \"ICA Nära Sofo\" (skapar regel)", "checked": true, "satisfies": ["KK-18-B"] },
         { "id": "manual-note", "type": "alert", "tone": "info", "text": "Manuellt vald kategori – regler ändrar inte den här transaktionen.", "satisfies": ["KK-18-C"] },
         { "id": "split", "type": "button", "label": "Dela upp transaktion", "variant": "secondary", "opens": "dela-upp", "satisfies": ["KK-19"] },
-        { "id": "exclude", "type": "toggle", "label": "Räkna inte i budget och översikt", "checked": false, "hint": "Till exempel ett utlägg som betalas tillbaka. Saldot påverkas inte.", "toast": "Räknas inte längre i budget och översikt", "satisfies": ["KK-39-A", "KK-39-B", "KK-39-D"] },
+        { "id": "exclude", "type": "button", "label": "Räkna inte", "variant": "secondary", "toast": "Räknas inte i budget och översikt", "satisfies": ["KK-39-A", "KK-39-B", "KK-39-D"] },
+        { "type": "text", "text": "Räknas: Nej (vald av dig). Knappen blir Räkna med, och Låt Kronkoll avgöra tar bort valet. Saldot påverkas inte." },
         { "id": "save", "type": "button", "label": "Spara", "variant": "primary", "opens": "regel-historik", "satisfies": ["KK-18-B"] },
         { "type": "card", "title": "Detaljer från banken", "body": "Beskrivning: ICA NARA SOFO STHLM\nStatus: PDNG · Transaktionsdatum 2026-11-01\nVisas som Bokförd när banken bokför (matchas automatiskt)." }
       ]
@@ -629,7 +630,7 @@
         "403": { "description": "CSRF-skydd: fel Origin eller saknad X-Kronkoll-header", "body": { "error": "forbidden" } },
         "404": { "body": { "error": "not_found" } }
       },
-      "description": "Byggt i #111. Ändrar ingen historik: svaret säger bara vad regeln skulle ändra bakåt. Själva transaktionen räknas inte med i retroactive_candidates eller protected_manual. **Tillägg (KK-39):** `{ \"excluded\": true | false }` markerar eller avmarkerar Räknas inte, med `excluded_source: manual` så att regler inte ändrar valet.",
+      "description": "Byggt i #111. Ändrar ingen historik: svaret säger bara vad regeln skulle ändra bakåt. Själva transaktionen räknas inte med i retroactive_candidates eller protected_manual. **KK-39 (beslut 2026-11-04):** Räknas inte för hand använder det befintliga `PUT /api/transactions/{id}/transfer` med `{ \"internal\": true | false | null }` (#120), som sparas i `manual_transfer`. Listan i `GET /api/transactions` har `manual_transfer`, så att ett eget val visas som Räknas inte och en automatisk överföring som Intern överföring.",
       "satisfies": ["KK-18-B", "KK-18-C", "KK-29-B", "KK-39-A", "KK-39-B"]
     },
     {
@@ -1137,8 +1138,7 @@
         { "name": "category_source", "type": "manual|learned|template|none", "satisfies": ["KK-18-C"] },
         { "name": "income_type", "type": "salary|parental_benefit|other|null", "satisfies": ["KK-22-A"] },
         { "name": "is_internal_transfer", "type": "bool", "satisfies": ["KK-20-C"] },
-        { "name": "excluded", "type": "bool", "description": "Räknas inte i budget, översikt eller trend", "satisfies": ["KK-39-A", "KK-39-B"] },
-        { "name": "excluded_source", "type": "manual|rule|none", "description": "manual skrivs aldrig över av regler", "satisfies": ["KK-39-C"] },
+        { "name": "manual_transfer", "type": "bool?", "description": "Användarens eget val (#120): true = räknas inte (KK-39), false = räknas, null = automatiskt. Vinner alltid över parning och regler.", "satisfies": ["KK-20-C", "KK-39-A", "KK-39-B", "KK-39-C"] },
         { "name": "transfer_pair_id", "type": "fk?" }
       ],
       "relations": [{ "to": "TransactionSplit", "cardinality": "0..*", "label": "delas i" }, { "to": "Category", "cardinality": "0..1" }]
@@ -1648,7 +1648,7 @@
     { "id": "V-e2e-budget", "title": "E2E: sätta budget", "type": "e2e", "given": "november utan budget", "when": "Föreslå från snitt, justera Mat till 6 300, spara", "then": "Mat visar 104 % – över (färg + text)", "satisfies": ["KK-20-A", "KK-20-B", "KK-15-B"] },
     { "id": "V-u-balances", "title": "Saldo per konto i översikten", "type": "unit", "given": "tre syntetiska konton, ett utan saldo från banken", "when": "översikten hämtas och visas", "then": "varje konto visas med sitt namn och saldo, kontot utan saldo visar Saldo saknas, och totalen är summan av de två andra", "satisfies": ["KK-38-A", "KK-38-B"] },
     { "id": "V-u-exclude", "title": "domain: Räknas inte", "type": "unit", "given": "en novembermånad med en utgift på 1 299 kr markerad Räknas inte", "when": "budgetens utfall och översikten räknas", "then": "utgiften är inte med i ut, utfall, kvar att spendera eller trend; saldot är oförändrat", "satisfies": ["KK-39-A", "KK-39-D"] },
-    { "id": "V-i-exclude", "title": "API: markera, ångra och regel för Räknas inte", "type": "integration", "given": "lokal D1 med syntetiska transaktioner, en manuellt avmarkerad", "when": "PATCH excluded true/false och en regel med action exclude appliceras bakåt", "then": "markeringen sätts och tas bort; regeln markerar träffarna men inte den manuellt avmarkerade", "satisfies": ["KK-39-B", "KK-39-C"] },
+    { "id": "V-i-exclude", "title": "API: markera, ångra och regel för Räknas inte", "type": "integration", "given": "lokal D1 med syntetiska transaktioner, en manuellt avmarkerad", "when": "PUT /transfer med internal true/false/null och en regel med action exclude appliceras bakåt", "then": "markeringen sätts och tas bort; regeln markerar träffarna men inte den manuellt avmarkerade", "satisfies": ["KK-39-B", "KK-39-C"] },
     { "id": "V-e2e-exclude", "title": "E2E: räkna inte en transaktion", "type": "e2e", "given": "syntetiska transaktioner i november", "when": "markera en utgift Räknas inte, öppna budget, ångra", "then": "raden är nedtonad med texten Räknas inte och utfallet minskar; efter ångra är allt som innan", "satisfies": ["KK-39-A", "KK-39-B"] },
     { "id": "V-i-budget-delete", "title": "API: ta bort en periods budget", "type": "integration", "given": "budget för oktober och november i lokal D1", "when": "DELETE /api/budgets/2026-11 med och utan CSRF-header", "then": "med header: november saknar budget, oktober är orörd; utan header: 403 och inget ändras", "satisfies": ["KK-40-A", "KK-40-B"] },
     { "id": "V-e2e-goal", "title": "E2E: skapa sparmål", "type": "e2e", "given": "inga sparmål", "when": "skapa Resa till Japan 60 000 / aug. 2027", "then": "prognos och krav per månad visas; måldatum i dåtid ger fel", "satisfies": ["KK-21-A", "KK-15-B"] },

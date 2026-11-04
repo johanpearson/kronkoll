@@ -123,7 +123,7 @@ describe("detaljsidan för en transaktion (#32)", () => {
       }),
     );
     await open();
-    expect(row("Räknas")).toBe("Inte som utgift – intern överföring (automatiskt)");
+    expect(row("Räknas")).toBe("Nej – intern överföring (automatiskt)");
     expect(row("Motpost")).toBe(`Sparkonto · ${formatSek(500000)} · 2 nov. 2026`);
     const parts = screen.getByRole("list", { name: "Uppdelning" });
     expect(within(parts).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
@@ -132,16 +132,25 @@ describe("detaljsidan för en transaktion (#32)", () => {
     ]);
   });
 
-  it("\"Räkna inte som utgift\" sparar valet och visar den nya statusen (KK-20-C)", async () => {
+  it("\"Räkna inte\" sparar valet och visar den nya statusen (KK-20-C, KK-39-A)", async () => {
     const calls = api(detail(), detail({ is_internal_transfer: true, manual_transfer: true }));
     await open();
-    expect(row("Räknas")).toBe("Som utgift");
-    fireEvent.click(screen.getByRole("button", { name: "Räkna inte som utgift" }));
+    expect(row("Räknas")).toBe("Ja");
+    fireEvent.click(screen.getByRole("button", { name: "Räkna inte" }));
     await settle();
     expect(calls.find((c) => c.method === "PUT")).toEqual({ method: "PUT", path: "/api/transactions/t1/transfer", body: { internal: true }, csrf: "1" });
-    expect(row("Räknas")).toBe("Inte som utgift (vald av dig)");
-    expect(screen.getByRole("button", { name: "Räkna som utgift" })).toBeDefined();
+    expect(row("Räknas")).toBe("Nej (vald av dig)");
+    expect(screen.getByRole("button", { name: "Räkna med" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Låt Kronkoll avgöra" })).toBeDefined();
+  });
+
+  it("\"Räkna med\" ångrar valet (KK-39-B)", async () => {
+    const calls = api(detail({ is_internal_transfer: true, manual_transfer: true }), detail({ manual_transfer: false }));
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Räkna med" }));
+    await settle();
+    expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ internal: false });
+    expect(row("Räknas")).toBe("Ja (vald av dig)");
   });
 
   it("\"Låt Kronkoll avgöra\" tar bort ditt val", async () => {
@@ -150,13 +159,13 @@ describe("detaljsidan för en transaktion (#32)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Låt Kronkoll avgöra" }));
     await settle();
     expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ internal: null });
-    expect(row("Räknas")).toBe("Som utgift");
+    expect(row("Räknas")).toBe("Ja");
   });
 
   it("visar ett fel när valet inte går att spara", async () => {
     api(detail(), undefined, 503);
     await open();
-    fireEvent.click(screen.getByRole("button", { name: "Räkna inte som utgift" }));
+    fireEvent.click(screen.getByRole("button", { name: "Räkna inte" }));
     await settle();
     expect(screen.getByRole("alert").textContent).toBe("Det gick inte att spara. Försök igen.");
   });
@@ -180,7 +189,7 @@ describe("detaljsidan för en transaktion (#32)", () => {
     [{ category_id: null, category_source: "none" }, "Kategori", "Okategoriserad"],
     [{ category_source: "learned" }, "Kategori", "Mat › Livsmedel (inlärd regel)"],
     [{ splits: [{ category_id: "mat-livsmedel", amount_minor: -41250 }] }, "Kategori", "Uppdelad"],
-    [{ manual_transfer: false }, "Räknas", "Som utgift (vald av dig)"],
+    [{ manual_transfer: false }, "Räknas", "Ja (vald av dig)"],
   ])("visar %j som %s: %s", async (overrides, label, value) => {
     api(detail(overrides));
     await open();
