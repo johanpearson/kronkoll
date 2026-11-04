@@ -22,14 +22,55 @@ categories and shows where the money went this month. The interface is in Swedis
 
 ## How it is built
 
-| Part | Where |
-|---|---|
-| Web app (PWA) | `apps/web` on Cloudflare Pages |
-| API | `apps/api` on Cloudflare Workers with D1 |
-| Business rules | `packages/domain`, plain TypeScript with no dependencies |
-| Bank, database, login | `packages/adapter-*` (ports and adapters) |
+```mermaid
+flowchart TB
+    user(["📱 Phone<br/>installed PWA"])
 
-Everything runs on the Cloudflare free tier behind Cloudflare Access.
+    subgraph cf["☁️ Cloudflare free tier"]
+        access{{"🔐 Access<br/>login"}}
+        subgraph pages["Pages · apps/web"]
+            ui["React PWA<br/>+ service worker"]
+            fn["/api/* function"]
+        end
+        subgraph worker["Worker · apps/api"]
+            routes["HTTP routes"]
+            cron["⏰ Cron sync<br/>twice a day"]
+            subgraph hex["Ports and adapters"]
+                domain[["🧠 packages/domain<br/>pure TypeScript"]]
+                d1a["adapter-d1"]
+                eba["adapter-enablebanking"]
+                acca["adapter-access"]
+            end
+        end
+        db[("🗄️ D1<br/>SQLite")]
+    end
+
+    eb["🏦 Enable Banking<br/>read-only"]
+    bank["Bank"]
+
+    user --> access --> ui
+    ui --> fn -- "service binding" --> routes
+    routes --> domain
+    cron --> domain
+    domain -. port .-> d1a --> db
+    domain -. port .-> eba --> eb --> bank
+    routes --> acca
+
+    classDef cfStyle fill:#fff4e6,stroke:#f38020,color:#222
+    classDef core fill:#e8f5e9,stroke:#2e7d32,color:#222,stroke-width:2px
+    classDef ext fill:#e3f2fd,stroke:#1565c0,color:#222
+    class access,ui,fn,routes,cron,d1a,eba,acca,db cfStyle
+    class domain core
+    class eb,bank,user ext
+    style cf fill:#fffaf5,stroke:#f38020
+    style pages fill:#ffffff,stroke:#f6a35b
+    style worker fill:#ffffff,stroke:#f6a35b
+    style hex fill:#f6fbf6,stroke:#81c784,stroke-dasharray:4 3
+```
+
+The business rules live in `packages/domain` without any dependencies. Cloudflare, the database and the bank
+are reached only through adapters, so the core can be tested on its own. The API Worker has no public address:
+it is reached only from Pages, after Cloudflare Access has checked the login.
 
 ## Quality
 
@@ -54,8 +95,7 @@ pnpm --filter @kronkoll/domain test:coverage
 ## More
 
 - Requirements and plan: [`plans/kronkoll`](plans/kronkoll) (open `plan.html` for a clickable version)
-- How to contribute: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Reporting a security issue: [SECURITY.md](SECURITY.md)
+- Working rules for people and AI agents: [AGENTS.md](AGENTS.md) (Swedish)
 - Privacy and terms (Swedish): [docs/privacy.md](docs/privacy.md), [docs/terms.md](docs/terms.md)
 
 ## License
