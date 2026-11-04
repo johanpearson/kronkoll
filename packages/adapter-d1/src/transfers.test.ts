@@ -51,6 +51,7 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
       transactionDate: "2026-11-02",
       amountMinor: -500000,
       counterpartyNorm: "SPARKONTO",
+      description: "",
       status: "booked",
       manualTransfer: null,
       internal: false,

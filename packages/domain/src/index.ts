@@ -17,8 +17,10 @@ export {
 } from "./reconcile.ts";
 export {
   classifyTransfers,
+  excludeRuleHits,
   TRANSFER_WINDOW_DAYS,
   type ClassifyTransfersInput,
+  type ExcludeRule,
   type OwnAccount,
   type TransferClassification,
   type TransferInput,
@@ -30,6 +32,7 @@ export {
   ruleReach,
   categorize,
   learnFromManualChoice,
+  matchingRule,
   patternChoices,
   ruleHits,
   ruleMatches,
@@ -39,6 +42,7 @@ export {
   type CategoryChange,
   type CategoryRule,
   type CategorySource,
+  type RuleCondition,
   type RuleMatch,
   type RuleReach,
   type LearnInput,

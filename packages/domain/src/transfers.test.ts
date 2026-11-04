@@ -2,6 +2,8 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   classifyTransfers,
+  excludeRuleHits,
+  type ExcludeRule,
   type OwnAccount,
   type TransferClassification,
   type TransferInput,
@@ -20,6 +22,7 @@ function tx(overrides: Partial<TransferInput> & { id: string }): TransferInput {
     transactionDate: "2026-11-10",
     amountMinor: -500000,
     counterpartyNorm: "",
+    description: "",
     status: "booked",
     manualTransfer: null,
     ...overrides,
@@ -27,7 +30,7 @@ function tx(overrides: Partial<TransferInput> & { id: string }): TransferInput {
 }
 
 function classify(transactions: TransferInput[], cardPayees = CARD_PAYEES) {
-  const result = classifyTransfers({ transactions, accounts: ACCOUNTS, cardPaymentCounterparties: cardPayees });
+  const result = classifyTransfers({ transactions, accounts: ACCOUNTS, cardPaymentCounterparties: cardPayees, excludeRules: [] });
   return Object.fromEntries(result.map((c) => [c.id, c]));
 }
 
@@ -146,12 +149,84 @@ describe("indata kontrolleras", () => {
   });
 });
 
+describe("regler med åtgärden Räkna inte (KK-39-C, V-u-exclude)", () => {
+  const MOBLER: ExcludeRule = { id: "r-mobler", match: "counterparty_prefix", pattern: "PAHITTADE MOBLER" };
+  const withRules = (transactions: TransferInput[], rules: ExcludeRule[]) =>
+    Object.fromEntries(classifyTransfers({ transactions, accounts: ACCOUNTS, cardPaymentCounterparties: CARD_PAYEES, excludeRules: rules }).map((c) => [c.id, c]));
+
+  it("en transaktion som regeln träffar räknas inte, oavsett tecken", () => {
+    const result = withRules(
+      [tx({ id: "köp", counterpartyNorm: "PAHITTADE MOBLER AB", amountMinor: -129900 }), tx({ id: "retur", counterpartyNorm: "PAHITTADE MOBLER AB", amountMinor: 129900 }), tx({ id: "annat", counterpartyNorm: "HORNBUTIKEN", amountMinor: -4500 })],
+      [MOBLER],
+    );
+    expect(result.köp).toEqual({ id: "köp", internal: true, pairId: null, reason: "rule" });
+    expect(result.retur).toMatchObject(internal(null, "rule"));
+    expect(result.annat).toMatchObject(external);
+  });
+
+  it("matchar på beskrivningen när banken inte skickar motpart, som kategoriregler", () => {
+    const rules: ExcludeRule[] = [MOBLER, { id: "r-text", match: "description_contains", pattern: "UTLÄGG" }];
+    const result = withRules([tx({ id: "kort", description: "PAHITTADE MOBLER 12, STOCKHOLM", amountMinor: -4500 }), tx({ id: "text", counterpartyNorm: "NÅGON", description: "utlägg resa", amountMinor: -4500 })], rules);
+    expect(result.kort).toMatchObject(internal(null, "rule"));
+    expect(result.text).toMatchObject(internal(null, "rule"));
+  });
+
+  it("ett eget val vinner över regeln, åt båda hållen", () => {
+    const result = withRules([tx({ id: "räkna", counterpartyNorm: "PAHITTADE MOBLER", manualTransfer: false }), tx({ id: "inte", counterpartyNorm: "PAHITTADE MOBLER", manualTransfer: true })], [MOBLER]);
+    expect(result.räkna).toMatchObject({ internal: false, reason: "manual" });
+    expect(result.inte).toMatchObject(internal(null, "manual"));
+  });
+
+  it("ett par förblir ett par, och borttagna eller okända konton markeras inte", () => {
+    const result = withRules(
+      [tx({ id: "ut", counterpartyNorm: "PAHITTADE MOBLER" }), tx({ id: "in", accountId: "spar", amountMinor: 500000 }), tx({ id: "borta", counterpartyNorm: "PAHITTADE MOBLER", status: "removed", amountMinor: -1 }), tx({ id: "främmande", accountId: "okänt", counterpartyNorm: "PAHITTADE MOBLER", amountMinor: -2 })],
+      [MOBLER],
+    );
+    expect(result.ut).toMatchObject(internal("in", "pair"));
+    expect(result.borta).toMatchObject(external);
+    expect(result.främmande).toMatchObject(external);
+  });
+
+  it("utan regler är allt som förut, och en borttagen regel släpper sina träffar", () => {
+    const batch = [tx({ id: "köp", counterpartyNorm: "PAHITTADE MOBLER", amountMinor: -4500 })];
+    expect(withRules(batch, []).köp).toMatchObject(external);
+    expect(classify(batch).köp).toMatchObject(external);
+  });
+
+  it("räknar hur många transaktioner varje regel träffar, egna val inräknade men inte borttagna", () => {
+    const rules: ExcludeRule[] = [MOBLER, { id: "r-tom", match: "counterparty_exact", pattern: "INGEN" }];
+    const hits = excludeRuleHits(
+      [tx({ id: "a", counterpartyNorm: "PAHITTADE MOBLER" }), tx({ id: "b", counterpartyNorm: "PAHITTADE MOBLER AB", manualTransfer: false }), tx({ id: "c", counterpartyNorm: "ANNAT" }), tx({ id: "d", counterpartyNorm: "PAHITTADE MOBLER", status: "removed" })],
+      rules,
+    );
+    expect(hits).toEqual(new Map([["r-mobler", 2]]));
+  });
+
+  it("när flera regler träffar räknas den mest precisa: exakt, sedan längst mönster, sedan id", () => {
+    const rules: ExcludeRule[] = [
+      { id: "b-kort", match: "counterparty_prefix", pattern: "PAHITTADE" },
+      { id: "c-lang", match: "counterparty_prefix", pattern: "PAHITTADE MOBLER" },
+      { id: "d-exakt", match: "counterparty_exact", pattern: "PAHITTADE MOBLER" },
+      { id: "e-text", match: "description_contains", pattern: "MÖBLER" },
+      { id: "a-text", match: "description_contains", pattern: "MÖBLER" },
+    ];
+    const hits = excludeRuleHits(
+      [tx({ id: "x", counterpartyNorm: "PAHITTADE MOBLER" }), tx({ id: "y", counterpartyNorm: "PAHITTADE MOBLER AB" }), tx({ id: "z", counterpartyNorm: "PAHITTADE LAMPOR" }), tx({ id: "w", counterpartyNorm: "ANNAT", description: "köp möbler" })],
+      rules,
+    );
+    expect(hits).toEqual(new Map([["d-exakt", 1], ["c-lang", 1], ["b-kort", 1], ["a-text", 1]]));
+    // Samma svar oavsett i vilken ordning reglerna kommer från databasen.
+    expect(excludeRuleHits([tx({ id: "w", counterpartyNorm: "ANNAT", description: "köp möbler" })], [...rules].reverse())).toEqual(new Map([["a-text", 1]]));
+  });
+});
+
 // Egenskaper: påhittade transaktioner på de egna kontona och ett okänt konto.
 const arbTx = fc.record({
   accountId: fc.constantFrom("privat", "spar", "visa", "okänt"),
   transactionDate: fc.integer({ min: 1, max: 12 }).map((d) => `2026-11-${String(d).padStart(2, "0")}`),
   amountMinor: fc.constantFrom(-500000, 500000, -4500, 4500),
   counterpartyNorm: fc.constantFrom("", "skandia visa", "ica"),
+  description: fc.constantFrom("", "ICA KVITTO"),
   status: fc.constantFrom<TransferInput["status"]>("pending", "booked", "removed"),
   manualTransfer: fc.constantFrom<boolean | null>(null, null, null, true, false),
 });
@@ -180,6 +255,20 @@ describe("egenskaper", () => {
         const byId = classify(batch);
         for (const t of batch) {
           if (t.manualTransfer !== null) expect(byId[t.id]?.internal).toBe(t.manualTransfer);
+        }
+      }),
+    );
+  });
+
+  it("en regel som Räkna inte gör aldrig något internt externt, och rör aldrig ett eget val (KK-39-C)", () => {
+    const rules: ExcludeRule[] = [{ id: "r-ica", match: "counterparty_prefix", pattern: "ica" }];
+    fc.assert(
+      fc.property(arbBatch, (batch) => {
+        const before = classify(batch);
+        const after = Object.fromEntries(classifyTransfers({ transactions: batch, accounts: ACCOUNTS, cardPaymentCounterparties: CARD_PAYEES, excludeRules: rules }).map((c) => [c.id, c]));
+        for (const t of batch) {
+          if (before[t.id]?.internal === true) expect(after[t.id]).toEqual(before[t.id]);
+          if (t.manualTransfer !== null) expect(after[t.id]?.reason).toBe("manual");
         }
       }),
     );
