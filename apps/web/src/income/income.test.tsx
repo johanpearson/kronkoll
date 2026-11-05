@@ -73,7 +73,7 @@ describe("Inkomst: planerad ledighet (#40, KK-23)", () => {
     cleanup();
     api(503, { error: "unavailable" });
     await open();
-    expect(screen.getByRole("alert").textContent).toBe("Det gick inte att hämta den planerade ledigheten. Försök igen om en stund.");
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toContain("Det gick inte att hämta den planerade ledigheten. Försök igen om en stund.");
   });
 
   it("Inkomst finns i menyn och är markerad", async () => {

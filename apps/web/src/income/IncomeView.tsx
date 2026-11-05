@@ -1,10 +1,11 @@
-// Inkomst (#40, KK-23): planerad föräldraledighet med uppskattad inkomst per månad, skillnaden mot en
+// Inkomst (#40, KK-22, KK-23): inkomsthistoriken (IncomeHistory) och planerad föräldraledighet med uppskattad inkomst per månad, skillnaden mot en
 // normal månad och vad som saknas mot budgeten. Uppskattningen räknas i API:t (GET /api/leave-periods)
-// och är aldrig ett besked från Försäkringskassan. Formuläret finns i NewLeave; inkomsthistoriken kommer i en egen PR.
+// och är aldrig ett besked från Försäkringskassan. Formuläret finns i NewLeave.
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
 import { navigate } from "../router.tsx";
+import { IncomeHistory } from "./IncomeHistory.tsx";
 
 export interface LeavePlan {
   readonly id: string;
@@ -94,6 +95,7 @@ export function IncomeView() {
   return (
     <main>
       <h1>Inkomst</h1>
+      <IncomeHistory />
       <h2>Planerad ledighet</h2>
       <p>
         <button type="button" className="primary" onClick={() => { navigate("/inkomst/ledighet"); }}>
