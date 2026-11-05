@@ -61,4 +61,32 @@ describe("Inkomst: historik (#40, KK-22-B)", () => {
     expect(toIncomeMonths({})).toBeNull();
     expect(toIncomeMonths({ months: [{ salary_minor: 1 }, { period: "2026-01", salary_minor: "x" }] })).toEqual([{ period: "2026-01", salaryMinor: 0, benefitMinor: 0, otherMinor: 0 }]);
   });
+
+  it("visar ett staplat diagram, äldst till vänster, där den största månaden fyller höjden (KK-22-B)", async () => {
+    api([200, { months: MONTHS }]);
+    await open();
+    const chart = screen.getByRole("figure");
+    expect(chart.querySelector("figcaption")?.textContent).toBe("Netto per månadLön Föräldrapenning Övrigt");
+    expect(chart.querySelector("svg")?.getAttribute("aria-hidden")).toBe("true");
+    const bars = [...chart.querySelectorAll("g")].map((g) => ({
+      label: g.querySelector("text")?.textContent,
+      heights: ["salary", "benefit", "other"].map((c) => Number(g.querySelector(`rect.${c}`)?.getAttribute("height")).toFixed(1)),
+    }));
+    expect(bars).toEqual([
+      { label: "SEP", heights: [(1120000 / 3403000 * 80).toFixed(1), (995000 / 3403000 * 80).toFixed(1), (78000 / 3403000 * 80).toFixed(1)] },
+      { label: "OKT", heights: [(3361000 / 3403000 * 80).toFixed(1), "0.0", (42000 / 3403000 * 80).toFixed(1)] },
+      { label: "NOV", heights: ["0.0", "0.0", "0.0"] },
+    ]);
+    const okt = chart.querySelectorAll("g")[1];
+    expect(Number(okt?.querySelector("rect.other")?.getAttribute("y"))).toBeCloseTo(0);
+    expect(chart.querySelector("svg")?.getAttribute("viewBox")).toBe("0 0 288 94");
+    expect(chart.querySelectorAll("g")[2]?.getAttribute("transform")).toBe("translate(264 0)");
+  });
+
+  it("utan någon inkomst visas inget diagram, bara listan", async () => {
+    api([200, { months: MONTHS.map((m) => ({ ...m, salary_minor: 0, parental_benefit_minor: 0, other_minor: -500 })) }]);
+    await open();
+    expect(screen.queryByRole("figure")).toBeNull();
+    expect(within(screen.getByRole("list", { name: "Inkomst per månad" })).getAllByRole("listitem")).toHaveLength(3);
+  });
 });
