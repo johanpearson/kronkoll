@@ -7,6 +7,7 @@ import { GoalDetail } from "./goals/GoalDetail.tsx";
 import { GoalsView } from "./goals/GoalsView.tsx";
 import { NewGoal } from "./goals/NewGoal.tsx";
 import { IncomeView } from "./income/IncomeView.tsx";
+import { InsightsView } from "./insights/InsightsView.tsx";
 import { LoansView } from "./loans/LoansView.tsx";
 import { NewLeave } from "./income/NewLeave.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
@@ -39,6 +40,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/sparmal/lan": LoansView,
   "/inkomst": IncomeView,
   "/inkomst/ledighet": NewLeave,
+  "/insikter": InsightsView,
   "/installningar": SettingsView,
   "/installningar/kategorier": CategoriesView,
   "/installningar/regler": RulesView,
@@ -48,7 +50,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
 };
 
 /**
- * Menyn i den ordning planen har den. Inställningar och Koppla bank nås från Översikt (kugghjulet),
+ * Menyn i den ordning planen har den. Insikter, Inställningar och Koppla bank nås från Översikt,
  * så Översikt är markerad där.
  */
 const TABS = [
@@ -56,7 +58,7 @@ const TABS = [
     to: "/",
     label: "Översikt",
     Icon: House,
-    owns: (path: string) => path === "/" || path === "/installningar" || path.startsWith("/installningar/") || path.startsWith("/koppla"),
+    owns: (path: string) => path === "/" || path === "/insikter" || path === "/installningar" || path.startsWith("/installningar/") || path.startsWith("/koppla"),
   },
   { to: "/transaktioner", label: "Transaktioner", Icon: ReceiptText, owns: (path: string) => path === "/transaktioner" || path.startsWith("/transaktioner/") },
   { to: "/budget", label: "Budget", Icon: PiggyBank, owns: (path: string) => path === "/budget" },

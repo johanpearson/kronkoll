@@ -267,6 +267,9 @@ export function OverviewView() {
       </dl>
       {o.accounts.length > 0 && <AccountList accounts={o.accounts} />}
       {o.trend.length > 0 && <TrendChart trend={o.trend} />}
+      <p>
+        <Link to="/insikter">Insikter: avvikelser, återkommande dragningar och största utgifter</Link>
+      </p>
     </main>
   );
 }
