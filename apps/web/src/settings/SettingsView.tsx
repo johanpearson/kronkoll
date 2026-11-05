@@ -1,12 +1,13 @@
-// Inställningar (#34, KK-18-A, KK-26-A, KK-34, KK-35, KK-37): bankkopplingarna och att koppla en bank,
-// egna kontonamn, budgetperiodens startdag, länkar till kategorierna och reglerna, utseende, och logga ut
-// och rensa enheten.
+// Inställningar (#34, KK-18-A, KK-26-A, KK-27, KK-34, KK-35, KK-37): bankkopplingarna och att koppla en bank,
+// egna kontonamn, budgetperiodens startdag, länkar till kategorierna och reglerna, notiser, utseende, och
+// logga ut och rensa enheten.
 import { useState } from "react";
 import { browser } from "../browser.ts";
 import { Link } from "../router.tsx";
 import { setTheme, storedTheme, type Theme } from "../theme.ts";
 import { AccountNames } from "./AccountNames.tsx";
 import { Connections } from "./Connections.tsx";
+import { Notifications } from "./Notifications.tsx";
 import { PeriodStart } from "./PeriodStart.tsx";
 
 /** Cloudflare Access utloggning på samma adress som appen. */
@@ -49,6 +50,10 @@ export function SettingsView() {
           <Link to="/installningar/kategorier">Kategorier</Link>
           <Link to="/installningar/regler">Regler</Link>
         </p>
+      </section>
+      <h2>Notiser</h2>
+      <section className="card">
+        <Notifications />
       </section>
       <h2 id="theme-heading">Utseende</h2>
       <section className="card">

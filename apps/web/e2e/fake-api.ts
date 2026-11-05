@@ -269,6 +269,8 @@ export async function useFakeApi(
     if (path === "/api/connections") return [200, { items: [CONNECTION] }];
     if (path === "/api/accounts") return [200, { items: ACCOUNTS }];
     if (path === "/api/settings") return [200, { budget_period_start_day: 1, current_period: NOVEMBER }];
+    // Web Push är påslaget på servern (KK-27). I E2E är service workers avstängda, så vyn säger att enheten saknar stöd.
+    if (path === "/api/push") return [200, { configured: true, public_key: "BPublicKeyForE2E", topics: ["consent", "budget_over", "sync_failed"] }];
     if (path === "/api/transactions") return [200, { period: NOVEMBER, items: transactions, next_cursor: null }];
     const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
     // En påhittad löneinbetalning som bara nås via sin adress, för inkomsttypen på detaljsidan (KK-22-A).
