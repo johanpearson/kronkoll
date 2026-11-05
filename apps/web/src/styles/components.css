@@ -659,3 +659,20 @@ main ul > li.budget-line.sub {
   font-size: 0.875rem;
   color: var(--muted);
 }
+.goal-form > label.check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+/* Sparat av målet med status bredvid, på sparmålets sida. */
+.goal-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-weight: 600;
+}
