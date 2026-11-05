@@ -2,9 +2,11 @@
 // tolv perioder och när synken senast gick, med knappen Synka nu. Utan bank visas en välkomstsida.
 // Siffrorna räknas i API:t (GET /api/overview); vyn visar dem bara.
 import { formatSek } from "@kronkoll/domain";
+import { Settings } from "lucide-react";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
-import { Link } from "../router.tsx";
+import { IconButton } from "../icon-button.tsx";
+import { Link, navigate } from "../router.tsx";
 import { SyncButton } from "../sync/SyncButton.tsx";
 import { toPeriod, type Period } from "../transactions/TransactionsView.tsx";
 
@@ -162,10 +164,20 @@ function SyncRow({ lastSyncAt, onDone }: { lastSyncAt: string | null; onDone: ()
   );
 }
 
+/** Rubriken med kugghjulet till Inställningar, som inte har någon egen flik (planens meny). */
+function Header({ title }: { title: string }) {
+  return (
+    <div className="page-header">
+      <h1>{title}</h1>
+      <IconButton label="Inställningar" icon={Settings} onClick={() => { navigate("/installningar"); }} />
+    </div>
+  );
+}
+
 function Welcome() {
   return (
     <main>
-      <h1>Välkommen till Kronkoll</h1>
+      <Header title="Välkommen till Kronkoll" />
       <section className="card">
         <p>Koppla ditt första konto för att se saldo, budget och trender. Kronkoll kan bara läsa, aldrig betala.</p>
         <Link to="/koppla">Koppla bank</Link>
@@ -190,8 +202,8 @@ export function OverviewView() {
     };
   }, [reload]);
 
-  if (state.kind === "loading") return <main><h1>Översikt</h1><p>Hämtar…</p></main>;
-  if (state.kind === "error") return <main><h1>Översikt</h1><p role="alert">Det gick inte att hämta översikten. Försök igen om en stund.</p></main>;
+  if (state.kind === "loading") return <main><Header title="Översikt" /><p>Hämtar…</p></main>;
+  if (state.kind === "error") return <main><Header title="Översikt" /><p role="alert">Det gick inte att hämta översikten. Försök igen om en stund.</p></main>;
   const o = state.overview;
   if (o.connections.length === 0) return <Welcome />;
 
@@ -202,7 +214,7 @@ export function OverviewView() {
 
   return (
     <main>
-      <h1>Översikt</h1>
+      <Header title="Översikt" />
       <p>{monthOf(o.period.key, monthName).replace(/^./u, (c) => c.toUpperCase())}</p>
       {o.offlineSavedAt && (
         <p className="note" role="note">

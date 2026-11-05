@@ -32,6 +32,17 @@ function transaction(id: string, date: string, amountMinor: number, counterparty
 /** Bankens inloggning i testerna. connect.spec.ts fångar adressen och skickar tillbaka till appen. */
 export const FAKE_BANK = "https://bank.example.test";
 
+/** Påhittad planerad ledighet i samma form som GET /api/leave-periods. */
+const LEAVE = {
+  id: "l1", from: "2027-03-01", to: "2027-08-31", days_per_week: 5, sgi_annual_minor: 54000000, employer_topup_pct: 10, tax_rate_pct: 31.5, override_net_monthly_minor: null,
+  estimate: {
+    disclaimer: "Uppskattning – inte ett besked från Försäkringskassan",
+    normal_net_monthly_minor: 3361000,
+    months: [{ period: "2027-03", leave_days: 23, withdrawal_days: 23, benefit_gross_minor: 2400000, topup_gross_minor: 450000, net_minor: 2014000, source: "estimate", params_year: 2027, params_fallback: false, income_minor: 2014000, delta_vs_normal_minor: -1347000 }],
+  },
+  impacts: [{ type: "budget", period: "2027-03", budget_minor: 3200000, income_minor: 2014000, shortfall_minor: 1186000 }],
+};
+
 /** Påhittade sparmål i samma form som GET /api/goals: i fas, sent och utan sparttakt. */
 const GOALS = [
   {
@@ -171,6 +182,7 @@ export async function useFakeApi(
       return [201, goal];
     }
     if (path === "/api/goals") return [200, { items: goals }];
+    if (path === "/api/leave-periods") return [200, { items: [LEAVE] }];
     const goalPath = /^\/api\/goals\/([^/]+)(\/contributions)?$/u.exec(path);
     const goal = goals.find((g) => g["id"] === goalPath?.[1]);
     if (goal && goalPath?.[2] && method === "POST") {

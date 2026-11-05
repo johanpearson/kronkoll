@@ -25,22 +25,27 @@ describe("navigering (#30, KK-25)", () => {
   it("visar huvudmenyn på varje sida och markerar sidan man är på", () => {
     at("/transaktioner");
     const links = within(nav()).getAllByRole("link");
-    expect(links.map((l) => l.textContent)).toEqual(["Översikt", "Transaktioner", "Budget", "Sparmål", "Inställningar"]);
+    expect(links.map((l) => l.textContent)).toEqual(["Översikt", "Transaktioner", "Budget", "Sparmål", "Inkomst"]);
     expect(within(nav()).getByRole("link", { name: "Transaktioner" }).getAttribute("aria-current")).toBe("page");
     expect(within(nav()).getByRole("link", { name: "Översikt" }).getAttribute("aria-current")).toBeNull();
   });
 
   it("byter sida via menyn utan att ladda om", () => {
     at("/");
-    fireEvent.click(within(nav()).getByRole("link", { name: "Inställningar" }));
-    expect(window.location.pathname).toBe("/installningar");
-    expect(screen.getByRole("heading", { level: 1, name: "Inställningar" })).toBeDefined();
+    fireEvent.click(within(nav()).getByRole("link", { name: "Budget" }));
+    expect(window.location.pathname).toBe("/budget");
+    expect(screen.getByRole("heading", { level: 1, name: "Budget" })).toBeDefined();
   });
 
-  it("menyn finns även på sidor utanför den, som Koppla bank", () => {
+  it("Inställningar nås med kugghjulet på Översikt, och Översikt är markerad där och på Koppla bank", () => {
+    at("/");
+    fireEvent.click(screen.getByRole("button", { name: "Inställningar" }));
+    expect(window.location.pathname).toBe("/installningar");
+    expect(screen.getByRole("heading", { level: 1, name: "Inställningar" })).toBeDefined();
+    expect(within(nav()).getByRole("link", { name: "Översikt" }).getAttribute("aria-current")).toBe("page");
+    cleanup();
     at("/koppla");
-    expect(nav()).toBeDefined();
-    expect(within(nav()).getByRole("link", { name: "Inställningar" }).getAttribute("aria-current")).toBe("page");
+    expect(within(nav()).getByRole("link", { name: "Översikt" }).getAttribute("aria-current")).toBe("page");
   });
 
   it("Inställningar leder till Koppla bank", () => {
