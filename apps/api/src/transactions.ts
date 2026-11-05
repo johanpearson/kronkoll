@@ -111,6 +111,8 @@ export async function getTransaction(env: { DB: D1Database }, id: string): Promi
         category_source: detail.categorySource,
         is_internal_transfer: detail.isInternalTransfer,
         manual_transfer: detail.manualTransfer,
+        income_type: detail.incomeType,
+        income_source: detail.incomeSource,
         transfer_pair: detail.transferPair && {
           id: detail.transferPair.id,
           account_name: detail.transferPair.accountName,

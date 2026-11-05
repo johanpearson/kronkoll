@@ -81,9 +81,16 @@ describe("GET /api/transactions/{id} (#32, KK-9, KK-18, KK-19, KK-20-C, KK-30)",
       category_source: "template",
       is_internal_transfer: false,
       manual_transfer: null,
+      income_type: null,
+      income_source: "none",
       transfer_pair: null,
       splits: [],
     });
+  });
+
+  it("visar inkomsttyp och vem som satte den för en inbetalning (KK-22)", async () => {
+    await db.prepare(`UPDATE transactions SET income_type = 'parental_benefit', income_source = 'manual' WHERE id = 'in'`).run();
+    expect(await (await get("in")).json()).toMatchObject({ income_type: "parental_benefit", income_source: "manual" });
   });
 
   it("visar motposten för en intern överföring", async () => {

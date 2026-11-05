@@ -140,6 +140,11 @@ export async function useFakeApi(
   ];
   const budgets = new Map<string, { category_id: string; budget_minor: number }[]>();
   const goals: Record<string, unknown>[] = GOALS.map((g) => ({ ...g }));
+  const salary = {
+    id: "lon1", account: { id: "acc_1", name: "Vardag", type: "checking" }, status: "booked", transaction_date: "2026-11-25", booking_date: "2026-11-25",
+    amount_minor: 3361000, counterparty: "", counterparty_norm: "EXEMPELFÖRETAGET AB", description: "EXEMPELFÖRETAGET AB LÖN", category_id: null, category_source: "none",
+    is_internal_transfer: false, manual_transfer: null, income_type: "other", income_source: "template", transfer_pair: null, splits: [],
+  };
   const leave: Record<string, unknown>[] = [LEAVE];
   const state: FakeApi = { rules: [], budgetPuts: [] };
   // Utan bank visar översikten välkomstsidan. Kopplingen görs klar med koden som banken skickar tillbaka.
@@ -221,6 +226,13 @@ export async function useFakeApi(
     if (path === "/api/settings") return [200, { budget_period_start_day: 1, current_period: NOVEMBER }];
     if (path === "/api/transactions") return [200, { period: NOVEMBER, items: transactions, next_cursor: null }];
     const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
+    // En påhittad löneinbetalning som bara nås via sin adress, för inkomsttypen på detaljsidan (KK-22-A).
+    if (tx?.[1] === "lon1" && method === "PATCH") {
+      salary.income_type = String(body["income_type"]);
+      salary.income_source = "manual";
+      return [200, { transaction: { id: "lon1", income_type: salary.income_type, income_source: "manual" }, rule: null, updated: 2 }];
+    }
+    if (tx?.[1] === "lon1") return [200, salary];
     const found = transactions.find((t) => t.id === tx?.[1]);
     if (found && method === "PATCH") {
       found.category_id = String(body["category_id"]);
