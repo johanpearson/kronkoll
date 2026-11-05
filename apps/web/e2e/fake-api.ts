@@ -223,7 +223,20 @@ export async function useFakeApi(
       else loans.push(loan);
       return [i >= 0 ? 200 : 201, loan];
     }
-    if (path === "/api/income") {
+    if (path === "/api/insights") {
+      return [200, {
+        period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
+        history_periods: ["2026-10", "2026-09", "2026-08"],
+        anomalies: [{ category_id: "mat-livsmedel", actual_minor: 375000, baseline_minor: 257000, diff_minor: 118000, pct: 46 }],
+        recurring: [
+          { name: "Streamingtjänst", interval: "monthly", amount_minor: 14900, last_date: "2026-10-19", next_expected: "2026-11-19", yearly_minor: 178800, occurrences: 4 },
+          { name: "Hemförsäkring AB", interval: "yearly", amount_minor: 234000, last_date: "2026-02-03", next_expected: "2027-02-03", yearly_minor: 234000, occurrences: 2 },
+        ],
+        recurring_yearly_minor: 412800,
+        top_expenses: [{ id: "t1", date: "2026-11-01", name: "Möbelhuset Påhittat", amount_minor: 890000, category_id: "hushall-forbrukning", split: false }],
+        top_categories: [{ category_id: "hushall", amount_minor: 890000 }, { category_id: "mat", amount_minor: 523000 }],
+      }];
+    }    if (path === "/api/income") {
       return [200, { months: [
         { period: "2026-09", salary_minor: 1120000, parental_benefit_minor: 995000, other_minor: 78000 },
         { period: "2026-10", salary_minor: 3361000, parental_benefit_minor: 0, other_minor: 42000 },
