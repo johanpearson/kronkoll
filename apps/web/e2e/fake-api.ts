@@ -186,6 +186,13 @@ export async function useFakeApi(
       return [201, goal];
     }
     if (path === "/api/goals") return [200, { items: goals }];
+    if (path === "/api/income") {
+      return [200, { months: [
+        { period: "2026-09", salary_minor: 1120000, parental_benefit_minor: 995000, other_minor: 78000 },
+        { period: "2026-10", salary_minor: 3361000, parental_benefit_minor: 0, other_minor: 42000 },
+        { period: "2026-11", salary_minor: 3361000, parental_benefit_minor: 483000, other_minor: 281000 },
+      ] }];
+    }
     if (path === "/api/leave-periods" && method === "POST") {
       const period = { ...LEAVE, id: `l${String(leave.length + 1)}`, from: body["from"], to: body["to"], days_per_week: body["days_per_week"], employer_topup_pct: body["employer_topup_pct"] };
       leave.push(period);
