@@ -302,9 +302,10 @@ main ul > li.budget-line {
   white-space: nowrap;
 }
 
-/* En status under en rads text ska inte sträckas ut över hela raden. */
+/* En status under en rads text ska inte sträckas ut över hela raden, men får brytas på smala skärmar. */
 li.tx > .badge {
   justify-self: start;
+  white-space: normal;
 }
 
 .badge.ok {
@@ -675,4 +676,16 @@ main ul > li.budget-line.sub {
   justify-content: space-between;
   gap: var(--space-2);
   font-weight: 600;
+}
+/* Sidans rubrik med en ikonknapp till höger, t.ex. kugghjulet på Översikt. */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-5);
+}
+
+.page-header h1 {
+  margin-bottom: 0;
 }

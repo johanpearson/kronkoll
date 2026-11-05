@@ -1,11 +1,12 @@
-// Appens skal (#30): sidorna och huvudmenyn. Menyn har de vyer som finns; Inkomst läggs till när den
-// byggs. Service workern (sw/) ger offline-skal och senaste översikten i högst 24 h.
-import { Goal, House, PiggyBank, ReceiptText, Settings } from "lucide-react";
+// Appens skal (#30): sidorna och huvudmenyn. Service workern (sw/) ger offline-skal och senaste
+// översikten i högst 24 h.
+import { Goal, House, PiggyBank, ReceiptText, Wallet } from "lucide-react";
 import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { GoalDetail } from "./goals/GoalDetail.tsx";
 import { GoalsView } from "./goals/GoalsView.tsx";
 import { NewGoal } from "./goals/NewGoal.tsx";
+import { IncomeView } from "./income/IncomeView.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
 import { Link, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
@@ -33,6 +34,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/budget": BudgetView,
   "/sparmal": GoalsView,
   "/sparmal/nytt": NewGoal,
+  "/inkomst": IncomeView,
   "/installningar": SettingsView,
   "/installningar/kategorier": CategoriesView,
   "/installningar/regler": RulesView,
@@ -41,13 +43,21 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/koppla/klar": ConnectDone,
 };
 
-/** Menyn i den ordning planen har den. Koppla bank hör till Inställningar. */
+/**
+ * Menyn i den ordning planen har den. Inställningar och Koppla bank nås från Översikt (kugghjulet),
+ * så Översikt är markerad där.
+ */
 const TABS = [
-  { to: "/", label: "Översikt", Icon: House, owns: (path: string) => path === "/" },
+  {
+    to: "/",
+    label: "Översikt",
+    Icon: House,
+    owns: (path: string) => path === "/" || path === "/installningar" || path.startsWith("/installningar/") || path.startsWith("/koppla"),
+  },
   { to: "/transaktioner", label: "Transaktioner", Icon: ReceiptText, owns: (path: string) => path === "/transaktioner" || path.startsWith("/transaktioner/") },
   { to: "/budget", label: "Budget", Icon: PiggyBank, owns: (path: string) => path === "/budget" },
   { to: "/sparmal", label: "Sparmål", Icon: Goal, owns: (path: string) => path === "/sparmal" || path.startsWith("/sparmal/") },
-  { to: "/installningar", label: "Inställningar", Icon: Settings, owns: (path: string) => path === "/installningar" || path.startsWith("/installningar/") || path.startsWith("/koppla") },
+  { to: "/inkomst", label: "Inkomst", Icon: Wallet, owns: (path: string) => path === "/inkomst" || path.startsWith("/inkomst/") },
 ];
 
 /** /transaktioner/{id}: detaljsidan för en transaktion. */

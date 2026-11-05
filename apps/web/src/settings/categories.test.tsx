@@ -162,10 +162,10 @@ describe("kategorier i Inställningar (#34, KK-18-A)", () => {
     expect(screen.getByRole("alert").textContent).toContain("Det gick inte att hämta kategorierna");
   });
 
-  it("Inställningar länkar hit, och fliken Inställningar är markerad", async () => {
+  it("Inställningar länkar hit, och Översikt är markerad i menyn eftersom Inställningar nås därifrån", async () => {
     api();
     await open();
-    const tab = within(screen.getByRole("navigation", { name: "Huvudmeny" })).getByRole("link", { name: "Inställningar" });
+    const tab = within(screen.getByRole("navigation", { name: "Huvudmeny" })).getByRole("link", { name: "Översikt" });
     expect(tab.getAttribute("aria-current")).toBe("page");
   });
 });

@@ -44,7 +44,7 @@ test.describe("Logga ut och rensa enheten (KK-35-A)", () => {
     await page.evaluate(() => { localStorage.setItem("kronkoll.theme", "dark"); });
     expect(await page.evaluate(() => caches.keys())).toEqual(expect.arrayContaining(["kronkoll-skal-v1", "kronkoll-data-v1"]));
 
-    await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Inställningar" }).click();
+    await page.getByRole("button", { name: "Inställningar" }).click();
     await page.getByRole("button", { name: "Logga ut och rensa enheten" }).click();
     await page.waitForURL("**/cdn-cgi/access/logout");
 
