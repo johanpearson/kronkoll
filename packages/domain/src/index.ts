@@ -5,6 +5,7 @@ export { addDays, addMonths, daysBetween, yearMonthOf, type YearMonth } from "./
 export { fixedClock, stockholmDate, todayInStockholm, type Clock } from "./clock.ts";
 export { easterSunday, isBankDay, previousBankDayOnOrBefore, swedishBankHolidays } from "./bankdays.ts";
 export { budgetPeriodForKey, budgetPeriodOf, currentBudgetPeriod, weekStart, type BudgetPeriod } from "./period.ts";
+export { loanMonthly, loanTotals, RATE_ENDING_DAYS, rateFixedStatus, type Loan, type LoanMonthly } from "./loans.ts";
 export {
   averageMonthlySaving,
   forecastGoal,
