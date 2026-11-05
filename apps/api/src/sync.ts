@@ -5,11 +5,12 @@ import {
   accountRepository,
   connectionRepository,
   deriveKeys,
+  incomeRepository,
   ruleRepository,
   syncRunRepository,
   transactionRepository,
 } from "@kronkoll/adapter-d1";
-import { applyRules, syncConnection, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
+import { applyIncomeRules, applyRules, syncConnection, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
 import type { Logger } from "@kronkoll/logging";
 import { recomputeTransfers } from "./transfers.ts";
 
@@ -79,6 +80,7 @@ export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps, only
       }
     }
     await categorizeNew(env.DB, logger);
+    await classifyIncome(env.DB, logger);
     await markTransfers(env.DB, logger);
   } catch {
     logger.error("sync.failed", { error_code: "FAILED" });
@@ -98,6 +100,22 @@ async function categorizeNew(db: D1Database, logger: Logger): Promise<void> {
     if (changes.length > 0) logger.info("sync.categorized", { count: changes.length });
   } catch {
     logger.error("sync.categorize_failed", { error_code: "FAILED" });
+  }
+}
+
+/**
+ * Klassar inbetalningar som lön, föräldrapenning eller övrigt (KK-22-A). Alla inbetalningar räknas om, så
+ * att en nyss inlärd regel gäller bakåt, men en manuell klassning rörs aldrig. Bara ändringar skrivs.
+ * Ett fel här stoppar inte synken.
+ */
+async function classifyIncome(db: D1Database, logger: Logger): Promise<void> {
+  try {
+    const store = incomeRepository(db);
+    const changes = applyIncomeRules(await store.incoming(), await store.rules());
+    await store.setIncome(changes);
+    if (changes.length > 0) logger.info("sync.income_classified", { count: changes.length });
+  } catch {
+    logger.error("sync.income_classify_failed", { error_code: "FAILED" });
   }
 }
 

@@ -167,6 +167,34 @@ describe("kategorisering efter synken (KK-18, F-dataflode)", () => {
   });
 });
 
+describe("inkomstklassning efter synken (KK-22-A)", () => {
+  it("klassar Försäkringskassan, lön och övrigt i meddelandet, och rör aldrig en manuell klassning", async () => {
+    await seedConnection("c1");
+    const { deps, logs } = setup(
+      fakeBank({
+        transactions: [
+          bankTx({ providerTxId: "fk", amountMinor: 1_500_000, counterparty: "", description: "FÖRSÄKRINGSKASSAN" }),
+          bankTx({ providerTxId: "lon", amountMinor: 3_300_000, counterparty: "", description: "LÖN EXEMPEL AB" }),
+          bankTx({ providerTxId: "swish", amountMinor: 20_000, counterparty: "", description: "Swish från Anna" }),
+          bankTx({ providerTxId: "kaffe" }),
+        ],
+      }),
+    );
+    await runSync(env(), "cron", deps);
+    const rows = () => db.prepare(`SELECT provider_tx_id AS id, income_type AS t, income_source AS s FROM transactions ORDER BY id`).all();
+    expect((await rows()).results).toEqual([
+      { id: "fk", t: "parental_benefit", s: "template" },
+      { id: "kaffe", t: null, s: "none" },
+      { id: "lon", t: "salary", s: "template" },
+      { id: "swish", t: "other", s: "none" },
+    ]);
+    expect(logs.lines.at(-1)).toEqual({ level: "info", event: "sync.income_classified", fields: { count: 3 } });
+    await db.prepare(`UPDATE transactions SET income_type = 'other', income_source = 'manual' WHERE provider_tx_id = 'lon'`).run();
+    await runSync(env(), "manual", deps);
+    expect((await rows()).results).toContainEqual({ id: "lon", t: "other", s: "manual" });
+  });
+});
+
 describe("interna överföringar efter synken (KK-20-C, F-dataflode)", () => {
   /** Påhittade transaktioner (KK-13) direkt i databasen, en per konto och dag. */
   async function insert(id: string, accountId: string, amount: number, date = "2026-11-02") {

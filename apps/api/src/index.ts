@@ -12,6 +12,7 @@ import { createCategory, listCategories, mergeCategory, patchCategory } from "./
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
 import { addContribution, createGoal, getGoal, listGoals } from "./goals.ts";
+import { getIncome } from "./income.ts";
 import { createLeavePeriod, deleteLeavePeriod, listLeavePeriods } from "./leave.ts";
 import { getOverview } from "./overview.ts";
 import { getSettings, patchSettings } from "./settings.ts";
@@ -217,6 +218,10 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, PATCH" });
   }
 
+  if (pathname === "/api/income") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return getIncome(request, env, context.sync);
+  }
   if (pathname === "/api/overview") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
     return getOverview(request, env, context.sync);
