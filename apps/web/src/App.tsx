@@ -3,6 +3,7 @@
 import { Goal, House, PiggyBank, ReceiptText, Settings } from "lucide-react";
 import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
+import { GoalDetail } from "./goals/GoalDetail.tsx";
 import { GoalsView } from "./goals/GoalsView.tsx";
 import { NewGoal } from "./goals/NewGoal.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
@@ -53,12 +54,16 @@ const TABS = [
 const DETAIL = /^\/transaktioner\/([^/]+)$/u;
 /** /installningar/koppling/{id}: sidan om en bankkoppling. */
 const CONNECTION = /^\/installningar\/koppling\/([^/]+)$/u;
+/** /sparmal/{id}: sidan för ett sparmål. /sparmal/nytt är formuläret. */
+const GOAL = /^\/sparmal\/(?!nytt$)([^/]+)$/u;
 
 function page(path: string): React.JSX.Element {
   const detailId = DETAIL.exec(path)?.[1];
   if (detailId !== undefined) return <TransactionDetail key={detailId} id={decodeURIComponent(detailId)} />;
   const connectionId = CONNECTION.exec(path)?.[1];
   if (connectionId !== undefined) return <ConnectionView key={connectionId} id={decodeURIComponent(connectionId)} />;
+  const goalId = GOAL.exec(path)?.[1];
+  if (goalId !== undefined) return <GoalDetail key={goalId} id={decodeURIComponent(goalId)} />;
   const Page = ROUTES[path] ?? NotFound;
   return <Page />;
 }

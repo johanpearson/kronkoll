@@ -83,7 +83,7 @@ test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {
   await expect(page.getByText("Ingen budget är satt för perioden än.")).toBeVisible();
 });
 
-test("skapa ett sparmål och se det i listan (V-e2e-goal, KK-21)", async ({ page }) => {
+test("skapa ett sparmål, se det i listan och lägg till en avsättning (V-e2e-goal, KK-21)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/");
   await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Sparmål" }).click();
@@ -98,4 +98,13 @@ test("skapa ett sparmål och se det i listan (V-e2e-goal, KK-21)", async ({ page
   const row = page.getByRole("list", { name: "Dina sparmål" }).getByRole("listitem").filter({ hasText: "Ny cykel" });
   await expect(row).toContainText("0,00 kr av 12 000,00 kr");
   await expect(row).toContainText("Nås inte i nuvarande takt");
+
+  await row.getByRole("link", { name: "Ny cykel" }).click();
+  await expect(page.getByRole("heading", { level: 1, name: "Ny cykel" })).toBeVisible();
+  const deposit = page.getByRole("form", { name: "Ny avsättning" });
+  await deposit.getByLabel("Belopp (kr)").fill("3 000");
+  await deposit.getByRole("button", { name: "Lägg till" }).click();
+  await expect(page.getByRole("status")).toHaveText("Avsättningen är sparad.");
+  await expect(page.getByRole("main")).toContainText("3 000,00 kr av 12 000,00 kr (25 %)");
+  await expect(page.getByRole("list", { name: "Avsättningar" }).getByRole("listitem")).toHaveCount(1);
 });

@@ -1,8 +1,8 @@
 // Sparmål (#39, KK-21): alla mål med hur mycket som är sparat, när de nås i nuvarande takt och om de
-// är i fas med måldatumet. Sidan för ett mål kommer i en egen PR.
+// är i fas med måldatumet. Namnet leder till målets sida.
 import { formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
-import { navigate } from "../router.tsx";
+import { Link, navigate } from "../router.tsx";
 import { fetchGoals, formatPeriod, goalBadge, type Goal } from "./goals.ts";
 
 type State = { readonly kind: "loading" } | { readonly kind: "error" } | { readonly kind: "ready"; readonly goals: readonly Goal[] };
@@ -13,7 +13,9 @@ function GoalRow({ goal }: { goal: Goal }) {
   return (
     <li className="tx goal">
       <div className="tx-main">
-        <span className="tx-name">{goal.name}</span>
+        <span className="tx-name">
+          <Link to={`/sparmal/${encodeURIComponent(goal.id)}`}>{goal.name}</Link>
+        </span>
         {badge && <span className={`badge ${badge.tone}`}>{badge.text}</span>}
       </div>
       <progress className="budget-bar" aria-hidden="true" max={100} value={percent} />

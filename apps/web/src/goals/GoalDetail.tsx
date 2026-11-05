@@ -1,0 +1,155 @@
+// Ett sparmål (#39, KK-21): hur mycket som är sparat, prognos, måldatum och takt, vad som krävs per
+// månad för att hinna, och avsättningarna. Mål med egna avsättningar får en ny avsättning eller ett
+// uttag här; ett kontos mål följer saldot.
+import { formatDateShort, formatSek } from "@kronkoll/domain";
+import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
+import { field, postJson } from "../api.ts";
+import { Link } from "../router.tsx";
+import { useToast } from "../toast.tsx";
+import { fetchGoal, formatMonthLong, formatPeriod, goalBadge, toGoal, type Goal } from "./goals.ts";
+import { parseKronor } from "./NewGoal.tsx";
+
+type State = { readonly kind: "loading" } | { readonly kind: "missing" } | { readonly kind: "error" } | { readonly kind: "ready"; readonly goal: Goal };
+
+/** Vad som krävs för att hinna till måldatum, när målet inte är i fas. */
+function advice(goal: Goal): string | null {
+  const f = goal.forecast;
+  if (f.kind === "reached" || goal.targetDate === null || f.requiredMonthlyMinor === null) return null;
+  if (f.kind === "eta" && f.onTrack === true) return null;
+  const needed = `För att nå målet till ${formatMonthLong(goal.targetDate)} behövs ${formatSek(f.requiredMonthlyMinor)}/mån`;
+  return f.kind === "never" ? `${needed}.` : `${needed} (nu ${formatSek(goal.monthlyRateMinor)}/mån).`;
+}
+
+function Deposit(props: { goalId: string; onSaved: (goal: Goal) => void }) {
+  const toast = useToast();
+  const [amount, setAmount] = useState("");
+  const [withdrawal, setWithdrawal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const save = async (event: SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const ore = parseKronor(amount);
+    if (ore === null || ore === 0) {
+      setError("Skriv beloppet i kronor, till exempel 3 000.");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    const { status, body } = await postJson(`/api/goals/${encodeURIComponent(props.goalId)}/contributions`, { amount_minor: withdrawal ? -ore : ore });
+    setBusy(false);
+    const goal = status === 201 ? toGoal(body) : null;
+    if (goal) {
+      setAmount("");
+      setWithdrawal(false);
+      toast.done(withdrawal ? "Uttaget är sparat." : "Avsättningen är sparad.");
+      props.onSaved(goal);
+    } else setError(field(body, "error") === "goal_uses_account" ? "Målet följer ett kontos saldo och har inga egna avsättningar." : "Det gick inte att spara. Försök igen.");
+  };
+
+  return (
+    <form className="card goal-form" aria-label="Ny avsättning" onSubmit={(e) => void save(e)}>
+      <label>
+        Belopp (kr)
+        <input value={amount} inputMode="decimal" onChange={(e) => { setAmount(e.target.value); }} />
+      </label>
+      <label className="check">
+        <input type="checkbox" checked={withdrawal} onChange={(e) => { setWithdrawal(e.target.checked); }} />
+        Det är ett uttag
+      </label>
+      {error && <p role="alert">{error}</p>}
+      <p className="actions">
+        <button type="submit" className="primary" disabled={busy}>
+          {busy ? "Sparar…" : "Lägg till"}
+        </button>
+      </p>
+    </form>
+  );
+}
+
+export function GoalDetail({ id }: { id: string }) {
+  const [state, setState] = useState<State>({ kind: "loading" });
+
+  const load = useCallback(async () => {
+    const goal = await fetchGoal(id);
+    setState(goal === null ? { kind: "missing" } : goal === "error" ? { kind: "error" } : { kind: "ready", goal });
+  }, [id]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const back = (
+    <p>
+      <Link to="/sparmal">‹ Sparmål</Link>
+    </p>
+  );
+  if (state.kind === "loading") return <main>{back}<p>Hämtar…</p></main>;
+  if (state.kind !== "ready") {
+    return (
+      <main>
+        {back}
+        <p role="alert">{state.kind === "missing" ? "Sparmålet finns inte." : "Det gick inte att hämta sparmålet. Försök igen om en stund."}</p>
+      </main>
+    );
+  }
+
+  const goal = state.goal;
+  const f = goal.forecast;
+  const badge = goalBadge(goal);
+  const percent = Math.min(100, Math.floor((goal.savedMinor * 100) / goal.targetMinor));
+  const tip = advice(goal);
+  return (
+    <main>
+      {back}
+      <h1>{goal.name}</h1>
+      <section className="card">
+        <p className="goal-progress">
+          {formatSek(goal.savedMinor)} av {formatSek(goal.targetMinor)} ({percent} %)
+          {badge && <span className={`badge ${badge.tone}`}>{badge.text}</span>}
+        </p>
+        <progress className="budget-bar" aria-hidden="true" max={100} value={percent} />
+      </section>
+      <dl className="card stats">
+        <div>
+          <dt>Prognos</dt>
+          <dd>{f.kind === "eta" ? formatPeriod(f.reachPeriod) : f.kind === "reached" ? "Nått" : "Nås inte"}</dd>
+        </div>
+        <div>
+          <dt>Måldatum</dt>
+          <dd>{goal.targetDate === null ? "Inget" : formatPeriod(goal.targetDate.slice(0, 7))}</dd>
+        </div>
+        <div>
+          <dt>Takt</dt>
+          <dd>{formatSek(goal.monthlyRateMinor)}/mån</dd>
+        </div>
+      </dl>
+      {goal.accountMissing && <p role="alert">Kontot som målet följde finns inte längre, så inget räknas som sparat.</p>}
+      {f.kind === "never" && !goal.accountMissing && <p className="note" role="note">Nås inte i nuvarande takt – inget sparat de senaste 3 månaderna.</p>}
+      {tip && <p className="note" role="note">{tip}</p>}
+      {goal.source === "account" ? (
+        !goal.accountMissing && <p>Saldot på kontot räknas som sparat. Takten är snittet av insättningar och uttag de senaste 3 månaderna.</p>
+      ) : (
+        <>
+          <h2>Avsättningar</h2>
+          {goal.contributions.length === 0 ? (
+            <p>Inga avsättningar än.</p>
+          ) : (
+            <ul aria-label="Avsättningar">
+              {goal.contributions.map((c, i) => (
+                <li key={`${c.date}-${String(i)}`} className="tx">
+                  <div className="tx-main">
+                    <span className="tx-name">{c.amountMinor < 0 ? "Uttag" : "Avsättning"}</span>
+                    <span className={c.amountMinor > 0 ? "amount income" : "amount"}>{formatSek(c.amountMinor)}</span>
+                  </div>
+                  <small className="tx-notes">{formatDateShort(c.date)}</small>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Deposit goalId={goal.id} onSaved={(saved) => { setState({ kind: "ready", goal: saved }); }} />
+        </>
+      )}
+    </main>
+  );
+}
