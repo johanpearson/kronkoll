@@ -131,3 +131,11 @@ test("sparmålets sida visar hur planerad ledighet försenar målet (KK-23-C)", 
   await page.goto("/sparmal/g1");
   await expect(page.getByRole("note").filter({ hasText: "Med ledighet" })).toContainText("nås målet mars 2028, 3 mån senare.");
 });
+test("ändra en inbetalnings inkomsttyp på transaktionens sida (KK-22-A)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/transaktioner/lon1");
+  await expect(page.getByRole("group", { name: "Inkomsttyp" }).getByLabel("Övrigt")).toBeChecked();
+  await page.getByRole("group", { name: "Inkomsttyp" }).getByLabel("Lön").check();
+  await expect(page.getByRole("status")).toHaveText("Inkomsttypen är sparad. 2 tidigare inbetalningar fick samma typ.");
+  await expect(page.getByRole("main")).toContainText("Lön (vald av dig)");
+});

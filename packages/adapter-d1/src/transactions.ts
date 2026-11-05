@@ -79,6 +79,9 @@ export interface TransactionDetail {
   readonly categorySource: Row["categorySource"];
   readonly isInternalTransfer: boolean;
   readonly manualTransfer: boolean | null;
+  /** Inkomsttyp för en inbetalning (KK-22), null om den inte är klassad. */
+  readonly incomeType: "salary" | "parental_benefit" | "other" | null;
+  readonly incomeSource: Row["categorySource"];
   readonly transferPair: { id: string; accountName: string; amountMinor: number; transactionDate: string } | null;
 }
 
@@ -371,6 +374,8 @@ export function transactionRepository(d1: D1Database) {
           categorySource: transactions.categorySource,
           isInternalTransfer: transactions.isInternalTransfer,
           manualTransfer: transactions.manualTransfer,
+          incomeType: transactions.incomeType,
+          incomeSource: transactions.incomeSource,
           pairId: transactions.transferPairId,
         })
         .from(transactions)
@@ -403,6 +408,8 @@ export function transactionRepository(d1: D1Database) {
         categorySource: row.categorySource,
         isInternalTransfer: row.isInternalTransfer,
         manualTransfer: row.manualTransfer,
+        incomeType: row.incomeType,
+        incomeSource: row.incomeSource,
         transferPair: pair ?? null,
       };
     },

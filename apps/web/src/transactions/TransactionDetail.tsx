@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { field, getJson, putJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { CategoryEditor } from "./CategoryEditor.tsx";
+import { INCOME_TYPES, IncomeTypePicker, incomeLabel, type IncomeType } from "./IncomeType.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "./TransactionsView.tsx";
 
@@ -24,6 +25,8 @@ interface Detail {
   readonly categorySource: string;
   readonly internal: boolean;
   readonly manualTransfer: boolean | null;
+  readonly incomeType: IncomeType | null;
+  readonly incomeSource: string;
   readonly pair: { accountName: string; amountMinor: number; transactionDate: string } | null;
   readonly splits: readonly { categoryId: string; amountMinor: number }[];
 }
@@ -55,6 +58,8 @@ function toDetail(body: unknown): Detail | null {
     categorySource: text(field(body, "category_source")),
     internal: field(body, "is_internal_transfer") === true,
     manualTransfer: typeof manual === "boolean" ? manual : null,
+    incomeType: INCOME_TYPES.find((t) => t.value === field(body, "income_type"))?.value ?? null,
+    incomeSource: text(field(body, "income_source")),
     pair: typeof pairAmount === "number" ? { accountName: text(field(pair, "account_name")), amountMinor: pairAmount, transactionDate: text(field(pair, "transaction_date")) } : null,
     splits: Array.isArray(splits)
       ? splits.flatMap((p) => {
@@ -126,6 +131,8 @@ export function TransactionDetail({ id }: { id: string }) {
     setMode(null);
     void load();
   };
+  // Bara inbetalningar som inte är interna överföringar har en inkomsttyp (KK-22).
+  const income = d.amountMinor > 0 && !d.internal;
 
   return (
     <main>
@@ -138,6 +145,7 @@ export function TransactionDetail({ id }: { id: string }) {
         <div><dt>Konto</dt><dd>{d.accountName}</dd></div>
         <div><dt>Kategori</dt><dd>{category}</dd></div>
         <div><dt>Räknas</dt><dd>{counting(d)}</dd></div>
+        {income && <div><dt>Inkomsttyp</dt><dd>{incomeLabel(d.incomeType, d.incomeSource)}</dd></div>}
         {d.pair && (
           <div><dt>Motpost</dt><dd>{`${d.pair.accountName} · ${formatSek(d.pair.amountMinor)} · ${formatDateShort(d.pair.transactionDate)}`}</dd></div>
         )}
@@ -163,6 +171,7 @@ export function TransactionDetail({ id }: { id: string }) {
           {d.manualTransfer !== null && <button type="button" disabled={busy} onClick={() => void setTransfer(null)}>Låt Kronkoll avgöra</button>}
         </p>
       )}
+      {mode === null && income && <IncomeTypePicker transactionId={d.id} value={d.incomeType} onSaved={() => void load()} />}
       {mode === "category" && (
         <section className="card tx-editor">
           <CategoryEditor
