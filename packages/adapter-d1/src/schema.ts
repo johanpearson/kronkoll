@@ -378,3 +378,29 @@ export const incomeParameters = sqliteTable(
     check("income_parameters_source", sql`source_url LIKE 'https://%'`),
   ],
 );
+/**
+ * Lån (KK-36, beslut D-loans). Läggs in för hand; inget lån hämtas från banken. Ett bolån i flera
+ * delar är ett lån per del. Räntan i hundradels procent (350 = 3,50 %).
+ */
+export const loans = sqliteTable(
+  "loans",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    lender: text("lender"),
+    balanceMinor: integer("balance_minor").notNull(),
+    interestRateBp: integer("interest_rate_bp").notNull(),
+    /** Sista dagen med bunden ränta, null för rörlig ränta. */
+    rateFixedUntil: text("rate_fixed_until"),
+    amortizationMinor: integer("amortization_minor").notNull(),
+    createdAt: createdAt(),
+  },
+  () => [
+    check("loans_name", sql`length(trim(name)) BETWEEN 1 AND 60`),
+    check("loans_lender", sql`lender IS NULL OR length(lender) <= 60`),
+    check("loans_balance", sql`balance_minor >= 0`),
+    check("loans_rate", sql`interest_rate_bp BETWEEN 0 AND 10000`),
+    check("loans_amortization", sql`amortization_minor >= 0`),
+    check("loans_rate_fixed_until", sql`rate_fixed_until IS NULL OR ${isoDate("rate_fixed_until")}`),
+  ],
+);

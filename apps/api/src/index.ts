@@ -12,6 +12,7 @@ import { createCategory, listCategories, mergeCategory, patchCategory } from "./
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
 import { addContribution, createGoal, getGoal, listGoals } from "./goals.ts";
+import { deleteLoan, listLoans, putLoan } from "./loans.ts";
 import { getIncome } from "./income.ts";
 import { createLeavePeriod, deleteLeavePeriod, listLeavePeriods } from "./leave.ts";
 import { getOverview } from "./overview.ts";
@@ -167,6 +168,18 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (ruleMatch?.[1]) {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     return applyRule(env, ruleMatch[1]);
+  }
+
+  const loanMatch = /^\/api\/loans\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (loanMatch?.[1]) {
+    if (request.method === "PUT") return putLoan(request, env, loanMatch[1], context.sync);
+    if (request.method === "DELETE") return deleteLoan(env, loanMatch[1]);
+    return json({ error: "method_not_allowed" }, 405, { allow: "PUT, DELETE" });
+  }
+
+  if (pathname === "/api/loans") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return listLoans(env, context.sync);
   }
 
   const contributionMatch = /^\/api\/goals\/([A-Za-z0-9_-]{1,64})\/contributions$/u.exec(pathname);

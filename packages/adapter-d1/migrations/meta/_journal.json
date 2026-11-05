@@ -85,6 +85,13 @@
       "when": 1793797483635,
       "tag": "0011_income_template_rules",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793873800230,
+      "tag": "0012_loans",
+      "breakpoints": true
     }
   ]
 }
