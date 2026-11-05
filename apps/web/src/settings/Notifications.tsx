@@ -1,13 +1,15 @@
-// Notiser via Web Push (KK-27, D-notify): reglage för samtycke som går ut, budget överskriden och synk som
-// misslyckas. Valen gäller den här enheten. Första valet ber webbläsaren om lov; inga val kvar tar bort
-// prenumerationen. Bannern i appen visar samma sak oavsett (R-5).
-import { useEffect, useState } from "react";
+// Notiser via Web Push (KK-27, D-notify): ett reglage per typ (samtycke som går ut, budget överskriden och
+// synk som misslyckas) och Spara. Reglagen ändrar bara formuläret; först Spara ber webbläsaren om lov och
+// skickar valen. Valen gäller den här enheten, och inga val kvar tar bort prenumerationen. Bannern i
+// appen visar samma sak oavsett (R-5).
+import { useEffect, useState, type SyntheticEvent } from "react";
 import { deleteWithBody, field, getJson, postJson } from "../api.ts";
+import { useToast } from "../toast.tsx";
 import { pushDevice, storedTopics, type PushDevice } from "./push-device.ts";
 
 const TOPICS = [
-  { value: "consent", label: "Samtycket går snart ut (14, 3 och 0 dagar före)" },
-  { value: "budget_over", label: "Budget överskriden" },
+  { value: "consent", label: "Samtycket hos banken går snart ut" },
+  { value: "budget_over", label: "En budget är överskriden" },
   { value: "sync_failed", label: "Synken misslyckas flera gånger i rad" },
 ] as const;
 
@@ -43,14 +45,19 @@ async function save(device: PushDevice, publicKey: string, topics: readonly stri
 }
 
 export function Notifications({ device = pushDevice }: { readonly device?: PushDevice }) {
+  const toast = useToast();
   const [state, setState] = useState<State>({ kind: "loading" });
+  /** Reglagens läge. Ändras fritt och skickas först med Spara. */
+  const [chosen, setChosen] = useState<readonly string[]>([]);
 
   useEffect(() => {
     let current = true;
     void load(device)
       .catch((): State => ({ kind: "off", text: `Den här webbläsaren kan inte ta emot notiser. ${IOS_HINT}` }))
       .then((next) => {
-        if (current) setState(next);
+        if (!current) return;
+        setState(next);
+        if (next.kind === "ready") setChosen(next.topics);
       });
     return () => {
       current = false;
@@ -60,25 +67,58 @@ export function Notifications({ device = pushDevice }: { readonly device?: PushD
   if (state.kind === "loading") return <p>Hämtar…</p>;
   if (state.kind === "off") return <p>{state.text}</p>;
 
-  const toggle = async (topic: string, on: boolean) => {
-    const topics = TOPICS.map((t) => t.value).filter((t) => (t === topic ? on : state.topics.includes(t)));
-    setState({ ...state, saving: true, message: null, failed: false });
-    const error = await save(device, state.publicKey, topics).catch(() => "Det gick inte att spara. Försök igen.");
-    if (error === null) storedTopics.set(topics);
-    setState({ ...state, topics: error === null ? topics : state.topics, saving: false, message: error ?? "Sparat.", failed: error !== null });
+  const ordered = (topics: readonly string[]) => TOPICS.map((t) => t.value).filter((t) => topics.includes(t));
+  const changed = ordered(chosen).join() !== ordered(state.topics).join();
+  const flip = (topic: string, on: boolean) => {
+    setChosen(on ? [...chosen, topic] : chosen.filter((t) => t !== topic));
+    if (state.failed) setState({ ...state, message: null, failed: false });
   };
 
+  const submit = async (event: SyntheticEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const topics = ordered(chosen);
+    setState({ ...state, saving: true, message: null, failed: false });
+    const error = await save(device, state.publicKey, topics).catch(() => "Det gick inte att spara. Försök igen.");
+    if (error === null) {
+      storedTopics.set(topics);
+      toast.done(topics.length === 0 ? "Notiserna är avstängda på den här enheten." : "Notiserna är sparade.");
+    }
+    setState({ ...state, topics: error === null ? topics : state.topics, saving: false, message: error, failed: error !== null });
+  };
+
+  const on = state.topics.length > 0;
   return (
-    <fieldset className="choices" disabled={state.saving}>
-      <legend>Skicka en notis till den här enheten när</legend>
-      {TOPICS.map((t) => (
-        <label key={t.value}>
-          <input type="checkbox" checked={state.topics.includes(t.value)} onChange={(e) => void toggle(t.value, e.target.checked)} />
-          {t.label}
-        </label>
-      ))}
+    <form className="notify-form" aria-label="Notiser" onSubmit={(e) => void submit(e)}>
+      <p className={on ? "notify-status on" : "notify-status"}>{on ? "Notiser är på för den här enheten." : "Notiser är av för den här enheten."}</p>
+      <ul className="switch-list">
+        {TOPICS.map((t) => (
+          <li key={t.value}>
+            <label>
+              <span>{t.label}</span>
+              <input
+                type="checkbox"
+                role="switch"
+                className="switch"
+                checked={chosen.includes(t.value)}
+                disabled={state.saving}
+                onChange={(e) => { flip(t.value, e.target.checked); }}
+              />
+            </label>
+          </li>
+        ))}
+      </ul>
+      {state.message && <p role="alert">{state.message}</p>}
+      <p className="actions">
+        <button type="submit" className="primary" disabled={!changed || state.saving}>
+          {state.saving ? "Sparar…" : "Spara"}
+        </button>
+        {changed && !state.saving && (
+          <button type="button" onClick={() => { setChosen(state.topics); }}>
+            Ångra
+          </button>
+        )}
+      </p>
       <small>Notiserna innehåller aldrig belopp. {IOS_HINT}</small>
-      {state.message && <p role={state.failed ? "alert" : "status"}>{state.message}</p>}
-    </fieldset>
+    </form>
   );
 }
