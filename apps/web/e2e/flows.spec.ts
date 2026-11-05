@@ -159,3 +159,14 @@ test("lägg till ett lån och se det i lånöversikten (V-e2e-loans, KK-36)", as
   await expect(loans.nth(1)).toContainText("Rörlig ränta");
   await expect(page.getByRole("definition").first()).toHaveText("1 286 000,00 kr");
 });
+test("insikterna nås från översikten och visar avvikelse, återkommande dragningar och största utgifter (KK-24)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/");
+  await page.getByRole("link", { name: "Insikter: avvikelser, återkommande dragningar och största utgifter" }).click();
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Insikter");
+  await expect(page.getByRole("list", { name: "Avvikelser" })).toContainText("Mat › Livsmedel");
+  await expect(page.getByRole("list", { name: "Avvikelser" })).toContainText("+46 %");
+  await expect(page.getByRole("list", { name: "Återkommande dragningar" }).getByRole("listitem")).toHaveCount(2);
+  await page.getByRole("link", { name: "Möbelhuset Påhittat" }).click();
+  await expect(page).toHaveURL(/\/transaktioner\/t1$/u);
+});
