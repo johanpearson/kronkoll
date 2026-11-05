@@ -25,3 +25,4 @@ export { overviewRepository, type ConnectionAccount, type OverviewAccountRow, ty
 export { goalRepository, type GoalRecord, type NewGoal } from "./goals.ts";
 export { leaveRepository, type LeavePeriodRecord } from "./leave.ts";
 export { incomeRepository, type IncomeMonth } from "./income.ts";
+export { loanRepository, type LoanRecord } from "./loans.ts";

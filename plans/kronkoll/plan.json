@@ -701,8 +701,8 @@
     },
     {
       "id": "api-loans", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/loans",
-      "summary": "Alla lån med månadskostnad och totalsummor. PUT /api/loans/{id} lägger till eller ändrar ett lån.",
-      "responses": { "200": { "body": { "loans": [{ "id": "loan_bolan", "name": "Bolån", "lender": "Skandia", "balance_minor": 240000000, "interest_rate_bp": 350, "rate_fixed_until": "2026-12-12", "amortization_minor": 400000, "monthly_interest_minor": 700000, "monthly_amortization_minor": 400000, "monthly_cost_minor": 1100000, "rate_fixed_days_left": 41, "rate_fixed_ending": true }], "total_balance_minor": 248600000, "total_monthly_cost_minor": 1395000 } } },
+      "summary": "Alla lån med månadskostnad, fördelning på ränta och amortering, bindningstid och totalsummor. PUT /api/loans/{id} lägger till (201) eller ändrar (200) ett lån; DELETE /api/loans/{id} tar bort det. Byggt i #72.",
+      "responses": { "200": { "body": { "loans": [{ "id": "loan_bolan", "name": "Bolån", "lender": "Skandia", "balance_minor": 240000000, "interest_rate_bp": 350, "rate_fixed_until": "2026-12-12", "amortization_minor": 400000, "monthly_interest_minor": 700000, "monthly_amortization_minor": 400000, "monthly_cost_minor": 1100000, "rate_fixed_days_left": 41, "rate_fixed_ending": true }], "total_balance_minor": 248600000, "total_monthly_interest_minor": 749808, "total_monthly_amortization_minor": 645000, "total_monthly_cost_minor": 1394808 } } },
       "satisfies": ["KK-36-A", "KK-36-C"]
     },
     {
