@@ -677,18 +677,18 @@
       "id": "KK-36",
       "title": "Lånöversikt",
       "normative_strength": "should",
-      "statement": "Användaren ser sina lån (bolån hos Skandia och billån eller privatlån) med kvarvarande skuld, ränta, bindningstid, amortering per månad och månadskostnad. I budgeten räknas räntan som utgift och amorteringen som sparande, eftersom den minskar skulden. (Motiv: Lånen är hushållets största fasta kostnad, och utan uppdelningen ser amorteringen ut som en utgift. Ägarens önskemål 2026-11-01.)",
-      "verification_note": "Unit-tester (TDD) för månadskostnad och uppdelning av en lånebetalning i ränta och amortering; E2E av lånvyn.",
+      "statement": "Användaren ser sina lån (bolån, även i flera delar, och billån eller privatlån) med kvarvarande skuld, ränta, bindningstid, amortering per månad och månadskostnad, och hur månadskostnaden fördelar sig på ränta och amortering. Lånebetalningarna delas inte upp: hela betalningen räknas som boendekostnad i budgeten. (Motiv: Lånen är hushållets största fasta kostnad. Ägarens önskemål 2026-11-01; ändrat 2026-11-05: inget lån syns som konto i Enable Banking, och amorteringen ska inte räknas som sparande.)",
+      "verification_note": "Unit-tester (TDD) för månadskostnad, fördelning på ränta och amortering och bindningstid; E2E av lånvyn.",
       "acceptance_criteria": [
         {
           "id": "KK-36-A",
-          "text": "Ett lån kan läggas till och ändras för hand med namn, långivare, kvarvarande skuld, ränta, bindningstid och amortering per månad. Om banken visar lånet som ett konto via Enable Banking uppdateras skulden automatiskt vid synk."
+          "text": "Ett lån kan läggas till och ändras för hand med namn, långivare, kvarvarande skuld, ränta, bindningstid och amortering per månad. Lån hämtas inte från banken (ägarens besked 2026-11-05: inget lån syns som konto)."
         },
         {
           "id": "KK-36-B",
           "given": "ett bolån på 2 400 000 kr med 3,5 % ränta och amortering 4 000 kr/mån",
-          "when": "månadens betalning på 11 000 kr till lånet importeras",
-          "then": "delas den upp i 7 000 kr ränta (utgift) och 4 000 kr amortering (sparande), och bara räntan räknas i budgetutfallet"
+          "when": "lånvyn räknar månadskostnaden",
+          "then": "visas 11 000 kr/mån, varav 7 000 kr ränta och 4 000 kr amortering, och lånebetalningen räknas i budgeten som en boendekostnad, hel och odelad"
         },
         {
           "id": "KK-36-C",

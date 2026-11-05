@@ -303,7 +303,7 @@
     },
     {
       "id": "lan", "title": "Lån", "group": "Huvudvyer", "nav_parent": "sparmal",
-      "description": "Lånöversikt (KK-36). Lån läggs in för hand; bolånet hos Skandia uppdateras automatiskt om Enable Banking visar det som ett konto. **Antagande:** exempeldatan är påhittad.",
+      "description": "Lånöversikt (KK-36). Lån läggs in för hand, ett bolån i flera delar som ett lån per del. Inget lån hämtas från banken (ägarens besked 2026-11-05). **Antagande:** exempeldatan är påhittad.",
       "satisfies": ["KK-36"],
       "elements": [
         { "id": "loan-total", "type": "row", "satisfies": ["KK-36-C"], "elements": [
@@ -314,7 +314,7 @@
           { "title": "Bolån · Skandia", "subtitle": "2 400 000 kr · 3,50 % · amortering 4 000 kr/mån · 11 000 kr/mån", "badge": "Bindningstid slutar om 41 dagar", "tone": "warn" },
           { "title": "Billån", "subtitle": "86 000 kr · 6,95 % · amortering 2 450 kr/mån · 2 950 kr/mån", "badge": "Rörlig ränta", "tone": "info" }
         ] },
-        { "id": "loan-split-note", "type": "text", "text": "Räntan räknas som utgift i budgeten. Amorteringen räknas som sparande, eftersom den minskar skulden.", "satisfies": ["KK-36-B"] },
+        { "id": "loan-split-note", "type": "text", "text": "Lånebetalningen räknas hel som boendekostnad i budgeten. Här ser du hur den fördelar sig på ränta och amortering.", "satisfies": ["KK-36-B"] },
         { "id": "new-loan", "type": "button", "label": "Lägg till lån", "variant": "primary", "toast": "Lån sparat", "satisfies": ["KK-36-A"] }
       ],
       "states": [
@@ -702,7 +702,7 @@
     {
       "id": "api-loans", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/loans",
       "summary": "Alla lån med månadskostnad och totalsummor. PUT /api/loans/{id} lägger till eller ändrar ett lån.",
-      "responses": { "200": { "body": { "loans": [{ "id": "loan_bolan", "name": "Bolån", "lender": "Skandia", "balance_minor": 240000000, "interest_rate_bp": 350, "rate_fixed_until": "2026-12-12", "amortization_minor": 400000, "monthly_interest_minor": 700000, "monthly_cost_minor": 1100000, "source": "bank" }], "total_balance_minor": 248600000, "total_monthly_cost_minor": 1395000 } } },
+      "responses": { "200": { "body": { "loans": [{ "id": "loan_bolan", "name": "Bolån", "lender": "Skandia", "balance_minor": 240000000, "interest_rate_bp": 350, "rate_fixed_until": "2026-12-12", "amortization_minor": 400000, "monthly_interest_minor": 700000, "monthly_amortization_minor": 400000, "monthly_cost_minor": 1100000, "rate_fixed_days_left": 41, "rate_fixed_ending": true }], "total_balance_minor": 248600000, "total_monthly_cost_minor": 1395000 } } },
       "satisfies": ["KK-36-A", "KK-36-C"]
     },
     {
@@ -1161,19 +1161,16 @@
       ]
     },
     {
-      "id": "Loan", "name": "Loan", "description": "Ett lån (KK-36). Skulden hämtas från banken om lånet syns som konto, annars anges den för hand.",
+      "id": "Loan", "name": "Loan", "description": "Ett lån (KK-36), inlagt för hand. Ett bolån i flera delar läggs in som ett lån per del.",
       "satisfies": ["KK-36", "KK-36-A"],
       "fields": [
         { "name": "id", "type": "text", "required": true },
         { "name": "name", "type": "text", "required": true },
         { "name": "lender", "type": "text" },
-        { "name": "account_id", "type": "fk?", "description": "Lånekontot hos banken, om det finns" },
         { "name": "balance_minor", "type": "int", "required": true, "description": "Kvarvarande skuld i öre" },
         { "name": "interest_rate_bp", "type": "int", "required": true, "description": "Ränta i hundradels procent (350 = 3,50 %)" },
         { "name": "rate_fixed_until", "type": "date?", "description": "Null = rörlig ränta", "satisfies": ["KK-36-C"] },
-        { "name": "amortization_minor", "type": "int", "required": true, "description": "Amortering per månad i öre", "satisfies": ["KK-36-B"] },
-        { "name": "payment_counterparty", "type": "text?", "description": "Normaliserad motpart för lånebetalningen, för automatisk uppdelning", "satisfies": ["KK-36-B"] },
-        { "name": "source", "type": "manual|bank" }
+        { "name": "amortization_minor", "type": "int", "required": true, "description": "Amortering per månad i öre", "satisfies": ["KK-36-B"] }
       ]
     },
     {
@@ -1386,10 +1383,10 @@
       "satisfies": ["KK-3", "KK-14-A"]
     },
     {
-      "id": "D-loans", "title": "Lån: översikt i M2, amortering som sparande", "status": "accepted",
-      "context": "Ditt svar 2026-11-01: \"Lånöversikt\", lån hos Skandia samt billån eller privatlån.",
-      "chosen": "Lånvy per lån och en betalning som delas upp i ränta (utgift) och amortering (sparande) med uppdelningen från KK-19. Mallen får kategorierna Boende › Låneränta och Sparande & överföringar › Amortering.",
-      "rationale": "Amortering minskar skulden och är därför inte en utgift. Månadsräntan uppskattas som skuld × ränta / 12, och resten av betalningen räknas som amortering. Ingen prognos för när lånet är betalt och inget ränteavdrag i den här versionen.",
+      "id": "D-loans", "title": "Lån: översikt i M2, betalningen räknas hel som boendekostnad", "status": "accepted",
+      "context": "Ditt svar 2026-11-01: \"Lånöversikt\", lån hos Skandia samt billån eller privatlån. Ändrat 2026-11-05: inget lån syns som konto i Enable Banking, bolånet är i två delar med var sin betalning, och amorteringen ska inte räknas som sparande.",
+      "chosen": "Lån läggs in för hand. Lånvyn räknar månadskostnaden och visar hur den fördelar sig på ränta och amortering. Transaktionerna delas inte upp: hela lånebetalningen räknas som boendekostnad i budgeten.",
+      "rationale": "Enklare och som ägaren vill. Månadsräntan uppskattas som skuld × ränta / 12. Ingen prognos för när lånet är betalt och inget ränteavdrag i den här versionen.",
       "satisfies": ["KK-36", "KK-36-B"]
     },
     {
@@ -1583,7 +1580,7 @@
     { "id": "V-u-template", "title": "Kategorimall: två nivåer, redigerbar", "type": "unit", "given": "seed-mallen", "when": "byt namn, slå ihop, arkivera", "then": "12 huvudkategorier med underkategorier; vid sammanslagning flyttas transaktioner och regler", "satisfies": ["KK-18-A"] },
     { "id": "V-u-split", "title": "domain/split: summainvariant", "type": "unit", "given": "−124 000 öre", "when": "delar −90 000 + −34 000 respektive −90 000 + −30 000", "then": "ok respektive SplitSumMismatch(kvar −4 000)", "satisfies": ["KK-19-A", "KK-19-B"] },
     { "id": "V-u-budget", "title": "domain/budget + overview: utfall, kvar och förslag", "type": "unit", "given": "budget, transaktioner (bokförda, preliminära, uppdelade) och 3 månaders historik", "when": "utfall räknas", "then": "rätt utfall, kvar, andel och över-flagga; kvar per dag; kopiera föregående och snittförslag", "satisfies": ["KK-20-A", "KK-20-B", "KK-17-B"] },
-    { "id": "V-u-loans", "title": "domain/loans: månadskostnad och uppdelning av betalning", "type": "unit", "given": "bolån 2 400 000 kr, 3,5 %, amortering 4 000 kr/mån och en betalning på 11 000 kr", "when": "betalningen delas upp", "then": "7 000 kr ränta + 4 000 kr amortering; bindningstid inom 60 dagar flaggas", "satisfies": ["KK-36-B", "KK-36-C"] },
+    { "id": "V-u-loans", "title": "domain/loans: månadskostnad, ränta och amortering, bindningstid", "type": "unit", "given": "bolån 2 400 000 kr, 3,5 %, amortering 4 000 kr/mån, bindningstid till om 41 dagar; billån med rörlig ränta", "when": "lånen räknas", "then": "11 000 kr/mån varav 7 000 kr ränta och 4 000 kr amortering; totalsummor; bindningstid inom 60 dagar flaggas, rörlig ränta flaggas inte", "satisfies": ["KK-36-B", "KK-36-C"] },
     { "id": "V-e2e-loans", "title": "E2E: lägg till lån och se översikten", "type": "e2e", "given": "inga lån", "when": "ett lån läggs till för hand", "then": "lånvyn visar skuld, ränta, bindningstid och månadskostnad samt totalsummor", "satisfies": ["KK-36-A", "KK-36-C"] },
     { "id": "V-u-goals", "title": "domain/goals: prognos inklusive kantfall", "type": "unit", "given": "60 000 kr, 21 500 sparat, takt 3 200/mån, måldatum aug. 2027, i dag nov. 2026", "when": "prognos räknas", "then": "13 mån → dec. 2027, 4 mån efter måldatum, krävs 4 278 kr/mån; takt ≤ 0 → \"nås inte\" med belopp som krävs; takten är summan de senaste 3 månaderna delat med 3, uttag drar ned den", "satisfies": ["KK-21-A", "KK-21-B"] },
     { "id": "V-u-income", "title": "domain/income-classify", "type": "unit", "given": "inbetalningar från FÖRSÄKRINGSKASSAN, \"LÖN ACME AB\", Swish", "when": "classify körs", "then": "föräldrapenning, lön respektive övrigt; manuell ändring lär en regel", "satisfies": ["KK-22-A"] },
