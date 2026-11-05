@@ -462,6 +462,30 @@ main ul > li.tx.sub .tx-name {
   background: var(--info);
 }
 
+/* Inkomstdiagrammet (KK-22-B): lön, föräldrapenning och övrigt staplade. */
+.income-chart .legend {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.income-chart rect.salary,
+.legend .salary::before {
+  fill: var(--success);
+  background: var(--success);
+}
+
+.income-chart rect.benefit,
+.legend .benefit::before {
+  fill: var(--info);
+  background: var(--info);
+}
+
+.income-chart rect.other,
+.legend .other::before {
+  fill: var(--warning);
+  background: var(--warning);
+}
+
 .trend text {
   fill: var(--muted);
   font-size: 9px;

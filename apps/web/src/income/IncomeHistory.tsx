@@ -1,5 +1,6 @@
 // Inkomsthistorik (#40, KK-22-B): netto per månad de senaste tolv månaderna, uppdelat på lön,
-// föräldrapenning och övrigt, nyast först. Klassningen görs i synken (#198); här visas bara summorna.
+// föräldrapenning och övrigt, som staplat diagram och som lista, nyast först. Klassningen görs i synken
+// (#198); här visas bara summorna.
 import { formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
@@ -48,6 +49,51 @@ function MonthRow({ m }: { m: IncomeMonth }) {
 
 type State = { readonly kind: "loading" } | { readonly kind: "error" } | { readonly kind: "ready"; readonly months: readonly IncomeMonth[] };
 
+const SHORT = new Intl.DateTimeFormat("sv-SE", { month: "short", timeZone: "UTC" });
+const short = (period: string) => SHORT.format(new Date(`${period}-01T00:00:00Z`)).replace(".", "").toUpperCase();
+
+/**
+ * Staplat diagram per månad, äldst till vänster (KK-22-B): lön, föräldrapenning och övrigt. Diagrammet är
+ * en bild för den som ser; listan under har samma belopp som text, så skärmläsare hoppar över bilden.
+ */
+export function IncomeChart({ months }: { months: readonly IncomeMonth[] }) {
+  const ordered = [...months].reverse();
+  const total = (m: IncomeMonth) => m.salaryMinor + m.benefitMinor + m.otherMinor;
+  const max = Math.max(1, ...ordered.map(total));
+  const height = 80;
+  const px = (value: number) => (Math.max(0, value) / max) * height;
+  // Alltid minst tolv kolumner, med den senaste månaden längst till höger, så att diagrammet har samma höjd.
+  const columns = Math.max(12, ordered.length);
+  const offset = (columns - ordered.length) * 24;
+  return (
+    <figure className="card trend income-chart">
+      <figcaption>
+        Netto per månad
+        <span className="legend" aria-hidden="true">
+          <span className="salary">Lön</span> <span className="benefit">Föräldrapenning</span> <span className="other">Övrigt</span>
+        </span>
+      </figcaption>
+      <svg viewBox={`0 0 ${String(columns * 24)} ${String(height + 14)}`} aria-hidden="true">
+        {ordered.map((m, i) => {
+          const salary = px(m.salaryMinor);
+          const benefit = px(m.benefitMinor);
+          const other = px(m.otherMinor);
+          return (
+            <g key={m.period} transform={`translate(${String(offset + i * 24)} 0)`}>
+              <rect className="salary" x="5" y={height - salary} width="14" height={salary} />
+              <rect className="benefit" x="5" y={height - salary - benefit} width="14" height={benefit} />
+              <rect className="other" x="5" y={height - salary - benefit - other} width="14" height={other} />
+              <text x="12" y={height + 12} textAnchor="middle">
+                {short(m.period)}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </figure>
+  );
+}
+
 export function IncomeHistory() {
   const [state, setState] = useState<State>({ kind: "loading" });
 
@@ -69,6 +115,7 @@ export function IncomeHistory() {
       {state.kind === "error" && <p role="alert">Det gick inte att hämta inkomsterna. Försök igen om en stund.</p>}
       {state.kind === "ready" && (
         <>
+          {state.months.some((m) => m.salaryMinor + m.benefitMinor + m.otherMinor > 0) && <IncomeChart months={state.months} />}
           <ul aria-label="Inkomst per månad">
             {state.months.map((m) => (
               <MonthRow key={m.period} m={m} />
