@@ -11,3 +11,7 @@ EB_PRIVATE_KEY=
 ACCESS_AUD=
 # Inbjudna e-postadresser, separerade med kommatecken.
 ACCESS_ALLOWED_EMAILS=
+
+# Web Push (#42, KK-27). Skapa ett par med `node scripts/vapid-keys.ts`. Utan båda är notiserna avstängda.
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=

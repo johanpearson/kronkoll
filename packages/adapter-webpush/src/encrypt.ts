@@ -25,13 +25,18 @@ export interface PushKeys {
 
 /** Fast salt och nyckelpar ger samma utdata som RFC 8291:s testvektor. Bara för tester. */
 export interface EncryptOverrides {
-  readonly salt: Uint8Array<ArrayBuffer>;
+  readonly salt: Uint8Array;
   readonly keyPair: EcKeyPair;
 }
 
-async function hkdf(salt: Uint8Array<ArrayBuffer>, ikm: Uint8Array<ArrayBuffer>, info: Uint8Array<ArrayBuffer>, bytes: number) {
+async function hkdf(salt: Uint8Array, ikm: Uint8Array, info: Uint8Array, bytes: number) {
   const key = await crypto.subtle.importKey("raw", ikm, "HKDF", false, ["deriveBits"]);
   return new Uint8Array(await crypto.subtle.deriveBits({ name: "HKDF", hash: "SHA-256", salt, info }, key, bytes * 8));
+}
+
+/** Nyckelns råa bytes. exportKey("raw") ger alltid en ArrayBuffer, men typen täcker även JWK. */
+export async function rawKey(key: Key): Promise<Uint8Array<ArrayBuffer>> {
+  return new Uint8Array((await crypto.subtle.exportKey("raw", key)) as ArrayBuffer);
 }
 
 /** Krypterar texten till en aes128gcm-kropp: salt, recordstorlek, avsändarens nyckel och chiffertext. */
@@ -43,10 +48,12 @@ export async function encryptPayload(plaintext: string, keys: PushKeys, override
   const data = encoder.encode(plaintext);
   if (data.length > MAX_PLAINTEXT) throw new RangeError("Notisen är för lång");
 
-  const keyPair: EcKeyPair = overrides?.keyPair ?? (await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]));
-  const asPublic = new Uint8Array(await crypto.subtle.exportKey("raw", keyPair.publicKey));
+  const keyPair = overrides?.keyPair ?? ((await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"])) as EcKeyPair);
+  const asPublic = await rawKey(keyPair.publicKey);
   const uaKey = await crypto.subtle.importKey("raw", uaPublic, { name: "ECDH", namedCurve: "P-256" }, false, []);
-  const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: uaKey }, keyPair.privateKey, 256));
+  // Som variabel, eftersom Workers typer kallar fältet `$public` medan körmiljön och standarden använder `public`.
+  const ecdh = { name: "ECDH", public: uaKey };
+  const ecdhSecret = new Uint8Array(await crypto.subtle.deriveBits(ecdh, keyPair.privateKey, 256));
 
   const ikm = await hkdf(authSecret, ecdhSecret, concat(encoder.encode("WebPush: info\0"), uaPublic, asPublic), 32);
   const salt = overrides?.salt ?? crypto.getRandomValues(new Uint8Array(16));

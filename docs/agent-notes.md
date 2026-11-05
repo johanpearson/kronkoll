@@ -17,16 +17,20 @@ lätt att trampa fel på. Håll den kort och uppdatera den när något nytt lär
 ```bash
 pnpm lint
 pnpm typecheck
+pnpm exec tsc -p tsconfig.json   # rotens tsconfig: scripts/, som pnpm typecheck inte täcker
 pnpm architecture
 pnpm --filter @kronkoll/<paket> test:coverage
 ```
 
-- Kör `test:coverage` **ett paket i taget** (`domain`, `adapter-d1`, `adapter-enablebanking`, `api`, `web`).
+- Kör `test:coverage` **ett paket i taget** (`domain`, `adapter-d1`, `adapter-enablebanking`, `adapter-webpush`, `api`, `web`).
   När alla körs parallellt på ägarens dator får några web- och adapter-d1-tester ibland timeout. Det är
   belastning, inte fel i koden.
 - Täckningskravet är 90 % per paket, även grenar. `adapter-d1` ligger nära gränsen för grenar.
 - Planen kontrolleras och byggs med reqplan: `check`, `build` och `build --mode prototype` på
   `plans/kronkoll/plan.json`. HTML-filerna räknas inte i PR-storleken.
+- gitleaks (`secret-scan`) regel `generic-api-key` slår till på fältnamn som `auth`, `key`, `secret` och
+  `token` följt av en slumpig sträng, även för publicerade exempelvärden i tester (RFC-vektorer). Döp om fältet
+  i stället för att lägga till rader i `.gitleaksignore`. Lokalt: `gitleaks git --log-opts="origin/main..HEAD"`.
 
 ## Mutationstest (Stryker)
 
@@ -114,7 +118,7 @@ pnpm --filter @kronkoll/<paket> test:coverage
   och de ska bara ge antal, aldrig banktext.
 - Förhandsvisning av webben: `pnpm --filter @kronkoll/web build`, sedan `wrangler pages dev dist --port 8788`
   i `apps/web`. API:t finns inte där, så stubba `window.fetch` i sidan för att se en vy med data.
-- Hemligheter (`EB_PRIVATE_KEY`, `EB_APP_ID`, `SESSION_ENC_KEY`) ligger i Cloudflare och i ägarens Bitwarden,
+- Hemligheter (`EB_PRIVATE_KEY`, `EB_APP_ID`, `SESSION_ENC_KEY`, `VAPID_PRIVATE_KEY`) ligger i Cloudflare och i ägarens Bitwarden,
   aldrig i repot.
 
 ## Redigera filer
