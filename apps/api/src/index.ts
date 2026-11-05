@@ -18,6 +18,7 @@ import { getOverview } from "./overview.ts";
 import { getSettings, patchSettings } from "./settings.ts";
 import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule } from "./rules.ts";
 import { applyRule, setCategory } from "./set-category.ts";
+import { isIncomeTypeRequest, setIncomeType } from "./set-income-type.ts";
 import { getSplits, putSplits } from "./splits.ts";
 import { putTransfer } from "./transfers.ts";
 import { completeConnection, renewConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
@@ -131,7 +132,10 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   const txMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
   if (txMatch?.[1]) {
     if (request.method === "GET") return getTransaction(env, txMatch[1]);
-    if (request.method === "PATCH") return setCategory(request, env, context.sync, txMatch[1]);
+    if (request.method === "PATCH") {
+      const body: unknown = await request.clone().json().catch(() => null);
+      return isIncomeTypeRequest(body) ? setIncomeType(request, env, context.sync, txMatch[1]) : setCategory(request, env, context.sync, txMatch[1]);
+    }
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, PATCH" });
   }
 
