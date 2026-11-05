@@ -1,8 +1,9 @@
 // Planerad föräldraledighet (#40, KK-23): GET och POST /api/leave-periods, DELETE /api/leave-periods/{id}.
 // Uppskattningen räknas i domänen (estimateLeaveIncome) med Försäkringskassans årsparametrar och sparas inte.
 // En normal månad är snittet av lönen de senaste tre hela kalendermånaderna. Underskottet jämför inkomsten
-// med budgeten för den pågående perioden (leaveImpact). Påverkan på sparmålen kommer i en senare PR.
-import { budgetRepository, categoryRepository, incomeRepository, leaveRepository, settingsRepository, type LeavePeriodRecord } from "@kronkoll/adapter-d1";
+// med budgeten för den pågående perioden, och sparmålens prognos räknas om med lägre sparande (leaveImpact).
+// Sparat och takt per mål kommer från goalStatus, samma som i GET /api/goals.
+import { budgetRepository, categoryRepository, goalRepository, incomeRepository, leaveRepository, settingsRepository, type LeavePeriodRecord } from "@kronkoll/adapter-d1";
 import {
   addMonths,
   budgetByMainCategory,
@@ -13,8 +14,11 @@ import {
   leaveImpact,
   todayInStockholm,
   yearMonthOf,
+  type GoalForecast,
+  type ImpactGoal,
   type LeavePeriod,
 } from "@kronkoll/domain";
+import { goalStatus } from "./goals.ts";
 import type { SyncDeps } from "./sync.ts";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -40,21 +44,32 @@ async function context(db: D1Database, sync: SyncDeps) {
   const budget = budgetRepository(db);
   const { budgetPeriodStartDay } = await settingsRepository(db).get();
   const period = currentBudgetPeriod(sync.clock, budgetPeriodStartDay);
-  const [parameters, income, lines, categories] = await Promise.all([
+  const [parameters, income, lines, categories, goalRecords] = await Promise.all([
     leaveRepository(db).parameters(),
     incomeRepository(db).monthly(monthKey(addMonths(thisMonth, -NORMAL_MONTHS)), monthKey(addMonths(thisMonth, -1))),
     budget.lines(period.key),
     categoryRepository(db).list(),
+    goalRepository(db).list(),
   ]);
+  const goals = await Promise.all(
+    goalRecords.map(async (g): Promise<ImpactGoal & { name: string }> => {
+      const status = await goalStatus(db, g, today);
+      return { id: g.id, name: g.name, targetMinor: g.targetMinor, savedMinor: status.savedMinor, monthlyRateMinor: status.monthlyRateMinor, targetDate: g.targetDate };
+    }),
+  );
   const normalNetMonthlyMinor = Math.round(income.reduce((sum, m) => sum + m.salaryMinor, 0) / NORMAL_MONTHS);
   const monthlyBudgetMinor = budgetByMainCategory({ period, transactions: [], splits: new Map(), categories, lines }).totalBudgetMinor;
-  return { today, parameters, normalNetMonthlyMinor, monthlyBudgetMinor };
+  return { today, parameters, normalNetMonthlyMinor, monthlyBudgetMinor, goals };
 }
+
+const reachPeriod = (f: GoalForecast) => (f.kind === "eta" ? f.reachedIn : null);
+const onTrack = (f: GoalForecast) => (f.kind === "eta" ? f.onTrack : f.kind === "reached" ? true : f.requiredPerMonthMinor === null ? null : false);
 
 function view(period: LeavePeriodRecord, ctx: Awaited<ReturnType<typeof context>>) {
   const months = estimateLeaveIncome(period, ctx.parameters);
   const compared = compareWithNormal(months, ctx.normalNetMonthlyMinor);
-  const impact = leaveImpact({ months: compared, monthlyBudgetMinor: ctx.monthlyBudgetMinor, goals: [], today: ctx.today });
+  const impact = leaveImpact({ months: compared, monthlyBudgetMinor: ctx.monthlyBudgetMinor, goals: ctx.goals, today: ctx.today });
+  const names = new Map(ctx.goals.map((g) => [g.id, g.name]));
   return {
     id: period.id,
     from: period.from,
@@ -81,7 +96,20 @@ function view(period: LeavePeriodRecord, ctx: Awaited<ReturnType<typeof context>
         delta_vs_normal_minor: compared[i]?.differenceMinor ?? 0,
       })),
     },
-    impacts: impact.months.map((m) => ({ type: "budget", period: m.month, budget_minor: m.budgetMinor, income_minor: m.incomeMinor, shortfall_minor: m.shortfallMinor })),
+    impacts: [
+      ...impact.months.map((m) => ({ type: "budget", period: m.month, budget_minor: m.budgetMinor, income_minor: m.incomeMinor, shortfall_minor: m.shortfallMinor })),
+      ...impact.goals.map((g) => ({
+        type: "goal",
+        goal_id: g.id,
+        name: names.get(g.id) ?? "",
+        lost_saving_minor: g.lostSavingMinor,
+        delay_months: g.monthsLater,
+        reach_period_before: reachPeriod(g.before),
+        reach_period_after: reachPeriod(g.after),
+        on_track_before: onTrack(g.before),
+        on_track_after: onTrack(g.after),
+      })),
+    ],
   };
 }
 
