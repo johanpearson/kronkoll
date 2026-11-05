@@ -27,3 +27,4 @@ export { leaveRepository, type LeavePeriodRecord } from "./leave.ts";
 export { incomeRepository, type IncomeMonth } from "./income.ts";
 export { loanRepository, type LoanRecord } from "./loans.ts";
 export { pushRepository, type PushSubscriptionRecord } from "./push.ts";
+export { insightsRepository, type ChargeRow } from "./insights.ts";
