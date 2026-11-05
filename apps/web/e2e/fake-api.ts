@@ -205,6 +205,24 @@ export async function useFakeApi(
         total_monthly_cost_minor: loans.reduce((s, l) => s + Number(l["monthly_cost_minor"]), 0),
       }];
     }
+    const loanId = /^\/api\/loans\/([^/]+)$/u.exec(path)?.[1];
+    if (loanId && method === "DELETE") {
+      const i = loans.findIndex((l) => l["id"] === loanId);
+      if (i < 0) return [404, { error: "not_found" }];
+      loans.splice(i, 1);
+      return [204, null];
+    }
+    if (loanId && method === "PUT") {
+      const interest = Math.round((Number(body["balance_minor"]) * Number(body["interest_rate_bp"])) / 120000);
+      const loan = {
+        id: loanId, ...body, monthly_interest_minor: interest, monthly_amortization_minor: body["amortization_minor"],
+        monthly_cost_minor: interest + Number(body["amortization_minor"]), rate_fixed: body["rate_fixed_until"] !== null, rate_fixed_days_left: body["rate_fixed_until"] === null ? null : 500, rate_fixed_ending: false,
+      };
+      const i = loans.findIndex((l) => l["id"] === loanId);
+      if (i >= 0) loans[i] = loan;
+      else loans.push(loan);
+      return [i >= 0 ? 200 : 201, loan];
+    }
     if (path === "/api/income") {
       return [200, { months: [
         { period: "2026-09", salary_minor: 1120000, parental_benefit_minor: 995000, other_minor: 78000 },

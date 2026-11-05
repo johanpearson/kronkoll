@@ -139,3 +139,23 @@ test("ändra en inbetalnings inkomsttyp på transaktionens sida (KK-22-A)", asyn
   await expect(page.getByRole("status")).toHaveText("Inkomsttypen är sparad. 2 tidigare inbetalningar fick samma typ.");
   await expect(page.getByRole("main")).toContainText("Lön (vald av dig)");
 });
+test("lägg till ett lån och se det i lånöversikten (V-e2e-loans, KK-36)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/sparmal");
+  await page.getByRole("button", { name: "Lån" }).click();
+  const loans = page.getByRole("list", { name: "Dina lån" }).getByRole("listitem");
+  await expect(loans.first()).toContainText("Bindningstiden slutar om 41 dagar");
+
+  await page.getByRole("button", { name: "Lägg till lån" }).click();
+  const form = page.getByRole("form", { name: "Nytt lån" });
+  await form.getByLabel("Namn").fill("Billån");
+  await form.getByLabel("Skuld (kr)").fill("86 000");
+  await form.getByLabel("Ränta (%)").fill("6,95");
+  await form.getByLabel("Amortering (kr/mån)").fill("2 450");
+  await form.getByRole("button", { name: "Spara" }).click();
+
+  await expect(page.getByRole("status")).toHaveText("Lånet är sparat.");
+  await expect(loans).toHaveCount(2);
+  await expect(loans.nth(1)).toContainText("Rörlig ränta");
+  await expect(page.getByRole("definition").first()).toHaveText("1 286 000,00 kr");
+});
