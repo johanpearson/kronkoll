@@ -109,6 +109,19 @@ export {
   type ReminderInput,
 } from "./consent.ts";
 export {
+  NOTIFICATION_TOPICS,
+  budgetOverNotices,
+  consentNotice,
+  parseTopics,
+  subscribedTo,
+  syncFailureNotice,
+  type BudgetNotice,
+  type BudgetNoticeInput,
+  type Notice,
+  type NotificationTopic,
+  type Notifier,
+} from "./notify.ts";
+export {
   budgetByMainCategory,
   budgetOutcome,
   spendingByCategory,
