@@ -24,6 +24,8 @@ export interface Goal {
   readonly savedMinor: number;
   readonly monthlyRateMinor: number;
   readonly forecast: Forecast;
+  /** Manuella avsättningar, nyast först. Tom för mål som bygger på ett konto. */
+  readonly contributions: readonly { readonly date: string; readonly amountMinor: number }[];
 }
 
 const int = (value: unknown) => (Number.isSafeInteger(value) ? (value as number) : 0);
@@ -61,6 +63,10 @@ export function toGoal(raw: unknown): Goal | null {
     savedMinor: int(field(raw, "saved_minor")),
     monthlyRateMinor: int(field(raw, "monthly_rate_minor")),
     forecast: toForecast(field(raw, "forecast")),
+    contributions: (Array.isArray(field(raw, "contributions")) ? (field(raw, "contributions") as unknown[]) : []).flatMap((c) => {
+      const date = field(c, "date");
+      return typeof date === "string" ? [{ date, amountMinor: int(field(c, "amount_minor")) }] : [];
+    }),
   };
 }
 
@@ -73,9 +79,20 @@ export async function fetchGoals(): Promise<Goal[] | null> {
 }
 
 const MONTH = new Intl.DateTimeFormat("sv-SE", { month: "short", year: "numeric", timeZone: "UTC" });
+const MONTH_LONG = new Intl.DateTimeFormat("sv-SE", { month: "long", year: "numeric", timeZone: "UTC" });
 
 /** "2027-12" som "dec. 2027". */
 export const formatPeriod = (period: string) => MONTH.format(new Date(`${period}-01T00:00:00Z`));
+
+/** "2027-08-31" som "augusti 2027". */
+export const formatMonthLong = (date: string) => MONTH_LONG.format(new Date(`${date.slice(0, 7)}-01T00:00:00Z`));
+
+/** Ett mål, eller null om det inte finns, eller "error" om det inte gick att hämta. */
+export async function fetchGoal(id: string): Promise<Goal | null | "error"> {
+  const { status, body } = await getJson(`/api/goals/${encodeURIComponent(id)}`);
+  if (status === 404) return null;
+  return (status === 200 ? toGoal(body) : null) ?? "error";
+}
 
 /** Status som en kort etikett. Texten bär betydelsen; färgen förstärker. */
 export function goalBadge(goal: Goal): { text: string; tone: "ok" | "warn" | "bad" } | null {
