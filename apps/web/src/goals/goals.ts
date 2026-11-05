@@ -25,7 +25,9 @@ export interface Goal {
   readonly monthlyRateMinor: number;
   readonly forecast: Forecast;
   /** Manuella avsättningar, nyast först. Tom för mål som bygger på ett konto. */
-  readonly contributions: readonly { readonly date: string; readonly amountMinor: number }[];
+  readonly contributions: readonly { readonly id: string; readonly date: string; readonly amountMinor: number }[];
+  /** Det som var sparat innan avsättningarna (manuella mål): sparat minus avsättningarna. */
+  readonly initialMinor: number;
 }
 
 const int = (value: unknown) => (Number.isSafeInteger(value) ? (value as number) : 0);
@@ -53,6 +55,12 @@ export function toGoal(raw: unknown): Goal | null {
   const name = field(raw, "name");
   if (typeof id !== "string" || typeof name !== "string") return null;
   const targetDate = field(raw, "target_date");
+  const savedMinor = int(field(raw, "saved_minor"));
+  const contributions = (Array.isArray(field(raw, "contributions")) ? (field(raw, "contributions") as unknown[]) : []).flatMap((c) => {
+    const date = field(c, "date");
+    const cid = field(c, "id");
+    return typeof date === "string" ? [{ id: typeof cid === "string" ? cid : "", date, amountMinor: int(field(c, "amount_minor")) }] : [];
+  });
   return {
     id,
     name,
@@ -60,13 +68,11 @@ export function toGoal(raw: unknown): Goal | null {
     targetDate: typeof targetDate === "string" ? targetDate : null,
     source: field(raw, "source") === "account" ? "account" : "manual",
     accountMissing: field(raw, "account_missing") === true,
-    savedMinor: int(field(raw, "saved_minor")),
+    savedMinor,
     monthlyRateMinor: int(field(raw, "monthly_rate_minor")),
     forecast: toForecast(field(raw, "forecast")),
-    contributions: (Array.isArray(field(raw, "contributions")) ? (field(raw, "contributions") as unknown[]) : []).flatMap((c) => {
-      const date = field(c, "date");
-      return typeof date === "string" ? [{ date, amountMinor: int(field(c, "amount_minor")) }] : [];
-    }),
+    contributions,
+    initialMinor: savedMinor - contributions.reduce((sum, c) => sum + c.amountMinor, 0),
   };
 }
 
