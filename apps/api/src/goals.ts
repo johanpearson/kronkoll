@@ -31,24 +31,37 @@ function forecastBody(f: GoalForecast) {
   };
 }
 
+export interface GoalStatus {
+  readonly savedMinor: number;
+  readonly monthlyRateMinor: number;
+  readonly accountMissing: boolean;
+  /** Avsättningarna för manuella mål, nyast först. Tom för mål som bygger på ett konto. */
+  readonly contributions: readonly GoalMovement[];
+}
+
+/**
+ * Sparat och takt för ett mål: underlaget till prognosen. Används av sparmålen och av ledighetens påverkan
+ * (KK-23-C), så att siffrorna alltid är desamma.
+ */
+export async function goalStatus(db: D1Database, goal: GoalRecord, today: string): Promise<GoalStatus> {
+  const repo = goalRepository(db);
+  if (goal.source === "manual") {
+    const contributions = await repo.contributions(goal.id);
+    const savedMinor = goal.initialMinor + contributions.reduce((sum, c) => sum + c.amountMinor, 0);
+    return { savedMinor, monthlyRateMinor: averageMonthlySaving(contributions, today), accountMissing: false, contributions };
+  }
+  const account = goal.accountId === null ? null : await repo.account(goal.accountId, addDays(today, -MOVEMENT_DAYS));
+  return {
+    savedMinor: Math.max(0, account?.balanceMinor ?? 0),
+    monthlyRateMinor: averageMonthlySaving(account?.movements ?? [], today),
+    accountMissing: account === null,
+    contributions: [],
+  };
+}
+
 /** Sparat, takt och prognos för ett mål, plus avsättningarna för manuella mål. */
 async function view(db: D1Database, goal: GoalRecord, today: string) {
-  const repo = goalRepository(db);
-  let saved: number;
-  let movements: GoalMovement[];
-  let contributions: GoalMovement[] = [];
-  let accountMissing = false;
-  if (goal.source === "manual") {
-    contributions = await repo.contributions(goal.id);
-    movements = contributions;
-    saved = goal.initialMinor + contributions.reduce((sum, c) => sum + c.amountMinor, 0);
-  } else {
-    const account = goal.accountId === null ? null : await repo.account(goal.accountId, addDays(today, -MOVEMENT_DAYS));
-    accountMissing = account === null;
-    movements = account?.movements ?? [];
-    saved = Math.max(0, account?.balanceMinor ?? 0);
-  }
-  const rate = averageMonthlySaving(movements, today);
+  const { savedMinor: saved, monthlyRateMinor: rate, accountMissing, contributions } = await goalStatus(db, goal, today);
   return {
     id: goal.id,
     name: goal.name,
