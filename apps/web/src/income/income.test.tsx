@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { formatDateShort, formatSek } from "@kronkoll/domain";
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App.tsx";
 import { toLeavePlan } from "./IncomeView.tsx";
@@ -88,5 +88,54 @@ describe("Inkomst: planerad ledighet (#40, KK-23)", () => {
       id: "x", from: "2027-01-01", to: "2027-02-01", daysPerWeek: 0, topupPct: 0, disclaimer: "Uppskattning – inte ett besked från Försäkringskassan",
       averageIncomeMinor: 0, averageDeltaMinor: 0, worstShortfallMinor: 0, fallbackYears: false,
     });
+  });
+});
+
+describe("ta bort en planerad ledighet (KK-23-A)", () => {
+  function withDelete(status: number) {
+    const deletes: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const path = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "https://app.test").pathname;
+        if (init?.method === "DELETE") {
+          deletes.push(path);
+          return Promise.resolve(new Response(status === 204 ? null : "{}", { status }));
+        }
+        return Promise.resolve(new Response(JSON.stringify({ items: [LEAVE, { ...LEAVE, id: "l2", from: "2028-01-01", to: "2028-02-29" }] }), { status: 200 }));
+      }),
+    );
+    return deletes;
+  }
+  const rows = () => within(screen.getByRole("list", { name: "Planerade perioder" })).getAllByRole("listitem");
+  const label = `Ta bort ledigheten ${formatDateShort("2027-03-01")} – ${formatDateShort("2027-08-31")}`;
+
+  it("frågar först, går att ångra och tar sedan bort perioden ur listan", async () => {
+    const deletes = withDelete(204);
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    expect(rows()[0]?.textContent).toContain("Ta bort ledigheten? Budget och sparmål räknas då utan den.");
+    fireEvent.click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Behåll" }));
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    fireEvent.click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Ta bort" }));
+    await act(async () => {
+      for (let i = 0; i < 4; i++) await Promise.resolve();
+    });
+    expect(deletes).toEqual(["/api/leave-periods/l1"]);
+    expect(rows()).toHaveLength(1);
+    expect(rows()[0]?.textContent).toContain(formatDateShort("2028-01-01"));
+    expect(screen.getByRole("status").textContent).toBe("Ledigheten är borttagen.");
+  });
+
+  it("visar ett fel och behåller perioden när det inte går", async () => {
+    withDelete(503);
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    fireEvent.click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Ta bort" }));
+    await act(async () => {
+      for (let i = 0; i < 4; i++) await Promise.resolve();
+    });
+    expect(rows()).toHaveLength(2);
+    expect(within(rows()[0] as HTMLElement).getByRole("alert").textContent).toBe("Det gick inte att ta bort ledigheten. Försök igen.");
   });
 });

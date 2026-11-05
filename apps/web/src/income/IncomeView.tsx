@@ -1,10 +1,14 @@
 // Inkomst (#40, KK-22, KK-23): inkomsthistoriken (IncomeHistory) och planerad föräldraledighet med uppskattad inkomst per månad, skillnaden mot en
 // normal månad och vad som saknas mot budgeten. Uppskattningen räknas i API:t (GET /api/leave-periods)
-// och är aldrig ett besked från Försäkringskassan. Formuläret finns i NewLeave.
+// och är aldrig ett besked från Försäkringskassan. Formuläret finns i NewLeave. En period tas bort med
+// papperskorgen efter en fråga (KK-23-A).
 import { formatDateShort, formatSek } from "@kronkoll/domain";
+import { Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { field, getJson } from "../api.ts";
+import { deleteJson, field, getJson } from "../api.ts";
+import { IconButton } from "../icon-button.tsx";
 import { navigate } from "../router.tsx";
+import { useToast } from "../toast.tsx";
 import { IncomeHistory } from "./IncomeHistory.tsx";
 
 export interface LeavePlan {
@@ -58,21 +62,48 @@ async function fetchPlans(): Promise<LeavePlan[] | null> {
 
 const decimal = (n: number) => String(n).replace(".", ",");
 
-function PlanRow({ plan }: { plan: LeavePlan }) {
+function PlanRow({ plan, onRemoved }: { plan: LeavePlan; onRemoved: (id: string) => void }) {
+  const toast = useToast();
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState(false);
   const notes = [`${decimal(plan.daysPerWeek)} ${plan.daysPerWeek === 1 ? "dag" : "dagar"}/vecka`];
   if (plan.topupPct > 0) notes.push(`föräldralön ${decimal(plan.topupPct)} %`);
+  const period = `${formatDateShort(plan.from)} – ${formatDateShort(plan.to)}`;
+  const remove = async () => {
+    const { status } = await deleteJson(`/api/leave-periods/${encodeURIComponent(plan.id)}`);
+    if (status === 204 || status === 404) {
+      toast.done("Ledigheten är borttagen.");
+      onRemoved(plan.id);
+    } else setError(true);
+  };
   return (
     <li className="tx">
       <div className="tx-main">
-        <span className="tx-name">
-          {formatDateShort(plan.from)} – {formatDateShort(plan.to)}
-        </span>
+        <span className="tx-name">{period}</span>
         <span className="amount">≈ {formatSek(plan.averageIncomeMinor)}/mån</span>
       </div>
       <small className="tx-notes">{notes.join(" · ")}</small>
       {plan.averageDeltaMinor < 0 && <span className="badge warn">{formatSek(plan.averageDeltaMinor)}/mån mot en vanlig månad</span>}
       {plan.worstShortfallMinor > 0 && <span className="badge bad">Underskott mot budget upp till {formatSek(plan.worstShortfallMinor)}/mån</span>}
       {plan.fallbackYears && <small className="tx-notes">Försäkringskassans belopp för ett senare år finns inte än, så det senaste kända året används.</small>}
+      {confirming ? (
+        <div className="tx-editor">
+          <p>Ta bort ledigheten? Budget och sparmål räknas då utan den.</p>
+          {error && <p role="alert">Det gick inte att ta bort ledigheten. Försök igen.</p>}
+          <p className="actions">
+            <button type="button" className="danger small" onClick={() => void remove()}>
+              Ta bort
+            </button>
+            <button type="button" className="small" onClick={() => { setConfirming(false); }}>
+              Behåll
+            </button>
+          </p>
+        </div>
+      ) : (
+        <div className="tx-actions">
+          <IconButton label={`Ta bort ledigheten ${period}`} icon={Trash2} onClick={() => { setConfirming(true); }} />
+        </div>
+      )}
     </li>
   );
 }
@@ -113,7 +144,7 @@ export function IncomeView() {
         <>
           <ul aria-label="Planerade perioder">
             {state.plans.map((p) => (
-              <PlanRow key={p.id} plan={p} />
+              <PlanRow key={p.id} plan={p} onRemoved={(id) => { setState({ kind: "ready", plans: state.plans.filter((x) => x.id !== id) }); }} />
             ))}
           </ul>
           <p className="note" role="note">
