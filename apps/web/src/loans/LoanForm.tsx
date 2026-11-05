@@ -21,6 +21,7 @@ export function LoanForm(props: { loan: Loan | null; onSaved: () => void; onClos
   const [amortization, setAmortization] = useState(l ? kronor(l.amortizationMinor) : "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   const save = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -94,6 +95,19 @@ export function LoanForm(props: { loan: Loan | null; onSaved: () => void; onClos
         <input value={amortization} inputMode="decimal" onChange={(e) => { setAmortization(e.target.value); }} />
       </label>
       {error && <p role="alert">{error}</p>}
+      {confirming ? (
+        <div className="tx-editor">
+          <p>Ta bort lånet? Det försvinner ur lånöversikten. Inget hos banken ändras.</p>
+          <p className="actions">
+            <button type="button" className="danger" disabled={busy} onClick={() => void remove()}>
+              Ta bort
+            </button>
+            <button type="button" onClick={() => { setConfirming(false); }}>
+              Behåll
+            </button>
+          </p>
+        </div>
+      ) : (
       <p className="actions">
         <button type="submit" className="primary" disabled={busy}>
           {busy ? "Sparar…" : "Spara"}
@@ -102,11 +116,12 @@ export function LoanForm(props: { loan: Loan | null; onSaved: () => void; onClos
           Avbryt
         </button>
         {l && (
-          <button type="button" className="danger" disabled={busy} onClick={() => void remove()}>
+          <button type="button" className="danger" onClick={() => { setConfirming(true); }}>
             Ta bort
           </button>
         )}
       </p>
+      )}
     </form>
   );
 }

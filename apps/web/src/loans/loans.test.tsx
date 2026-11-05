@@ -127,6 +127,12 @@ describe("Lån (#72, KK-36)", () => {
     await open();
     fireEvent.click(screen.getByRole("button", { name: "Ändra Billån" }));
     fireEvent.click(screen.getByRole("button", { name: "Ta bort" }));
+    expect(screen.getByRole("form", { name: "Ändra Billån" }).textContent).toContain("Ta bort lånet? Det försvinner ur lånöversikten. Inget hos banken ändras.");
+    fireEvent.click(screen.getByRole("button", { name: "Behåll" }));
+    expect(screen.queryByRole("button", { name: "Behåll" })).toBeNull();
+    expect(deletes).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Ta bort" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ta bort" }));
     await settle();
     expect(deletes).toEqual([{ method: "DELETE", path: "/api/loans/l2", body: null }]);
     expect(screen.getByRole("status").textContent).toBe("Lånet är borttaget.");
@@ -169,6 +175,7 @@ describe("Lån (#72, KK-36)", () => {
     api(undefined, 503);
     await open();
     fireEvent.click(screen.getByRole("button", { name: "Ändra Billån" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ta bort" }));
     fireEvent.click(screen.getByRole("button", { name: "Ta bort" }));
     await settle();
     expect(screen.getByRole("alert").textContent).toBe("Det gick inte att ta bort lånet. Försök igen.");
