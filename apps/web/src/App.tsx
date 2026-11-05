@@ -7,6 +7,7 @@ import { GoalDetail } from "./goals/GoalDetail.tsx";
 import { GoalsView } from "./goals/GoalsView.tsx";
 import { NewGoal } from "./goals/NewGoal.tsx";
 import { IncomeView } from "./income/IncomeView.tsx";
+import { NewLeave } from "./income/NewLeave.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
 import { Link, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
@@ -35,6 +36,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/sparmal": GoalsView,
   "/sparmal/nytt": NewGoal,
   "/inkomst": IncomeView,
+  "/inkomst/ledighet": NewLeave,
   "/installningar": SettingsView,
   "/installningar/kategorier": CategoriesView,
   "/installningar/regler": RulesView,
