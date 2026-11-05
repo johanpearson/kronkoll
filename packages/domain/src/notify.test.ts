@@ -34,9 +34,12 @@ const names = new Map([
   ["bil", "Bil"],
 ]);
 
+/** Alla kategorier i testerna har en egen budgetrad, om inget annat sägs. */
+const ALL = ["mat", "mat-livs", "noje", "bil", "okand"];
+
 describe("budgetnotis när en kategori passerar budget (KK-27-A, V-u-consent)", () => {
   it("en kategori över budget ger en notis med procent men utan belopp", () => {
-    const result = budgetOverNotices({ budget: budget([{ ...fig("mat", 500_000, 520_000), subcategories: [] }]), names, alreadySent: [] });
+    const result = budgetOverNotices({ budget: budget([{ ...fig("mat", 500_000, 520_000), subcategories: [] }]), names, alreadySent: [], budgeted: ALL });
     expect(result).toEqual([
       {
         categoryId: "mat",
@@ -51,7 +54,7 @@ describe("budgetnotis när en kategori passerar budget (KK-27-A, V-u-consent)", 
       { ...fig("mat", 500_000, 500_000), subcategories: [] },
       { ...fig("noje", 100_000, 20_000), subcategories: [] },
     ];
-    expect(budgetOverNotices({ budget: budget(groups), names, alreadySent: [] })).toEqual([]);
+    expect(budgetOverNotices({ budget: budget(groups), names, alreadySent: [], budgeted: ALL })).toEqual([]);
   });
 
   it("högst en notis per kategori och period: redan skickade hoppas över", () => {
@@ -59,32 +62,38 @@ describe("budgetnotis när en kategori passerar budget (KK-27-A, V-u-consent)", 
       { ...fig("mat", 500_000, 600_000), subcategories: [] },
       { ...fig("noje", 100_000, 150_000), subcategories: [] },
     ];
-    const result = budgetOverNotices({ budget: budget(groups), names, alreadySent: ["mat"] });
+    const result = budgetOverNotices({ budget: budget(groups), names, alreadySent: ["mat"], budgeted: ALL });
     expect(result.map((r) => r.categoryId)).toEqual(["noje"]);
     expect(result[0]?.notice.body).toBe("Nöje har passerat budget (150 %)");
   });
 
   it("en underkategori med egen budget får en egen notis", () => {
     const groups = [{ ...fig("mat", 500_000, 400_000), subcategories: [fig("mat-livs", 300_000, 330_000)] }];
-    const result = budgetOverNotices({ budget: budget(groups), names, alreadySent: [] });
+    const result = budgetOverNotices({ budget: budget(groups), names, alreadySent: [], budgeted: ALL });
     expect(result.map((r) => [r.categoryId, r.notice.body, r.notice.tag])).toEqual([
       ["mat-livs", "Livsmedel har passerat budget (110 %)", "budget:2026-11:mat-livs"],
     ]);
   });
 
+  it("en huvudkategori som bara har budget via underkategorierna får ingen egen notis, bara underkategorin", () => {
+    const groups = [{ ...fig("mat", 300_000, 330_000), subcategories: [fig("mat-livs", 300_000, 330_000)] }];
+    const result = budgetOverNotices({ budget: budget(groups), names, alreadySent: [], budgeted: ["mat-livs"] });
+    expect(result.map((r) => r.categoryId)).toEqual(["mat-livs"]);
+  });
+
   it("utgifter utan budget ger ingen notis", () => {
     const groups = [{ ...fig("bil", null, 90_000), subcategories: [fig("mat-livs", null, 10_000)] }];
-    expect(budgetOverNotices({ budget: budget(groups), names, alreadySent: [] })).toEqual([]);
+    expect(budgetOverNotices({ budget: budget(groups), names, alreadySent: [], budgeted: ALL })).toEqual([]);
   });
 
   it("budget noll med utgifter ger en notis utan procent", () => {
     const groups = [{ ...fig("bil", 0, 10_000), subcategories: [] }];
-    expect(budgetOverNotices({ budget: budget(groups), names, alreadySent: [] })[0]?.notice.body).toBe("Bil har passerat budget");
+    expect(budgetOverNotices({ budget: budget(groups), names, alreadySent: [], budgeted: ALL })[0]?.notice.body).toBe("Bil har passerat budget");
   });
 
   it("en kategori utan namn får ett neutralt namn i stället för sitt id", () => {
     const groups = [{ ...fig("okand", 100, 200), subcategories: [] }];
-    expect(budgetOverNotices({ budget: budget(groups), names, alreadySent: [] })[0]?.notice.body).toBe("En kategori har passerat budget (200 %)");
+    expect(budgetOverNotices({ budget: budget(groups), names, alreadySent: [], budgeted: ALL })[0]?.notice.body).toBe("En kategori har passerat budget (200 %)");
   });
 });
 

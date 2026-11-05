@@ -4,24 +4,11 @@
 import { pushRepository } from "@kronkoll/adapter-d1";
 import { isPushEndpoint, isPushKeys } from "@kronkoll/adapter-webpush";
 import { NOTIFICATION_TOPICS, parseTopics } from "@kronkoll/domain";
+import { vapidPublicKey, type PushEnv } from "./notify.ts";
 import type { SyncDeps } from "./sync.ts";
-
-/** VAPID-nycklarna sätts med `wrangler secret put`, aldrig i repot (D-secrets). */
-export interface PushEnv {
-  DB: D1Database;
-  /** Publik VAPID-nyckel (P-256, base64url). Inte hemlig, men sätts tillsammans med den privata. */
-  VAPID_PUBLIC_KEY?: string | undefined;
-  /** Secret: privat VAPID-nyckel (base64url). */
-  VAPID_PRIVATE_KEY?: string | undefined;
-}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
-}
-
-/** Den publika nyckeln, eller null om Web Push inte är konfigurerat. */
-export function vapidPublicKey(env: PushEnv): string | null {
-  return env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY ? env.VAPID_PUBLIC_KEY : null;
 }
 
 export function getPushConfig(env: PushEnv): Response {
