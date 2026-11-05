@@ -16,7 +16,8 @@
     "APP_ORIGIN": "https://kronkoll-25e.pages.dev"
   },
   // Schemalagd synk två gånger per dygn (UTC), ungefär 05 och 16 vintertid (KK-7, D-sync).
-  // Hemligheterna EB_APP_ID, EB_PRIVATE_KEY och SESSION_ENC_KEY sätts med `wrangler secret put`.
+  // Hemligheterna EB_APP_ID, EB_PRIVATE_KEY, SESSION_ENC_KEY, VAPID_PUBLIC_KEY och VAPID_PRIVATE_KEY
+  // sätts med `wrangler secret put` (VAPID-paret skapas med `node scripts/vapid-keys.ts`).
   "triggers": { "crons": ["7 4,15 * * *"] },
   // Databasens id är inte hemligt. Åtkomst kräver Cloudflare-token.
   "d1_databases": [
