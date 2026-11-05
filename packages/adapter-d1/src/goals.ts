@@ -18,6 +18,14 @@ export interface NewGoal {
   readonly initialMinor: number;
 }
 
+/** Det som går att ändra på ett mål (KK-21-C). Källa och konto ändras inte; då skapas ett nytt mål. */
+export type GoalChanges = Partial<Pick<NewGoal, "name" | "targetMinor" | "targetDate" | "initialMinor">>;
+
+/** En avsättning med sitt id, så att den går att ta bort. */
+export interface Contribution extends GoalMovement {
+  readonly id: string;
+}
+
 export interface GoalRecord extends NewGoal {
   readonly id: string;
 }
@@ -52,6 +60,24 @@ export function goalRepository(d1: D1Database) {
       await db.insert(savingsGoals).values({ id, ...goal }).run();
     },
 
+    /** Ändrar ett mål. Falskt om det inte finns. Minst ett fält måste ändras. */
+    async update(id: string, changes: GoalChanges): Promise<boolean> {
+      const updated = await db.update(savingsGoals).set(changes).where(eq(savingsGoals.id, id)).returning({ id: savingsGoals.id }).all();
+      return updated.length > 0;
+    },
+
+    /** Tar bort ett mål och, via ON DELETE CASCADE, dess avsättningar. Falskt om det inte finns. */
+    async remove(id: string): Promise<boolean> {
+      const result = await d1.prepare(`DELETE FROM savings_goals WHERE id = ?`).bind(id).run();
+      return result.meta.changes > 0;
+    },
+
+    /** Tar bort en avsättning i ett visst mål. Falskt om den inte finns där. */
+    async removeContribution(goalId: string, contributionId: string): Promise<boolean> {
+      const result = await d1.prepare(`DELETE FROM goal_contributions WHERE id = ? AND goal_id = ?`).bind(contributionId, goalId).run();
+      return result.meta.changes > 0;
+    },
+
     /** Lägger till en avsättning. Falskt om målet inte finns. */
     async addContribution(goalId: string, contribution: GoalMovement, id: string): Promise<boolean> {
       const result = await d1
@@ -62,9 +88,9 @@ export function goalRepository(d1: D1Database) {
     },
 
     /** Målets avsättningar, nyast först. */
-    async contributions(goalId: string): Promise<GoalMovement[]> {
+    async contributions(goalId: string): Promise<Contribution[]> {
       return db
-        .select({ date: goalContributions.date, amountMinor: goalContributions.amountMinor })
+        .select({ id: goalContributions.id, date: goalContributions.date, amountMinor: goalContributions.amountMinor })
         .from(goalContributions)
         .where(eq(goalContributions.goalId, goalId))
         .orderBy(desc(goalContributions.date), desc(sql`rowid`))

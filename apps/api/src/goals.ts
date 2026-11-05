@@ -1,8 +1,8 @@
 // Sparmål (#39, KK-21): GET och POST /api/goals, GET /api/goals/{id} och POST /api/goals/{id}/contributions.
 // Prognosen räknas i domänen (forecastGoal) med takten de senaste 3 månaderna: manuella avsättningar,
 // eller rörelserna på det kopplade kontot. Ett mål vars konto har försvunnit visas med account_missing.
-import { goalRepository, type GoalRecord, type NewGoal } from "@kronkoll/adapter-d1";
-import { addDays, averageMonthlySaving, forecastGoal, todayInStockholm, type GoalForecast, type GoalMovement } from "@kronkoll/domain";
+import { goalRepository, type Contribution, type GoalChanges, type GoalRecord, type NewGoal } from "@kronkoll/adapter-d1";
+import { addDays, averageMonthlySaving, forecastGoal, todayInStockholm, type GoalForecast } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -36,7 +36,7 @@ export interface GoalStatus {
   readonly monthlyRateMinor: number;
   readonly accountMissing: boolean;
   /** Avsättningarna för manuella mål, nyast först. Tom för mål som bygger på ett konto. */
-  readonly contributions: readonly GoalMovement[];
+  readonly contributions: readonly Contribution[];
 }
 
 /**
@@ -73,7 +73,7 @@ async function view(db: D1Database, goal: GoalRecord, today: string) {
     saved_minor: saved,
     monthly_rate_minor: rate,
     forecast: forecastBody(forecastGoal({ targetMinor: goal.targetMinor, savedMinor: saved, monthlyRateMinor: rate, targetDate: goal.targetDate, today })),
-    contributions: contributions.map((c) => ({ date: c.date, amount_minor: c.amountMinor })),
+    contributions: contributions.map((c) => ({ id: c.id, date: c.date, amount_minor: c.amountMinor })),
   };
 }
 
@@ -122,6 +122,67 @@ export async function createGoal(request: Request, env: { DB: D1Database }, sync
     const id = sync.newId();
     await repo.create(goal, id);
     return json(await view(env.DB, { id, ...goal }, today), 201);
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
+}
+
+/** Ändringarna ur en PATCH, eller null om formen är fel eller inget ändras. */
+async function readChanges(request: Request): Promise<GoalChanges | null> {
+  const body: unknown = await request.json().catch(() => null);
+  if (typeof body !== "object" || body === null) return null;
+  const raw = body as Record<string, unknown>;
+  const changes: { -readonly [K in keyof GoalChanges]: GoalChanges[K] } = {};
+  if ("name" in raw) {
+    if (typeof raw["name"] !== "string" || raw["name"].trim().length < 1 || raw["name"].trim().length > 60) return null;
+    changes.name = raw["name"].trim();
+  }
+  if ("target_minor" in raw) {
+    if (!isMinor(raw["target_minor"], 1)) return null;
+    changes.targetMinor = raw["target_minor"];
+  }
+  if ("target_date" in raw) {
+    if (raw["target_date"] !== null && !isDate(raw["target_date"])) return null;
+    changes.targetDate = raw["target_date"];
+  }
+  if ("initial_minor" in raw) {
+    if (!isMinor(raw["initial_minor"], 0)) return null;
+    changes.initialMinor = raw["initial_minor"];
+  }
+  return Object.keys(changes).length > 0 ? changes : null;
+}
+
+/** PATCH /api/goals/{id} (KK-21-C): ändrar målet och ger det med ny prognos. Källa och konto går inte att byta. */
+export async function patchGoal(request: Request, env: { DB: D1Database }, id: string, sync: SyncDeps): Promise<Response> {
+  const changes = await readChanges(request);
+  if (!changes) return invalid();
+  const today = todayInStockholm(sync.clock);
+  if (changes.targetDate != null && changes.targetDate <= today) return json({ error: "target_date_in_past" }, 422);
+  try {
+    const repo = goalRepository(env.DB);
+    const goal = await repo.get(id);
+    if (!goal) return json({ error: "not_found" }, 404);
+    if (changes.initialMinor !== undefined && goal.source !== "manual") return json({ error: "goal_uses_account" }, 409);
+    await repo.update(id, changes);
+    return json(await view(env.DB, { ...goal, ...changes }, today), 200);
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
+}
+
+/** DELETE /api/goals/{id} (KK-21-C): tar bort målet och dess avsättningar. Inget hos banken ändras. */
+export async function deleteGoal(env: { DB: D1Database }, id: string): Promise<Response> {
+  try {
+    return (await goalRepository(env.DB).remove(id)) ? new Response(null, { status: 204 }) : json({ error: "not_found" }, 404);
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
+}
+
+/** DELETE /api/goals/{id}/contributions/{contributionId} (KK-21-C). */
+export async function deleteContribution(env: { DB: D1Database }, goalId: string, contributionId: string): Promise<Response> {
+  try {
+    return (await goalRepository(env.DB).removeContribution(goalId, contributionId)) ? new Response(null, { status: 204 }) : json({ error: "not_found" }, 404);
   } catch {
     return json({ error: "unavailable" }, 503);
   }
