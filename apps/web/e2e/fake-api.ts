@@ -137,6 +137,7 @@ export async function useFakeApi(
   ];
   const budgets = new Map<string, { category_id: string; budget_minor: number }[]>();
   const goals: Record<string, unknown>[] = GOALS.map((g) => ({ ...g }));
+  const leave: Record<string, unknown>[] = [LEAVE];
   const state: FakeApi = { rules: [], budgetPuts: [] };
   // Utan bank visar översikten välkomstsidan. Kopplingen görs klar med koden som banken skickar tillbaka.
   let connected = options.connected ?? true;
@@ -182,7 +183,12 @@ export async function useFakeApi(
       return [201, goal];
     }
     if (path === "/api/goals") return [200, { items: goals }];
-    if (path === "/api/leave-periods") return [200, { items: [LEAVE] }];
+    if (path === "/api/leave-periods" && method === "POST") {
+      const period = { ...LEAVE, id: `l${String(leave.length + 1)}`, from: body["from"], to: body["to"], days_per_week: body["days_per_week"], employer_topup_pct: body["employer_topup_pct"] };
+      leave.push(period);
+      return [201, period];
+    }
+    if (path === "/api/leave-periods") return [200, { items: leave }];
     const goalPath = /^\/api\/goals\/([^/]+)(\/contributions)?$/u.exec(path);
     const goal = goals.find((g) => g["id"] === goalPath?.[1]);
     if (goal && goalPath?.[2] && method === "POST") {
