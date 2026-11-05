@@ -363,6 +363,7 @@
             { "id": "leave-list", "type": "list", "title": "Planerade perioder", "satisfies": ["KK-23-A"], "items": [
               { "title": "1 mars – 31 aug. 2027", "subtitle": "5 dagar/vecka · föräldralön 10 % (6 mån)", "meta": "≈ 20 140 kr/mån", "badge": "−13 470 kr/mån", "tone": "warn", "goto": "ledighet-ny" }
             ] },
+            { "id": "remove-leave", "type": "button", "label": "Ta bort period", "variant": "secondary", "toast": "Ledigheten är borttagen", "satisfies": ["KK-23-A"] },
             { "id": "leave-impact-list", "type": "list", "title": "Påverkan", "satisfies": ["KK-23-C"], "items": [
               { "title": "Kvar att spendera mars–aug", "subtitle": "Budget 32 000 kr > inkomst 20 140 kr", "badge": "Underskott 11 860 kr/mån", "tone": "bad", "goto": "budget#leave-month" },
               { "title": "Resa till Japan", "subtitle": "Nås mars 2028 i stället för dec. 2027", "badge": "+3 mån", "tone": "warn", "goto": "sparmal-detalj" },
@@ -741,7 +742,7 @@
     },
     {
       "id": "api-leave", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "POST", "path": "/api/leave-periods",
-      "summary": "Spara planerad föräldraledighet och få uppskattning och påverkan",
+      "summary": "Spara planerad föräldraledighet och få uppskattning och påverkan. GET /api/leave-periods listar perioderna och DELETE /api/leave-periods/{id} tar bort en (204).",
       "request": { "from": "2027-03-01", "to": "2027-08-31", "days_per_week": 5, "sgi_annual_minor": 54000000, "employer_topup_pct": 10, "tax_rate_pct": 31.5, "override_net_monthly_minor": null },
       "responses": { "201": { "body": { "id": "leave_1", "estimate": { "daily_benefit_minor": 114800, "net_monthly_minor": 2014000, "delta_vs_normal_minor": -1347000, "params_year": 2027, "disclaimer": "Uppskattning – inte ett besked från Försäkringskassan" }, "impacts": [{ "type": "goal", "goal_id": "goal_jp", "delay_months": 3 }, { "type": "budget", "period": "2027-04", "shortfall_minor": 1186000 }] } } },
       "satisfies": ["KK-23-A", "KK-23-B", "KK-23-C"]
