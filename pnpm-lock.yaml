@@ -49,6 +49,9 @@ importers:
       '@kronkoll/adapter-enablebanking':
         specifier: workspace:*
         version: link:../../packages/adapter-enablebanking
+      '@kronkoll/adapter-webpush':
+        specifier: workspace:*
+        version: link:../../packages/adapter-webpush
       '@kronkoll/domain':
         specifier: workspace:*
         version: link:../../packages/domain
@@ -177,6 +180,9 @@ importers:
         specifier: workspace:*
         version: link:../domain
     devDependencies:
+      '@cloudflare/workers-types':
+        specifier: 5.20261016.1
+        version: 5.20261016.1
       '@vitest/coverage-v8':
         specifier: 5.0.5
         version: 5.0.5(vitest@5.0.5)

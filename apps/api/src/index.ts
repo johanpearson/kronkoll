@@ -17,6 +17,7 @@ import { getIncome } from "./income.ts";
 import { getInsights } from "./insights.ts";
 import { createLeavePeriod, deleteLeavePeriod, listLeavePeriods } from "./leave.ts";
 import { getOverview } from "./overview.ts";
+import { getPushConfig, subscribe, unsubscribe, type PushEnv } from "./push.ts";
 import { getSettings, patchSettings } from "./settings.ts";
 import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule } from "./rules.ts";
 import { applyRule, setCategory } from "./set-category.ts";
@@ -27,7 +28,7 @@ import { completeConnection, renewConnection, startConnection, type ConnectConte
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
 import { getTransaction, listTransactions } from "./transactions.ts";
 
-export interface Env extends AccessEnv, SyncEnv, ConnectEnv {
+export interface Env extends AccessEnv, SyncEnv, ConnectEnv, PushEnv {
   /** Secret: Enable Bankings application id. */
   EB_APP_ID?: string | undefined;
   /** Secret: privat nyckel (PKCS#8 PEM) för att signera anrop till Enable Banking. */
@@ -270,6 +271,17 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/transactions") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
     return listTransactions(request, env, context.sync);
+  }
+
+  if (pathname === "/api/push") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return getPushConfig(env);
+  }
+
+  if (pathname === "/api/push/subscriptions") {
+    if (request.method === "POST") return subscribe(request, env, context.sync);
+    if (request.method === "DELETE") return unsubscribe(request, env);
+    return json({ error: "method_not_allowed" }, 405, { allow: "POST, DELETE" });
   }
 
   if (pathname === "/api/sync") {
