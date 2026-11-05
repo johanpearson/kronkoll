@@ -43,9 +43,12 @@ export function GoalsView() {
   return (
     <main>
       <h1>Sparmål</h1>
-      <p>
+      <p className="actions">
         <button type="button" className="primary" onClick={() => { navigate("/sparmal/nytt"); }}>
           Nytt sparmål
+        </button>
+        <button type="button" onClick={() => { navigate("/sparmal/lan"); }}>
+          Lån
         </button>
       </p>
       {state.kind === "loading" && <p>Hämtar…</p>}
