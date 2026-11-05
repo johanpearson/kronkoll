@@ -7,6 +7,7 @@ import { GoalDetail } from "./goals/GoalDetail.tsx";
 import { GoalsView } from "./goals/GoalsView.tsx";
 import { NewGoal } from "./goals/NewGoal.tsx";
 import { IncomeView } from "./income/IncomeView.tsx";
+import { LoansView } from "./loans/LoansView.tsx";
 import { NewLeave } from "./income/NewLeave.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
 import { Link, usePath } from "./router.tsx";
@@ -35,6 +36,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/budget": BudgetView,
   "/sparmal": GoalsView,
   "/sparmal/nytt": NewGoal,
+  "/sparmal/lan": LoansView,
   "/inkomst": IncomeView,
   "/inkomst/ledighet": NewLeave,
   "/installningar": SettingsView,
@@ -66,8 +68,8 @@ const TABS = [
 const DETAIL = /^\/transaktioner\/([^/]+)$/u;
 /** /installningar/koppling/{id}: sidan om en bankkoppling. */
 const CONNECTION = /^\/installningar\/koppling\/([^/]+)$/u;
-/** /sparmal/{id}: sidan för ett sparmål. /sparmal/nytt är formuläret. */
-const GOAL = /^\/sparmal\/(?!nytt$)([^/]+)$/u;
+/** /sparmal/{id}: sidan för ett sparmål. /sparmal/nytt är formuläret och /sparmal/lan lånen. */
+const GOAL = /^\/sparmal\/(?!(?:nytt|lan)$)([^/]+)$/u;
 
 function page(path: string): React.JSX.Element {
   const detailId = DETAIL.exec(path)?.[1];

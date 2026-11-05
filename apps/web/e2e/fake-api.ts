@@ -146,6 +146,11 @@ export async function useFakeApi(
     is_internal_transfer: false, manual_transfer: null, income_type: "other", income_source: "template", transfer_pair: null, splits: [],
   };
   const leave: Record<string, unknown>[] = [LEAVE];
+  /** Ett påhittat bolån vars bindningstid slutar om 41 dagar (KK-36-C). */
+  const loans: Record<string, unknown>[] = [{
+    id: "lan1", name: "Bolån del 1", lender: "Exempelbanken", balance_minor: 120000000, interest_rate_bp: 350, rate_fixed_until: "2026-12-15", amortization_minor: 200000,
+    monthly_interest_minor: 350000, monthly_amortization_minor: 200000, monthly_cost_minor: 550000, rate_fixed: true, rate_fixed_days_left: 41, rate_fixed_ending: true,
+  }];
   const state: FakeApi = { rules: [], budgetPuts: [] };
   // Utan bank visar översikten välkomstsidan. Kopplingen görs klar med koden som banken skickar tillbaka.
   let connected = options.connected ?? true;
@@ -191,6 +196,15 @@ export async function useFakeApi(
       return [201, goal];
     }
     if (path === "/api/goals") return [200, { items: goals }];
+    if (path === "/api/loans") {
+      return [200, {
+        loans,
+        total_balance_minor: loans.reduce((s, l) => s + Number(l["balance_minor"]), 0),
+        total_monthly_interest_minor: loans.reduce((s, l) => s + Number(l["monthly_interest_minor"]), 0),
+        total_monthly_amortization_minor: loans.reduce((s, l) => s + Number(l["amortization_minor"]), 0),
+        total_monthly_cost_minor: loans.reduce((s, l) => s + Number(l["monthly_cost_minor"]), 0),
+      }];
+    }
     if (path === "/api/income") {
       return [200, { months: [
         { period: "2026-09", salary_minor: 1120000, parental_benefit_minor: 995000, other_minor: 78000 },
