@@ -61,6 +61,8 @@ pnpm --filter @kronkoll/<paket> test:coverage
   ett litet tillstånd per test. Nya vyer behöver nya svar där, i samma form som det riktiga API:t.
 - Första gången: `pnpm --filter @kronkoll/web exec playwright install chromium`. `pnpm` måste finnas i PATH,
   eftersom webbservern startas med `pnpm preview` (`corepack enable` räcker).
+- Lokalt återanvänder Playwright en server som redan lyssnar på port 8788 (`reuseExistingServer`), även en från
+  en annan worktree. Då testas fel bygge. Sätt `CI=1` när flera sessioner kör E2E samtidigt.
 - Transaktionslistan är grupperad per dag med nästlade `<li>`. Filtrera bort dagens rubrik för att få en rad.
 - `e2e/a11y.spec.ts` kör axe (WCAG 2.1 A och AA) på huvudvyerna i ljust och mörkt läge via
   `emulateMedia({ colorScheme })`. En ny vy läggs till i `VIEWS`, och fake-API:t måste svara på alla dess

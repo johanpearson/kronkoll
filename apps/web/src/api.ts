@@ -29,6 +29,11 @@ export function deleteJson(path: string, timeoutMs = TIMEOUT_MS): Promise<ApiRes
   return sendJson("DELETE", path, undefined, timeoutMs);
 }
 
+/** DELETE med JSON, när servern behöver veta vad som ska tas bort, till exempel en push-adress. */
+export function deleteWithBody(path: string, body: unknown, timeoutMs = TIMEOUT_MS): Promise<ApiResult> {
+  return sendJson("DELETE", path, body, timeoutMs);
+}
+
 async function sendJson(method: "POST" | "PATCH" | "PUT" | "DELETE", path: string, body: unknown, timeoutMs: number): Promise<ApiResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => {

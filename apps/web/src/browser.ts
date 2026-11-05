@@ -1,5 +1,7 @@
 // Det appen gör med webbläsarens adress och lagring utöver routern. Samlat här så att testerna kan
 // ersätta det.
+import { deleteWithBody } from "./api.ts";
+import { pushDevice } from "./settings/push-device.ts";
 
 /** Tar bort alla IndexedDB-databaser som webbläsaren kan lista. */
 async function deleteDatabases(): Promise<void> {
@@ -37,10 +39,14 @@ export const browser = {
   },
 
   /**
-   * Rensar det appen kan ha sparat på enheten (KK-35): Cache Storage, IndexedDB och webbläsarens
-   * lagring. Push-prenumerationer finns inte än och rensas när de byggs (#42).
+   * Rensar det appen kan ha sparat på enheten (KK-35): push-prenumerationen (KK-27), Cache Storage,
+   * IndexedDB och webbläsarens lagring. Prenumerationen tas bort först, medan inloggningen fortfarande gäller.
    */
   async clearDevice(): Promise<void> {
+    await tryStep(async () => {
+      const endpoint = await pushDevice.unsubscribe();
+      if (endpoint !== null) await deleteWithBody("/api/push/subscriptions", { endpoint });
+    });
     await tryStep(async () => {
       const names = await caches.keys();
       await Promise.all(names.map((name) => caches.delete(name)));

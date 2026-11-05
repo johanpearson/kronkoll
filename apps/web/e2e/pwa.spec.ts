@@ -32,3 +32,15 @@ test("appen går att installera, och utan nät visas senaste översikten med tid
   await expect(page.getByRole("note")).toContainText(/^Offline – visar data från \d+ nov\. \d\d:\d\d\.$/u);
   await expect(page.getByRole("main")).toContainText("8 582,00 kr");
 });
+
+test("med service worker och tillåtna notiser visas reglagen för notiser, alla avslagna från början (KK-27)", async ({ page, context }) => {
+  await useFakeApi(context);
+  await context.grantPermissions(["notifications"]);
+  await page.goto("/installningar");
+  await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
+  await page.reload();
+  for (const name of ["Samtycket går snart ut (14, 3 och 0 dagar före)", "Budget överskriden", "Synken misslyckas flera gånger i rad"]) {
+    await expect(page.getByRole("checkbox", { name })).not.toBeChecked();
+  }
+  await expect(page.getByRole("main")).toContainText("Notiserna innehåller aldrig belopp.");
+});
