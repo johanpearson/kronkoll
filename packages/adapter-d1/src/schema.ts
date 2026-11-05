@@ -404,3 +404,44 @@ export const loans = sqliteTable(
     check("loans_rate_fixed_until", sql`rate_fixed_until IS NULL OR ${isoDate("rate_fixed_until")}`),
   ],
 );
+
+/**
+ * Web Push-prenumerationer (KK-27, D-notify), en per enhet. Adressen är push-tjänstens och
+ * nycklarna är webbläsarens publika nyckel och hemlighet för krypteringen. `topics` är de valda
+ * notistyperna som JSON-lista. Samma adress igen ersätter raden.
+ */
+export const pushSubscriptions = sqliteTable(
+  "push_subscriptions",
+  {
+    id: text("id").primaryKey(),
+    endpoint: text("endpoint").notNull(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    topics: text("topics").notNull().default("[]"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("push_subscriptions_endpoint").on(t.endpoint),
+    check("push_subscriptions_endpoint_https", sql`endpoint LIKE 'https://%' AND length(endpoint) <= 1024`),
+    check("push_subscriptions_keys", sql`length(p256dh) BETWEEN 1 AND 100 AND length(auth) BETWEEN 1 AND 30`),
+    check("push_subscriptions_topics", sql`json_valid(topics) AND json_type(topics) = 'array'`),
+  ],
+);
+
+const NOTICE_KINDS = ["budget", "consent"] as const;
+
+/**
+ * Notiser som redan skickats, så att samma notis aldrig skickas två gånger (KK-27-A, KK-27-B).
+ * Budget: `scope` är perioden och `item` kategorin. Samtycke: `scope` är kopplingen och
+ * utgångsdagen, och `item` gränsen (14, 3 eller 0). Inga belopp eller texter sparas.
+ */
+export const sentNotices = sqliteTable(
+  "sent_notices",
+  {
+    kind: text("kind", { enum: NOTICE_KINDS }).notNull(),
+    scope: text("scope").notNull(),
+    item: text("item").notNull(),
+    sentAt: text("sent_at").notNull().default(sql`(strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.scope, t.item] }), check("sent_notices_kind", oneOf("kind", NOTICE_KINDS))],
+);
