@@ -1,11 +1,15 @@
 // Ett sparmål (#39, KK-21): hur mycket som är sparat, prognos, måldatum och takt, vad som krävs per
 // månad för att hinna, och avsättningarna. Mål med egna avsättningar får en ny avsättning eller ett
-// uttag här; ett kontos mål följer saldot.
+// uttag här; ett kontos mål följer saldot. Målet ändras eller tas bort med pennan, och en avsättning
+// tas bort med papperskorgen (KK-21-C).
 import { formatDateShort, formatSek } from "@kronkoll/domain";
+import { Pencil, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
-import { field, postJson } from "../api.ts";
+import { deleteJson, field, postJson } from "../api.ts";
+import { IconButton } from "../icon-button.tsx";
 import { Link } from "../router.tsx";
 import { useToast } from "../toast.tsx";
+import { GoalEdit } from "./GoalEdit.tsx";
 import { fetchGoal, formatMonthLong, formatPeriod, goalBadge, toGoal, type Goal } from "./goals.ts";
 import { effectText, fetchLeaveEffects, type LeaveEffect } from "./leave-effect.ts";
 import { parseKronor } from "./NewGoal.tsx";
@@ -68,9 +72,56 @@ function Deposit(props: { goalId: string; onSaved: (goal: Goal) => void }) {
   );
 }
 
+/** En avsättning med en knapp som frågar innan den tas bort (KK-21-C). */
+function ContributionRow(props: { goalId: string; c: Goal["contributions"][number]; onRemoved: () => void }) {
+  const toast = useToast();
+  const { c } = props;
+  const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState(false);
+  const kind = c.amountMinor < 0 ? "Uttag" : "Avsättning";
+  const the = c.amountMinor < 0 ? "uttaget" : "avsättningen";
+  const remove = async () => {
+    const { status } = await deleteJson(`/api/goals/${encodeURIComponent(props.goalId)}/contributions/${encodeURIComponent(c.id)}`);
+    if (status === 204) {
+      toast.done(c.amountMinor < 0 ? "Uttaget är borttaget." : "Avsättningen är borttagen.");
+      props.onRemoved();
+    } else setError(true);
+  };
+  return (
+    <li className="tx">
+      <div className="tx-main">
+        <span className="tx-name">{kind}</span>
+        <span className={c.amountMinor > 0 ? "amount income" : "amount"}>{formatSek(c.amountMinor)}</span>
+      </div>
+      <small className="tx-notes">{formatDateShort(c.date)}</small>
+      {confirming ? (
+        <div className="tx-editor">
+          <p>Ta bort {the}? Sparat och takt räknas om.</p>
+          {error && <p role="alert">Det gick inte att ta bort. Försök igen.</p>}
+          <p className="actions">
+            <button type="button" className="danger small" onClick={() => void remove()}>
+              Ta bort
+            </button>
+            <button type="button" className="small" onClick={() => { setConfirming(false); }}>
+              Behåll
+            </button>
+          </p>
+        </div>
+      ) : (
+        c.id !== "" && (
+          <div className="tx-actions">
+            <IconButton label={`Ta bort ${kind.toLowerCase()} ${formatDateShort(c.date)}`} icon={Trash2} onClick={() => { setConfirming(true); }} />
+          </div>
+        )
+      )}
+    </li>
+  );
+}
+
 export function GoalDetail({ id }: { id: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [effects, setEffects] = useState<readonly LeaveEffect[]>([]);
+  const [editing, setEditing] = useState(false);
 
   const load = useCallback(async () => {
     const goal = await fetchGoal(id);
@@ -106,7 +157,20 @@ export function GoalDetail({ id }: { id: string }) {
   return (
     <main>
       {back}
-      <h1>{goal.name}</h1>
+      <div className="page-header">
+        <h1>{goal.name}</h1>
+        {!editing && <IconButton label="Ändra sparmål" icon={Pencil} onClick={() => { setEditing(true); }} />}
+      </div>
+      {editing && (
+        <GoalEdit
+          goal={goal}
+          onSaved={(saved) => {
+            setEditing(false);
+            setState({ kind: "ready", goal: saved });
+          }}
+          onClose={() => { setEditing(false); }}
+        />
+      )}
       <section className="card">
         <p className="goal-progress">
           {formatSek(goal.savedMinor)} av {formatSek(goal.targetMinor)} ({percent} %)
@@ -146,13 +210,7 @@ export function GoalDetail({ id }: { id: string }) {
           ) : (
             <ul aria-label="Avsättningar">
               {goal.contributions.map((c, i) => (
-                <li key={`${c.date}-${String(i)}`} className="tx">
-                  <div className="tx-main">
-                    <span className="tx-name">{c.amountMinor < 0 ? "Uttag" : "Avsättning"}</span>
-                    <span className={c.amountMinor > 0 ? "amount income" : "amount"}>{formatSek(c.amountMinor)}</span>
-                  </div>
-                  <small className="tx-notes">{formatDateShort(c.date)}</small>
-                </li>
+                <ContributionRow key={c.id === "" ? `${c.date}-${String(i)}` : c.id} goalId={goal.id} c={c} onRemoved={() => void load()} />
               ))}
             </ul>
           )}
