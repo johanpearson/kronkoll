@@ -11,7 +11,7 @@ import { deleteBudget, getBudget, putBudget } from "./budget.ts";
 import { createCategory, listCategories, mergeCategory, patchCategory } from "./categories.ts";
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
-import { addContribution, createGoal, getGoal, listGoals } from "./goals.ts";
+import { addContribution, createGoal, deleteContribution, deleteGoal, getGoal, listGoals, patchGoal } from "./goals.ts";
 import { deleteLoan, listLoans, putLoan } from "./loans.ts";
 import { getIncome } from "./income.ts";
 import { getInsights } from "./insights.ts";
@@ -189,10 +189,18 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     return addContribution(request, env, contributionMatch[1], context.sync);
   }
 
+  const oneContributionMatch = /^\/api\/goals\/([A-Za-z0-9_-]{1,64})\/contributions\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (oneContributionMatch?.[1] && oneContributionMatch[2]) {
+    if (request.method !== "DELETE") return json({ error: "method_not_allowed" }, 405, { allow: "DELETE" });
+    return deleteContribution(env, oneContributionMatch[1], oneContributionMatch[2]);
+  }
+
   const goalMatch = /^\/api\/goals\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
   if (goalMatch?.[1]) {
-    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
-    return getGoal(env, goalMatch[1], context.sync);
+    if (request.method === "GET") return getGoal(env, goalMatch[1], context.sync);
+    if (request.method === "PATCH") return patchGoal(request, env, goalMatch[1], context.sync);
+    if (request.method === "DELETE") return deleteGoal(env, goalMatch[1]);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, PATCH, DELETE" });
   }
 
   if (pathname === "/api/goals") {

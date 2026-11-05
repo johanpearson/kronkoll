@@ -76,10 +76,38 @@ describe("sparmål i D1 (KK-21)", () => {
     expect(await repo.addContribution("g1", { date: "2026-10-28", amountMinor: -50_000 }, "a3")).toBe(true);
     expect(await repo.addContribution("g3", { date: "2026-10-01", amountMinor: 100 }, "a4")).toBe(true);
     expect(await repo.contributions("g1")).toEqual([
-      { date: "2026-10-28", amountMinor: -50_000 },
-      { date: "2026-10-28", amountMinor: 300_000 },
-      { date: "2026-09-27", amountMinor: 340_000 },
+      { id: "a3", date: "2026-10-28", amountMinor: -50_000 },
+      { id: "a2", date: "2026-10-28", amountMinor: 300_000 },
+      { id: "a1", date: "2026-09-27", amountMinor: 340_000 },
     ]);
+  });
+
+  it("ändrar namn, belopp, måldatum och redan sparat, men bara på rätt mål (KK-21-C)", async () => {
+    const repo = goalRepository(db);
+    await repo.create(japan, "g1");
+    await repo.create(buffert, "g2");
+    expect(await repo.update("g1", { name: "Japan och Korea", targetMinor: 7_000_000, targetDate: null, initialMinor: 0 })).toBe(true);
+    expect(await repo.get("g1")).toEqual({ ...japan, id: "g1", name: "Japan och Korea", targetMinor: 7_000_000, targetDate: null, initialMinor: 0 });
+    expect(await repo.get("g2")).toEqual({ id: "g2", ...buffert });
+    expect(await repo.update("saknas", { name: "x" })).toBe(false);
+    await expect(repo.update("g1", { targetMinor: 0 })).rejects.toThrow();
+    await expect(repo.update("g1", { name: " " })).rejects.toThrow();
+  });
+
+  it("tar bort ett mål med dess avsättningar, och en avsättning bara i sitt eget mål (KK-21-C)", async () => {
+    const repo = goalRepository(db);
+    await repo.create(japan, "g1");
+    await repo.create({ ...japan, name: "Annat" }, "g3");
+    await repo.addContribution("g1", { date: "2026-09-27", amountMinor: 340_000 }, "a1");
+    await repo.addContribution("g1", { date: "2026-10-28", amountMinor: 300_000 }, "a2");
+    await repo.addContribution("g3", { date: "2026-10-01", amountMinor: 100 }, "a4");
+    expect(await repo.removeContribution("g3", "a1")).toBe(false);
+    expect(await repo.removeContribution("g1", "a1")).toBe(true);
+    expect(await repo.contributions("g1")).toEqual([{ id: "a2", date: "2026-10-28", amountMinor: 300_000 }]);
+    expect(await repo.remove("g1")).toBe(true);
+    expect(await repo.remove("g1")).toBe(false);
+    expect(await repo.list()).toEqual([{ id: "g3", ...japan, name: "Annat" }]);
+    expect((await db.prepare(`SELECT id FROM goal_contributions`).all<{ id: string }>()).results).toEqual([{ id: "a4" }]);
   });
 
   it("en avsättning till ett mål som inte finns sparas inte, och en avsättning på 0 kr stoppas", async () => {

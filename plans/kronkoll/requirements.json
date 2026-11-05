@@ -428,6 +428,10 @@
         {
           "id": "KK-21-B",
           "text": "Ett mål med noll eller negativ sparttakt visar \"nås inte i nuvarande takt\" i stället för ett datum."
+        },
+        {
+          "id": "KK-21-C",
+          "text": "Ett sparmål går att ändra (namn, målbelopp, måldatum och redan sparat för manuella mål) och ta bort, och en avsättning går att ta bort. När ett mål tas bort försvinner dess avsättningar, men inget hos banken ändras. Tillagt på ägarens begäran 2026-11-05."
         }
       ]
     },

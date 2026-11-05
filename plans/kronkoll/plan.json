@@ -291,7 +291,10 @@
           { "title": "Manuell avsättning", "subtitle": "28 okt. 2026", "meta": "+3 000 kr" },
           { "title": "Manuell avsättning", "subtitle": "27 sep. 2026", "meta": "+3 400 kr" }
         ] },
-        { "type": "button", "label": "Lägg till avsättning", "variant": "secondary", "toast": "Avsättning på 3 000 kr sparad" }
+        { "type": "button", "label": "Lägg till avsättning", "variant": "secondary", "toast": "Avsättning på 3 000 kr sparad" },
+        { "id": "remove-contribution", "type": "button", "label": "Ta bort avsättning", "variant": "secondary", "toast": "Avsättningen är borttagen", "satisfies": ["KK-21-C"] },
+        { "id": "edit-goal", "type": "button", "label": "Ändra sparmål", "variant": "secondary", "toast": "Sparmålet är ändrat", "satisfies": ["KK-21-C"] },
+        { "id": "delete-goal", "type": "button", "label": "Ta bort sparmål", "variant": "secondary", "goto": "sparmal", "toast": "Sparmålet är borttaget", "satisfies": ["KK-21-C"] }
       ],
       "states": [
         { "id": "no-rate", "label": "Ingen sparttakt", "satisfies": ["KK-21-B"], "elements": [
@@ -716,6 +719,18 @@
         "422": { "body": { "error": "target_date_in_past" } }
       },
       "satisfies": ["KK-21-A", "KK-21-B", "KK-23-C"]
+    },
+    {
+      "id": "api-goal-edit", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PATCH", "path": "/api/goals/{id}",
+      "summary": "Ändra namn, målbelopp, måldatum (null = inget) eller redan sparat (bara manuella mål) och få målet med ny prognos. DELETE /api/goals/{id} tar bort målet och dess avsättningar (204). DELETE /api/goals/{id}/contributions/{contribution_id} tar bort en avsättning (204). Avsättningarna i svaren har id.",
+      "request": { "name": "Resa till Japan", "target_minor": 6500000, "target_date": "2027-12-31" },
+      "responses": {
+        "200": { "body": { "id": "goal_jp", "name": "Resa till Japan", "target_minor": 6500000, "contributions": [{ "id": "c_1", "date": "2026-10-28", "amount_minor": 300000 }] } },
+        "404": { "body": { "error": "not_found" } },
+        "409": { "body": { "error": "goal_uses_account" } },
+        "422": { "body": { "error": "target_date_in_past" } }
+      },
+      "satisfies": ["KK-21-C"]
     },
     {
       "id": "api-income", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/income",
@@ -1562,7 +1577,7 @@
     {
       "id": "M2", "title": "M2 · Sparmål, lån och inkomst (föräldraledighet)", "target": "Vecka 9–11",
       "description": "Sparmål med prognos, lånöversikt med ränta och amortering (KK-36), inkomstklassning, inkomsthistorik, planering av ledighet med omräkning av budget och sparmål. Se Q-mvp-scope om detta ska tidigareläggas.",
-      "includes": ["sparmal", "sparmal-detalj", "sparmal-nytt", "lan", "api-loans", "Loan", "inkomst", "ledighet-ny", "api-goals", "api-income", "api-leave", "F-leave", "SavingsGoal", "GoalContribution", "LeavePeriod", "IncomeParameters"]
+      "includes": ["sparmal", "sparmal-detalj", "sparmal-nytt", "lan", "api-loans", "Loan", "inkomst", "ledighet-ny", "api-goals", "api-goal-edit", "api-income", "api-leave", "F-leave", "SavingsGoal", "GoalContribution", "LeavePeriod", "IncomeParameters"]
     },
     {
       "id": "M3", "title": "M3 · Insikter och notiser", "target": "Vecka 12–13",
@@ -1612,6 +1627,7 @@
     { "id": "V-i-exclude", "title": "API: markera, ångra och regel för Räknas inte", "type": "integration", "given": "lokal D1 med syntetiska transaktioner, en manuellt avmarkerad", "when": "PUT /transfer med internal true/false/null och en regel med action exclude appliceras bakåt", "then": "markeringen sätts och tas bort; regeln markerar träffarna men inte den manuellt avmarkerade", "satisfies": ["KK-39-B", "KK-39-C"] },
     { "id": "V-e2e-exclude", "title": "E2E: räkna inte en transaktion", "type": "e2e", "given": "syntetiska transaktioner i november", "when": "markera en utgift Räknas inte, öppna budget, ångra", "then": "raden är nedtonad med texten Räknas inte och utfallet minskar; efter ångra är allt som innan", "satisfies": ["KK-39-A", "KK-39-B"] },
     { "id": "V-i-budget-delete", "title": "API: ta bort en periods budget", "type": "integration", "given": "budget för oktober och november i lokal D1", "when": "DELETE /api/budgets/2026-11 med och utan CSRF-header", "then": "med header: november saknar budget, oktober är orörd; utan header: 403 och inget ändras", "satisfies": ["KK-40-A", "KK-40-B"] },
+    { "id": "V-i-goal-edit", "title": "API: ändra och ta bort sparmål och avsättningar", "type": "integration", "given": "ett manuellt mål med två avsättningar", "when": "målbeloppet ändras, en avsättning tas bort och sedan målet", "then": "prognosen räknas om med det nya beloppet och utan avsättningen; när målet tas bort försvinner avsättningarna; ett kopplat mål kan inte få redan sparat; måldatum i dåtid ger 422", "satisfies": ["KK-21-C"] },
     { "id": "V-e2e-goal", "title": "E2E: skapa sparmål", "type": "e2e", "given": "inga sparmål", "when": "skapa Resa till Japan 60 000 / aug. 2027", "then": "prognos och krav per månad visas; måldatum i dåtid ger fel", "satisfies": ["KK-21-A", "KK-15-B"] },
     { "id": "V-e2e-leave", "title": "E2E: planera ledighet", "type": "e2e", "given": "inkomsthistorik och ett sparmål", "when": "lägg till mars–aug. 2027", "then": "uppskattning, påverkan på budget april 2027 och sparmål visas; manuellt belopp slår igenom", "satisfies": ["KK-23-A", "KK-23-C", "KK-22-B"] },
     { "id": "V-e2e-dashboard", "title": "E2E: översikt", "type": "e2e", "given": "syntetisk månad", "when": "öppna appen", "then": "saldo, in, ut, kvar att spendera, senaste synk och 12-månaderstrend stämmer mot fixture", "satisfies": ["KK-17-A", "KK-17-C"] },

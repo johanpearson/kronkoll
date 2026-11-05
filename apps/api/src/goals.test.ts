@@ -92,9 +92,9 @@ describe("sparmål med prognos (KK-21)", () => {
       monthly_rate_minor: kr(3200),
       forecast: { kind: "eta", remaining_minor: kr(38500), months_left: 13, reach_period: "2027-12", on_track: false, months_late: 4, required_monthly_minor: 427778 },
       contributions: [
-        { date: "2026-10-28", amount_minor: kr(3000) },
-        { date: "2026-09-27", amount_minor: kr(3400) },
-        { date: "2026-08-30", amount_minor: kr(3200) },
+        { id: expect.any(String) as unknown, date: "2026-10-28", amount_minor: kr(3000) },
+        { id: expect.any(String) as unknown, date: "2026-09-27", amount_minor: kr(3400) },
+        { id: expect.any(String) as unknown, date: "2026-08-30", amount_minor: kr(3200) },
       ],
     });
     expect(await (await call("GET", "/api/goals")).json()).toEqual({ items: [goal] });
@@ -164,18 +164,63 @@ describe("ogiltiga anrop", () => {
       expect((await call("POST", `/api/goals/${id}/contributions`, body)).status, JSON.stringify(body)).toBe(400);
     }
     const res = await call("POST", `/api/goals/${id}/contributions`, { amount_minor: kr(-500) });
-    expect(await res.json()).toMatchObject({ saved_minor: kr(11400), contributions: [{ date: "2026-11-04", amount_minor: kr(-500) }] });
+    expect(await res.json()).toMatchObject({ saved_minor: kr(11400), contributions: [{ id: expect.any(String) as unknown, date: "2026-11-04", amount_minor: kr(-500) }] });
   });
 
   it("okänt mål ger 404, fel metod 405 och en databas som inte svarar 503", async () => {
     expect((await call("GET", "/api/goals/saknas")).status).toBe(404);
     expect((await call("DELETE", "/api/goals")).headers.get("allow")).toBe("GET, POST");
-    expect((await call("PUT", "/api/goals/g1")).headers.get("allow")).toBe("GET");
+    expect((await call("PUT", "/api/goals/g1")).headers.get("allow")).toBe("GET, PATCH, DELETE");
     expect((await call("GET", "/api/goals/g1/contributions")).headers.get("allow")).toBe("POST");
+    expect((await call("GET", "/api/goals/g1/contributions/c1")).headers.get("allow")).toBe("DELETE");
     const broken = { prepare: () => { throw new Error("nere"); }, batch: () => { throw new Error("nere"); } } as unknown as D1Database;
     expect((await call("GET", "/api/goals", undefined, { DB: broken })).status).toBe(503);
     expect((await call("GET", "/api/goals/g1", undefined, { DB: broken })).status).toBe(503);
     expect((await call("POST", "/api/goals", JAPAN, { DB: broken })).status).toBe(503);
     expect((await call("POST", "/api/goals/g1/contributions", { amount_minor: 100 }, { DB: broken })).status).toBe(503);
+    expect((await call("PATCH", "/api/goals/g1", { name: "x" }, { DB: broken })).status).toBe(503);
+    expect((await call("DELETE", "/api/goals/g1", undefined, { DB: broken })).status).toBe(503);
+    expect((await call("DELETE", "/api/goals/g1/contributions/c1", undefined, { DB: broken })).status).toBe(503);
+  });
+});
+
+describe("ändra och ta bort sparmål och avsättningar (KK-21-C, V-i-goal-edit)", () => {
+  it("ett nytt målbelopp och måldatum ger ny prognos, och en borttagen avsättning räknas inte längre", async () => {
+    const id = String((await create(JAPAN)).body["id"]);
+    for (const [date, amount] of [["2026-08-30", 3200], ["2026-09-27", 3400], ["2026-10-28", 3000]] as const) {
+      await call("POST", `/api/goals/${id}/contributions`, { date, amount_minor: kr(amount) });
+    }
+    const res = await call("PATCH", `/api/goals/${id}`, { name: " Japan och Korea ", target_minor: kr(70000), target_date: null });
+    expect(res.status).toBe(200);
+    const goal = await res.json<{ contributions: { id: string; date: string }[] } & Record<string, unknown>>();
+    expect(goal).toMatchObject({ name: "Japan och Korea", target_minor: kr(70000), target_date: null, saved_minor: kr(21500), forecast: { kind: "eta", months_left: 16, on_track: null } });
+    const sept = goal.contributions.find((c) => c.date === "2026-09-27")?.id ?? "";
+    expect((await call("DELETE", `/api/goals/${id}/contributions/${sept}`)).status).toBe(204);
+    expect(await (await call("GET", `/api/goals/${id}`)).json()).toMatchObject({ saved_minor: kr(18100), monthly_rate_minor: 206_666 });
+    expect((await call("DELETE", `/api/goals/${id}/contributions/${sept}`)).status).toBe(404);
+  });
+
+  it("redan sparat går att ändra på ett manuellt mål men inte på ett kopplat, och ett mål tas bort med sina avsättningar", async () => {
+    const id = String((await create(JAPAN)).body["id"]);
+    await call("POST", `/api/goals/${id}/contributions`, { amount_minor: kr(1000) });
+    expect(await (await call("PATCH", `/api/goals/${id}`, { initial_minor: 0 })).json()).toMatchObject({ saved_minor: kr(1000), target_minor: kr(60000), name: "Resa till Japan" });
+    const account = String((await create({ name: "Buffert", target_minor: kr(100000), source: { type: "account", account_id: "acc_spar" } })).body["id"]);
+    const refused = await call("PATCH", `/api/goals/${account}`, { initial_minor: kr(100) });
+    expect([refused.status, await refused.json()]).toEqual([409, { error: "goal_uses_account" }]);
+    expect((await call("PATCH", `/api/goals/${account}`, { target_minor: kr(120000) })).status).toBe(200);
+    expect((await call("DELETE", `/api/goals/${id}`)).status).toBe(204);
+    expect((await call("DELETE", `/api/goals/${id}`)).status).toBe(404);
+    expect((await (await call("GET", "/api/goals")).json<{ items: { id: string }[] }>()).items.map((g) => g.id)).toEqual([account]);
+    expect((await db.prepare(`SELECT count(*) AS n FROM goal_contributions`).first<{ n: number }>())?.n).toBe(0);
+  });
+
+  it("felaktiga ändringar ger 400, ett måldatum i dåtid 422 och ett okänt mål 404, och inget ändras", async () => {
+    const id = String((await create(JAPAN)).body["id"]);
+    const bad: unknown[] = ["x", null, {}, { name: " " }, { name: 3 }, { target_minor: 0 }, { target_date: "31 aug" }, { initial_minor: -1 }, { target_minor: "6000" }];
+    for (const body of bad) expect((await call("PATCH", `/api/goals/${id}`, body)).status, JSON.stringify(body)).toBe(400);
+    const past = await call("PATCH", `/api/goals/${id}`, { target_date: "2026-11-04" });
+    expect([past.status, await past.json()]).toEqual([422, { error: "target_date_in_past" }]);
+    expect((await call("PATCH", "/api/goals/saknas", { name: "x" })).status).toBe(404);
+    expect(await (await call("GET", `/api/goals/${id}`)).json()).toMatchObject({ name: "Resa till Japan", target_minor: kr(60000), target_date: "2027-08-31", saved_minor: kr(11900) });
   });
 });
