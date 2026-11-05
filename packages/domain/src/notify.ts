@@ -43,6 +43,11 @@ export interface BudgetNoticeInput {
   readonly names: ReadonlyMap<string, string>;
   /** Kategorier som redan fått en budgetnotis i perioden. */
   readonly alreadySent: readonly string[];
+  /**
+   * Kategorier med en egen budgetrad. En huvudkategori utan egen rad får sin budget från underkategorierna,
+   * och då är det underkategorin som får notisen, så att samma köp inte ger två notiser.
+   */
+  readonly budgeted: readonly string[];
 }
 
 export interface BudgetNotice {
@@ -52,14 +57,15 @@ export interface BudgetNotice {
 }
 
 /**
- * Budgetnotiser för perioden (KK-27-A): huvudkategorier och underkategorier med egen budget som har
+ * Budgetnotiser för perioden (KK-27-A): kategorier med egen budgetrad som har
  * passerat budgeten och inte redan fått en notis i perioden. Bara procent visas, aldrig belopp.
  */
 export function budgetOverNotices(input: BudgetNoticeInput): BudgetNotice[] {
   const sent = new Set(input.alreadySent);
+  const budgeted = new Set(input.budgeted);
   const all: BudgetFigures[] = input.budget.groups.flatMap((g) => [g, ...g.subcategories]);
   return all
-    .filter((f) => f.over && !sent.has(f.categoryId))
+    .filter((f) => f.over && budgeted.has(f.categoryId) && !sent.has(f.categoryId))
     .map((f) => {
       const name = input.names.get(f.categoryId) ?? "En kategori";
       const percent = f.percent === null ? "" : ` (${String(f.percent)} %)`;

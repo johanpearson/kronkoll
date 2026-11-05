@@ -1,8 +1,9 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import { accountRepository, connectionRepository, deriveKeys, type Keys } from "@kronkoll/adapter-d1";
+import { accountRepository, connectionRepository, deriveKeys, pushRepository, type Keys } from "@kronkoll/adapter-d1";
 import { migratedDb, randomSecret } from "@kronkoll/adapter-d1/test-support";
-import { fixedClock, ProviderError, type BankDataProvider, type ProviderTransaction } from "@kronkoll/domain";
+import { fixedClock, ProviderError, type BankDataProvider, type Notice, type ProviderTransaction } from "@kronkoll/domain";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import type { PushSender } from "./notify.ts";
 import { runSync, type SyncDeps } from "./sync.ts";
 import { captureLogs } from "./test-support.ts";
 
@@ -305,6 +306,54 @@ describe("fel isoleras (KK-7-B)", () => {
     await runSync(env(), "cron", throwing);
     expect(logs.lines.map((l) => l.event)).toEqual(["sync.connection_failed", "sync.finished"]);
     expect(JSON.stringify(logs.lines)).not.toContain("1234");
+  });
+});
+
+describe("notiser efter synken (KK-27)", () => {
+  function pushSpy(fail = false) {
+    const sent: Notice[] = [];
+    const sender: PushSender = {
+      deliver(notice) {
+        if (fail) return Promise.reject(new Error("push-tjänsten svarar inte"));
+        sent.push(notice);
+        return Promise.resolve({ sent: 1, gone: 0, failed: 0 });
+      },
+    };
+    return { sent, sender };
+  }
+
+  beforeEach(async () => {
+    await db.batch([db.prepare(`DELETE FROM push_subscriptions`), db.prepare(`DELETE FROM sent_notices`)]);
+    await pushRepository(db).save({ id: "p1", endpoint: "https://web.push.apple.com/exempel", p256dh: `B${"A".repeat(86)}`, auth: "A".repeat(22), topics: ["consent", "sync_failed", "budget_over"] });
+  });
+
+  it("tredje misslyckade körningen skickar en notis om synkfel", async () => {
+    await seedConnection("c1");
+    const { sent, sender } = pushSpy();
+    const { deps } = setup(fakeBank({ transactions: new ProviderError("UNAVAILABLE") }));
+    for (let i = 0; i < 4; i++) await runSync(env(), "cron", { ...deps, pushFor: () => sender });
+    expect(sent.map((n) => n.tag)).toEqual(["sync:c1"]);
+  });
+
+  it("den schemalagda synken påminner om samtycket, den manuella inte", async () => {
+    await seedConnection("c1");
+    await db.prepare(`UPDATE bank_connections SET consent_expires_on = '2026-11-23'`).run();
+    const { sent, sender } = pushSpy();
+    const { deps } = setup();
+    await runSync(env(), "manual", { ...deps, pushFor: () => sender });
+    expect(sent).toEqual([]);
+    await runSync(env(), "cron", { ...deps, pushFor: () => sender });
+    expect(sent.map((n) => n.tag)).toEqual(["consent:c1"]);
+  });
+
+  it("utan Web Push skickas inget, och ett fel i leveransen stoppar inte synken", async () => {
+    await seedConnection("c1");
+    await db.prepare(`UPDATE bank_connections SET consent_expires_on = '2026-11-23'`).run();
+    const { deps, logs } = setup();
+    await runSync(env(), "cron", { ...deps, pushFor: () => null });
+    await runSync(env(), "cron", { ...deps, pushFor: () => pushSpy(true).sender });
+    expect(logs.lines.filter((l) => l.event === "push.failed")).toEqual([expect.objectContaining({ fields: { error_code: "FAILED" } })]);
+    expect(await count("sync_runs")).toBe(2);
   });
 });
 

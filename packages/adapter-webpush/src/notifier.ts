@@ -17,7 +17,7 @@ export interface StoredPushSubscription extends PushKeys {
 
 export interface PushSubscriptionStore {
   list(): Promise<readonly StoredPushSubscription[]>;
-  remove(id: string): Promise<void>;
+  remove(id: string): Promise<unknown>;
 }
 
 export type PushResult = "sent" | "gone" | "failed";
