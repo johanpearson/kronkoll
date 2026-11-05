@@ -39,8 +39,8 @@ test("med service worker och tillåtna notiser visas reglagen för notiser, alla
   await page.goto("/installningar");
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
   await page.reload();
-  for (const name of ["Samtycket går snart ut (14, 3 och 0 dagar före)", "Budget överskriden", "Synken misslyckas flera gånger i rad"]) {
-    await expect(page.getByRole("checkbox", { name })).not.toBeChecked();
+  for (const name of ["Samtycket hos banken går snart ut", "En budget är överskriden", "Synken misslyckas flera gånger i rad"]) {
+    await expect(page.getByRole("switch", { name })).not.toBeChecked();
   }
   await expect(page.getByRole("main")).toContainText("Notiserna innehåller aldrig belopp.");
 });
