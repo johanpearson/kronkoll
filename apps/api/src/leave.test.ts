@@ -102,15 +102,24 @@ describe("planerad föräldraledighet (KK-23)", () => {
       ),
     ]);
     const body = await (await call("POST", "/api/leave-periods", SPRING)).json<{ impacts: { type: string; goal_id?: string }[] }>();
-    const goals = body.impacts.filter((i) => i.type === "goal");
-    expect(goals.map((g) => g.goal_id)).toEqual(["klart", "resa", "sent", "still"]);
-    const [klart, resa, sent, still] = goals;
-    expect(resa).toMatchObject({ name: "Resa", reach_period_before: "2027-11", on_track_before: true, on_track_after: false });
-    expect(resa).toHaveProperty("delay_months", 3);
-    console.log(JSON.stringify(goals));
-    expect(klart).toMatchObject({ lost_saving_minor: 0, delay_months: null, reach_period_after: null, on_track_before: true, on_track_after: true });
-    expect(still).toMatchObject({ lost_saving_minor: 0, delay_months: null, on_track_after: null });
-    expect(sent).toMatchObject({ on_track_after: false });
+    // Mål som skapas i samma millisekund har ingen bestämd ordning, så de hämtas på id.
+    const goals = new Map(body.impacts.filter((i) => i.type === "goal").map((g) => [g.goal_id, g]));
+    expect([...goals.keys()].sort()).toEqual(["klart", "resa", "sent", "still"]);
+    // Ungefär 62 % av lönen i sex månader: cirka 3 800 kr mindre sparat per månad, och målet nås 3 månader senare.
+    expect(goals.get("resa")).toEqual({
+      type: "goal",
+      goal_id: "resa",
+      name: "Resa",
+      lost_saving_minor: 2_294_028,
+      delay_months: 3,
+      reach_period_before: "2027-11",
+      reach_period_after: "2028-02",
+      on_track_before: true,
+      on_track_after: false,
+    });
+    expect(goals.get("klart")).toMatchObject({ lost_saving_minor: 0, delay_months: null, reach_period_after: null, on_track_before: true, on_track_after: true });
+    expect(goals.get("still")).toMatchObject({ lost_saving_minor: 0, delay_months: null, on_track_after: null });
+    expect(goals.get("sent")).toMatchObject({ on_track_after: false });
     await db.prepare(`DELETE FROM savings_goals`).run();
   });
 
