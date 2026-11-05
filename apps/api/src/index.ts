@@ -17,7 +17,8 @@ import { getIncome } from "./income.ts";
 import { getInsights } from "./insights.ts";
 import { createLeavePeriod, deleteLeavePeriod, listLeavePeriods } from "./leave.ts";
 import { getOverview } from "./overview.ts";
-import { getPushConfig, subscribe, unsubscribe, type PushEnv } from "./push.ts";
+import { webPushFrom, type PushEnv } from "./notify.ts";
+import { getPushConfig, subscribe, unsubscribe } from "./push.ts";
 import { getSettings, patchSettings } from "./settings.ts";
 import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule } from "./rules.ts";
 import { applyRule, setCategory } from "./set-category.ts";
@@ -349,6 +350,7 @@ export function syncDeps(env: Env): SyncDeps {
     clock: { now: () => new Date() },
     newId: () => crypto.randomUUID(),
     providerFor: () => enableBankingFrom(env),
+    pushFor: () => webPushFrom(env),
   };
 }
 

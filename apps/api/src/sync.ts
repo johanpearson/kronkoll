@@ -12,6 +12,7 @@ import {
 } from "@kronkoll/adapter-d1";
 import { applyIncomeRules, applyRules, syncConnection, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
 import type { Logger } from "@kronkoll/logging";
+import { notifyBudgetOver, notifySyncFailure, remindConsent, type PushSender } from "./notify.ts";
 import { recomputeTransfers } from "./transfers.ts";
 
 /** Det synken behöver ur Workerns miljö. Hemligheterna sätts i Cloudflare, aldrig i repot (KK-12). */
@@ -27,6 +28,8 @@ export interface SyncDeps {
   readonly newId: () => string;
   /** Banken att hämta från, eller null när dess hemligheter saknas. */
   readonly providerFor: () => BankDataProvider | null;
+  /** Web Push, eller null/saknas när VAPID-nycklarna inte är satta (KK-27). */
+  readonly pushFor?: () => PushSender | null;
 }
 
 /** Synkar alla Enable Banking-kopplingar, eller bara en (`onlyConnectionId`, till exempel efter en ny koppling). */
@@ -44,6 +47,7 @@ export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps, only
     const accounts = accountRepository(env.DB, keys);
     const runs = syncRunRepository(env.DB);
     const store = transactionRepository(env.DB);
+    const failed: { id: string; bank: string | null }[] = [];
 
     for (const connection of await connections.list()) {
       if (connection.provider !== "enablebanking" || (onlyConnectionId !== undefined && connection.id !== onlyConnectionId)) continue;
@@ -73,8 +77,10 @@ export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps, only
           error_code: summary.errorCode,
         });
         if (outcome.consentExpired) logger.warn("sync.consent_expired", { connection_id: connection.id });
-        // Web Push byggs i M3 (#42). Tills dess syns bara att en notis skulle ha skickats.
-        if (outcome.notifyFailure) logger.warn("sync.failure_notice", { connection_id: connection.id });
+        if (outcome.notifyFailure) {
+          logger.warn("sync.failure_notice", { connection_id: connection.id });
+          failed.push({ id: connection.id, bank: connection.aspspName });
+        }
       } catch {
         logger.error("sync.connection_failed", { connection_id: connection.id, error_code: "FAILED" });
       }
@@ -82,8 +88,26 @@ export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps, only
     await categorizeNew(env.DB, logger);
     await classifyIncome(env.DB, logger);
     await markTransfers(env.DB, logger);
+    await sendNotices(env.DB, deps, kind, failed);
   } catch {
     logger.error("sync.failed", { error_code: "FAILED" });
+  }
+}
+
+/**
+ * Notiser efter synken (KK-27, steget s-rules i F-dataflode): synkfel, budget överskriden och, vid den
+ * schemalagda körningen, samtyckespåminnelser. Ett fel här stoppar inte synken, och bannern i appen
+ * visar samma sak ändå (R-5).
+ */
+async function sendNotices(db: D1Database, deps: SyncDeps, kind: SyncKind, failed: readonly { id: string; bank: string | null }[]): Promise<void> {
+  const sender = deps.pushFor?.() ?? null;
+  if (!sender) return;
+  try {
+    for (const f of failed) await notifySyncFailure(db, deps, sender, f.id, f.bank);
+    await notifyBudgetOver(db, deps, sender);
+    if (kind === "cron") await remindConsent(db, deps, sender);
+  } catch {
+    deps.logger.error("push.failed", { error_code: "FAILED" });
   }
 }
 

@@ -1,6 +1,7 @@
-// Skapar ett VAPID-nyckelpar för Web Push (KK-27, D-notify). Kör en gång: `node scripts/vapid-keys.ts`.
-// Sätt sedan båda i Cloudflare med `wrangler secret put VAPID_PUBLIC_KEY` och
-// `wrangler secret put VAPID_PRIVATE_KEY`, och spara den privata i Bitwarden. Aldrig i repot (KK-12).
+// Skapar ett VAPID-nyckelpar för Web Push (KK-27, D-notify). Kör en gång från repots rot:
+// `node scripts/vapid-keys.ts`. Sätt sedan båda som secrets på workern kronkoll-api, i Cloudflares
+// kontrollpanel eller med `npx wrangler secret put VAPID_PUBLIC_KEY` och `… VAPID_PRIVATE_KEY` i
+// apps/api, och spara den privata i Bitwarden. Aldrig i repot (KK-12).
 // Byts nycklarna måste varje enhet slå på notiserna igen.
 export {};
 
