@@ -40,7 +40,10 @@ const LEAVE = {
     normal_net_monthly_minor: 3361000,
     months: [{ period: "2027-03", leave_days: 23, withdrawal_days: 23, benefit_gross_minor: 2400000, topup_gross_minor: 450000, net_minor: 2014000, source: "estimate", params_year: 2027, params_fallback: false, income_minor: 2014000, delta_vs_normal_minor: -1347000 }],
   },
-  impacts: [{ type: "budget", period: "2027-03", budget_minor: 3200000, income_minor: 2014000, shortfall_minor: 1186000 }],
+  impacts: [
+    { type: "budget", period: "2027-03", budget_minor: 3200000, income_minor: 2014000, shortfall_minor: 1186000 },
+    { type: "goal", goal_id: "g1", name: "Resa till Japan", lost_saving_minor: 840000, delay_months: 3, reach_period_before: "2027-12", reach_period_after: "2028-03", on_track_before: false, on_track_after: false },
+  ],
 };
 
 /** Påhittade sparmål i samma form som GET /api/goals: i fas, sent och utan sparttakt. */

@@ -126,3 +126,8 @@ test("planera föräldraledighet och se den under Inkomst (V-e2e-leave, KK-23)",
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(1)).toContainText("3 dagar/vecka");
 });
+test("sparmålets sida visar hur planerad ledighet försenar målet (KK-23-C)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/sparmal/g1");
+  await expect(page.getByRole("note").filter({ hasText: "Med ledighet" })).toContainText("nås målet mars 2028, 3 mån senare.");
+});

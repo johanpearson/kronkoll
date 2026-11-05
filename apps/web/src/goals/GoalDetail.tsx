@@ -7,6 +7,7 @@ import { field, postJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { useToast } from "../toast.tsx";
 import { fetchGoal, formatMonthLong, formatPeriod, goalBadge, toGoal, type Goal } from "./goals.ts";
+import { effectText, fetchLeaveEffects, type LeaveEffect } from "./leave-effect.ts";
 import { parseKronor } from "./NewGoal.tsx";
 
 type State = { readonly kind: "loading" } | { readonly kind: "missing" } | { readonly kind: "error" } | { readonly kind: "ready"; readonly goal: Goal };
@@ -69,6 +70,7 @@ function Deposit(props: { goalId: string; onSaved: (goal: Goal) => void }) {
 
 export function GoalDetail({ id }: { id: string }) {
   const [state, setState] = useState<State>({ kind: "loading" });
+  const [effects, setEffects] = useState<readonly LeaveEffect[]>([]);
 
   const load = useCallback(async () => {
     const goal = await fetchGoal(id);
@@ -77,7 +79,9 @@ export function GoalDetail({ id }: { id: string }) {
 
   useEffect(() => {
     void load();
-  }, [load]);
+    // Ledigheten är ett tillägg: går den inte att hämta visas målet ändå, utan den.
+    void fetchLeaveEffects(id).then(setEffects);
+  }, [load, id]);
 
   const back = (
     <p>
@@ -127,6 +131,11 @@ export function GoalDetail({ id }: { id: string }) {
       {goal.accountMissing && <p role="alert">Kontot som målet följde finns inte längre, så inget räknas som sparat.</p>}
       {f.kind === "never" && !goal.accountMissing && <p className="note" role="note">Nås inte i nuvarande takt – inget sparat de senaste 3 månaderna.</p>}
       {tip && <p className="note" role="note">{tip}</p>}
+      {effects.map((e) => (
+        <p key={`${e.from}-${e.to}`} className="note" role="note">
+          {effectText(e)}
+        </p>
+      ))}
       {goal.source === "account" ? (
         !goal.accountMissing && <p>Saldot på kontot räknas som sparat. Takten är snittet av insättningar och uttag de senaste 3 månaderna.</p>
       ) : (
