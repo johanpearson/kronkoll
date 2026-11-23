@@ -27,7 +27,7 @@ function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 }
 
-const previousKey = (key: string, back: number) => {
+export const previousKey = (key: string, back: number) => {
   const { year, month } = addMonths({ year: Number(key.slice(0, 4)), month: Number(key.slice(5, 7)) }, -back);
   return `${String(year)}-${String(month).padStart(2, "0")}`;
 };

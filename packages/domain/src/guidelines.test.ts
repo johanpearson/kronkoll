@@ -4,9 +4,12 @@ import {
   allocateFreeSpending,
   categoryLevels,
   freeSpending,
+  guidelineLines,
   isOverPace,
   medianMinor,
   perDayMinor,
+  remainingFree,
+  type CategoryLevels,
   type PeriodSpending,
 } from "./guidelines.ts";
 import type { BudgetPeriod } from "./period.ts";
@@ -269,5 +272,67 @@ describe("isOverPace: över takt mot sparlägesnivån (KK-42-D)", () => {
 
   it("sista dagen är hela nivån i takt", () => {
     expect(isOverPace({ levelMinor: kr(3_000), actualMinor: kr(3_000), today: "2026-11-30", period: NOVEMBER })).toBe(false);
+  });
+});
+
+const level = (categoryId: string, normal: number, average = normal): CategoryLevels => ({ categoryId, averageMinor: kr(average), normalMinor: kr(normal) });
+
+describe("guidelineLines: sparlägesnivå per kategori med fasta kostnader (KK-42-A, KK-42-B)", () => {
+  const levels = [level("hyra", 9_000), level("mat", 6_000, 6_500), level("nöje", 3_000, 3_600)];
+
+  it("de fasta kostnaderna i en kategori räknas först och utrymmet fördelas på det rörliga", () => {
+    const lines = guidelineLines({ levels, fixedByCategory: new Map([["hyra", kr(9_000)], ["mat", kr(1_000)]]), freeMinor: kr(5_000), overrides: new Map() });
+    // Rörligt normalt: mat 5 000, nöje 3 000. Utrymme 5 000 fördelas 5/8 och 3/8.
+    expect(lines).toEqual([
+      { categoryId: "hyra", averageMinor: kr(9_000), normalMinor: kr(9_000), fixedMinor: kr(9_000), savingMinor: kr(9_000) },
+      { categoryId: "mat", averageMinor: kr(6_500), normalMinor: kr(6_000), fixedMinor: kr(1_000), savingMinor: kr(1_000) + kr(3_125) },
+      { categoryId: "nöje", averageMinor: kr(3_600), normalMinor: kr(3_000), fixedMinor: 0, savingMinor: kr(1_875) },
+    ]);
+  });
+
+  it("fasta kostnader över normalnivån räknas som högst normalnivån", () => {
+    const [line] = guidelineLines({ levels: [level("el", 500)], fixedByCategory: new Map([["el", kr(900)]]), freeMinor: kr(1_000), overrides: new Map() });
+    expect(line).toMatchObject({ fixedMinor: kr(500), savingMinor: kr(500) });
+  });
+
+  it("en manuell nivå är kategorins hela sparlägesnivå och drar av från det som fördelas", () => {
+    const lines = guidelineLines({ levels, fixedByCategory: new Map([["mat", kr(1_000)]]), freeMinor: kr(5_000), overrides: new Map([["mat", kr(2_000)]]) });
+    expect(lines.find((l) => l.categoryId === "mat")?.savingMinor).toBe(kr(2_000));
+    // Mat tar 1 000 av utrymmet (2 000 − 1 000 fast). Resten, 4 000, delas mellan hyra (9 000) och nöje (3 000).
+    expect(lines.find((l) => l.categoryId === "nöje")?.savingMinor).toBe(kr(1_000));
+    expect(lines.find((l) => l.categoryId === "hyra")?.savingMinor).toBe(kr(3_000));
+  });
+
+  it("en manuell nivå under de fasta kostnaderna drar inget av utrymmet", () => {
+    const lines = guidelineLines({ levels: [level("mat", 6_000), level("nöje", 3_000)], fixedByCategory: new Map([["mat", kr(1_000)]]), freeMinor: kr(3_000), overrides: new Map([["mat", kr(500)]]) });
+    expect(lines.find((l) => l.categoryId === "mat")?.savingMinor).toBe(kr(500));
+    expect(lines.find((l) => l.categoryId === "nöje")?.savingMinor).toBe(kr(3_000));
+  });
+
+  it("en kategori utan rörlig normalnivå får inget av utrymmet och ingen kategori får något utan utrymme", () => {
+    const lines = guidelineLines({ levels: [level("hyra", 9_000), level("mat", 6_000)], fixedByCategory: new Map([["hyra", kr(9_000)]]), freeMinor: 0, overrides: new Map() });
+    expect(lines.map((l) => l.savingMinor)).toEqual([kr(9_000), 0]);
+  });
+
+  it("utan nivåer blir det inga rader", () => {
+    expect(guidelineLines({ levels: [], fixedByCategory: new Map(), freeMinor: kr(1_000), overrides: new Map() })).toEqual([]);
+  });
+});
+
+describe("remainingFree: kvar att spendera fritt hittills (KK-42-C)", () => {
+  const lines = guidelineLines({ levels: [level("hyra", 9_000), level("mat", 6_000)], fixedByCategory: new Map([["hyra", kr(9_000)]]), freeMinor: kr(6_000), overrides: new Map() });
+
+  it("räknar bara det rörliga: fasta kostnader drar inget av det fria utrymmet", () => {
+    const actual = new Map<string | null, number>([["hyra", kr(9_000)], ["mat", kr(2_500)]]);
+    expect(remainingFree(kr(6_000), lines, actual)).toBe(kr(3_500));
+  });
+
+  it("det som överstiger den fasta delen i en kategori, okategoriserat och kategorier utan historik räknas som rörligt", () => {
+    const actual = new Map<string | null, number>([["hyra", kr(9_500)], [null, kr(300)], ["ny", kr(200)]]);
+    expect(remainingFree(kr(6_000), lines, actual)).toBe(kr(5_000));
+  });
+
+  it("blir negativt när det fria utrymmet är överskridet", () => {
+    expect(remainingFree(kr(1_000), lines, new Map([["mat", kr(1_500)]]))).toBe(-kr(500));
   });
 });

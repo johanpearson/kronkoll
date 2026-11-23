@@ -253,6 +253,41 @@ export const budgetLines = sqliteTable(
   ],
 );
 
+/**
+ * Riktlinjer och sparläge (KK-42): läge och sparmål i en enda rad, manuella nivåer per kategori och
+ * perioder som markerats som engångsperioder. Läget och sparmålet gäller tills vidare (D-guidelines).
+ */
+export const guidelineSettings = sqliteTable(
+  "guideline_settings",
+  {
+    id: text("id").primaryKey().default("guidelines"),
+    mode: text("mode", { enum: ["none", "budget", "saving"] }).notNull().default("none"),
+    savingGoalMinor: integer("saving_goal_minor").notNull().default(0),
+  },
+  () => [
+    check("guideline_settings_single_row", sql`id = 'guidelines'`),
+    check("guideline_settings_mode", oneOf("mode", ["none", "budget", "saving"])),
+    check("guideline_settings_goal", sql`saving_goal_minor >= 0`),
+  ],
+);
+
+export const guidelineOverrides = sqliteTable(
+  "guideline_overrides",
+  {
+    categoryId: text("category_id")
+      .primaryKey()
+      .references(() => categories.id, { onDelete: "cascade" }),
+    amountMinor: integer("amount_minor").notNull(),
+  },
+  () => [check("guideline_overrides_amount", sql`amount_minor >= 0`)],
+);
+
+export const guidelineOneOffPeriods = sqliteTable(
+  "guideline_one_off_periods",
+  { period: text("period").primaryKey() },
+  () => [check("guideline_one_off_period", sql`period GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'`)],
+);
+
 /** Driftlogg utan bankdata. Gallras efter 90 dagar (D-retention). */
 export const syncRuns = sqliteTable(
   "sync_runs",

@@ -17,6 +17,8 @@ export interface ChargeRow {
   readonly description: string;
   readonly status: "pending" | "booked" | "removed";
   readonly internal: boolean;
+  /** Kategorin, för att veta vilken kategori en återkommande dragning hör till (KK-42). */
+  readonly categoryId: string | null;
 }
 
 const chargeDate = sql<string>`coalesce(${transactions.bookingDate}, ${transactions.transactionDate})`;
@@ -36,6 +38,7 @@ export function insightsRepository(d1: D1Database) {
           description: transactions.description,
           status: transactions.status,
           internal: transactions.isInternalTransfer,
+          categoryId: transactions.categoryId,
         })
         .from(transactions)
         .where(and(lt(transactions.amountMinor, 0), ne(transactions.status, "removed"),
