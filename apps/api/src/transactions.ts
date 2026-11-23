@@ -3,6 +3,7 @@
 // skickas som den kom och renderas alltid som text i appen (KK-30).
 import { settingsRepository, splitRepository, transactionRepository, type TransactionListItem } from "@kronkoll/adapter-d1";
 import { budgetPeriodForKey, currentBudgetPeriod, ruleKey, type BudgetPeriod } from "@kronkoll/domain";
+import { readAccountFilter } from "./account-filter.ts";
 import type { SyncDeps } from "./sync.ts";
 
 const DEFAULT_LIMIT = 50;
@@ -44,7 +45,9 @@ function readQuery(url: URL) {
   const q = params.get("q") ?? undefined;
   const categoryId = params.get("category_id") ?? undefined;
   const cursor = params.get("cursor");
+  const accountIds = readAccountFilter(url);
   const valid =
+    accountIds !== null &&
     Number.isInteger(limit) &&
     limit >= 1 &&
     limit <= MAX_LIMIT &&
@@ -52,7 +55,7 @@ function readQuery(url: URL) {
     (q === undefined || q.length <= MAX_QUERY_LENGTH) &&
     (categoryId === undefined || (categoryId !== "" && categoryId.length <= MAX_ID_LENGTH)) &&
     (cursor === null || cursor.length <= MAX_CURSOR_LENGTH);
-  return valid ? { period: params.get("period"), limit, uncategorized: uncategorized === "true", q, categoryId, cursor } : null;
+  return valid ? { period: params.get("period"), limit, uncategorized: uncategorized === "true", q, categoryId, cursor, accountIds } : null;
 }
 
 export async function listTransactions(request: Request, env: { DB: D1Database }, sync: SyncDeps): Promise<Response> {
@@ -81,6 +84,7 @@ export async function listTransactions(request: Request, env: { DB: D1Database }
       uncategorized: query.uncategorized,
       q: query.q,
       categoryId: query.categoryId,
+      accountIds: query.accountIds,
       cursor: query.cursor,
     });
     return json({ period, items: items.map(toJson), next_cursor: nextCursor }, 200);

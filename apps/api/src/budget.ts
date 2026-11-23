@@ -4,6 +4,7 @@
 // uppåt (`budgetByMainCategory`), och det är dem budgetvyn visar.
 import { budgetRepository, categoryRepository, settingsRepository, type BudgetSource } from "@kronkoll/adapter-d1";
 import { budgetByMainCategory, budgetOutcome, budgetPeriodForKey, currentBudgetPeriod, spendingByCategory, type BudgetFigures, type BudgetLineInput, type BudgetPeriod } from "@kronkoll/domain";
+import { readAccountFilter } from "./account-filter.ts";
 import type { SyncDeps } from "./sync.ts";
 
 const SOURCES = new Set<string>(["manual", "copy_previous", "average_3m"] satisfies BudgetSource[]);
@@ -25,12 +26,14 @@ async function periodFor(db: D1Database, key: string, sync: SyncDeps): Promise<B
   }
 }
 
-export async function getBudget(env: { DB: D1Database }, key: string, sync: SyncDeps): Promise<Response> {
+export async function getBudget(request: Request, env: { DB: D1Database }, key: string, sync: SyncDeps): Promise<Response> {
+  const accountIds = readAccountFilter(new URL(request.url));
+  if (accountIds === null) return invalid();
   try {
     const period = await periodFor(env.DB, key, sync);
     if (!period) return invalid();
     const repo = budgetRepository(env.DB);
-    const [{ transactions, splits }, lines, categories] = await Promise.all([repo.actuals(period), repo.lines(period.key), categoryRepository(env.DB).list()]);
+    const [{ transactions, splits }, lines, categories] = await Promise.all([repo.actuals(period, accountIds), repo.lines(period.key), categoryRepository(env.DB).list()]);
     const input = { period, transactions, splits, categories };
     const outcome = budgetOutcome({ ...input, lines });
     const byMain = budgetByMainCategory({ ...input, lines });

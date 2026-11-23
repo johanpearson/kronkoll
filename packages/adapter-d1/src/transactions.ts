@@ -36,6 +36,8 @@ export interface TransactionListQuery {
   /** En kategori med dess underkategorier, och uppdelningar med en del i dem. */
   readonly categoryId?: string | undefined;
   readonly uncategorized?: boolean | undefined;
+  /** Bara dessa konton (KK-41-C). Utelämnat betyder alla konton. */
+  readonly accountIds?: readonly string[] | undefined;
   /** Fritext i motpart och beskrivning. */
   readonly q?: string | undefined;
   /** Från förra sidans `nextCursor`, eller null för första sidan. */
@@ -195,6 +197,7 @@ export function transactionRepository(d1: D1Database) {
         // Perioden räknas som i budgeten: bokföringsdagen, annars köpdagen (KK-20, KK-34).
         sql`coalesce(${transactions.bookingDate}, ${transactions.transactionDate}) BETWEEN ${query.from} AND ${query.to}`,
         query.uncategorized ? isNull(transactions.categoryId) : undefined,
+        query.accountIds === undefined ? undefined : inArray(transactions.accountId, [...query.accountIds]),
         query.categoryId === undefined ? undefined : inCategory(query.categoryId),
         q === ""
           ? undefined

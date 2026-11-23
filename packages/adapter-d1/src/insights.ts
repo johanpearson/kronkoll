@@ -4,7 +4,7 @@
  * Datumet är bokföringsdagen, annars köpdagen, som i budgeten.
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import { and, asc, between, lt, ne, sql } from "drizzle-orm";
+import { and, asc, between, inArray, lt, ne, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { transactions } from "./schema.ts";
 
@@ -24,8 +24,8 @@ const chargeDate = sql<string>`coalesce(${transactions.bookingDate}, ${transacti
 export function insightsRepository(d1: D1Database) {
   const db = drizzle(d1);
   return {
-    /** Utbetalningar från och med `from` till och med `to`, äldst först, utan borttagna. */
-    async charges(from: string, to: string): Promise<ChargeRow[]> {
+    /** Utbetalningar från och med `from` till och med `to`, äldst först, utan borttagna. Bara `accountIds` om de anges (KK-41-C). */
+    async charges(from: string, to: string, accountIds?: readonly string[]): Promise<ChargeRow[]> {
       return db
         .select({
           id: transactions.id,
@@ -38,7 +38,11 @@ export function insightsRepository(d1: D1Database) {
           internal: transactions.isInternalTransfer,
         })
         .from(transactions)
-        .where(and(lt(transactions.amountMinor, 0), ne(transactions.status, "removed"), between(chargeDate, from, to)))
+        .where(and(lt(transactions.amountMinor, 0), ne(transactions.status, "removed"),
+            between(chargeDate, from, to),
+            accountIds === undefined ? undefined : inArray(transactions.accountId, [...accountIds]),
+          ),
+        )
         .orderBy(asc(chargeDate), asc(transactions.id))
         .all();
     },

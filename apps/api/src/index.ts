@@ -223,7 +223,7 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
 
   const budgetMatch = /^\/api\/budgets\/([A-Za-z0-9-]{1,16})$/u.exec(pathname);
   if (budgetMatch?.[1]) {
-    if (request.method === "GET") return getBudget(env, budgetMatch[1], context.sync);
+    if (request.method === "GET") return getBudget(request, env, budgetMatch[1], context.sync);
     if (request.method === "PUT") return putBudget(request, env, budgetMatch[1], context.sync);
     if (request.method === "DELETE") return deleteBudget(env, budgetMatch[1], context.sync);
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, PUT, DELETE" });
