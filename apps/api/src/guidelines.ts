@@ -48,7 +48,8 @@ export async function getGuidelines(request: Request, env: { DB: D1Database }, s
     const { budgetPeriodStartDay: startDay } = await settingsRepository(env.DB).get();
     let period: BudgetPeriod;
     try {
-      period = key === null ? currentBudgetPeriod(sync.clock, startDay) : budgetPeriodForKey(key, startDay);
+      // Utan period, och med "current" som appen skickar, är det den pågående perioden, som för budget.
+      period = key === null || key === "current" ? currentBudgetPeriod(sync.clock, startDay) : budgetPeriodForKey(key, startDay);
     } catch {
       return invalid();
     }

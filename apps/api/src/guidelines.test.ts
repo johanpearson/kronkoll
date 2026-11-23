@@ -158,8 +158,16 @@ describe("GET /api/guidelines (KK-42)", () => {
     expect(await get("/api/guidelines?period=2024-01")).toMatchObject({ expected_income_minor: 0, free_to_spend_minor: 0, categories: [] });
   });
 
-  it("tar emot period current och avvisar ogiltig period och ogiltigt kontofilter", async () => {
-    expect((await call("GET", "/api/guidelines")).status).toBe(200);
+  it("period current och ingen period ger den pågående perioden, som appen frågar efter", async () => {
+    for (const path of ["/api/guidelines", "/api/guidelines?period=current", "/api/guidelines?period=current&account=acc_1"]) {
+      const res = await call("GET", path);
+      expect(res.status).toBe(200);
+      const body: { period: { key: string } } = await res.json();
+      expect(body.period.key).toBe("2026-11");
+    }
+  });
+
+  it("avvisar ogiltig period och ogiltigt kontofilter", async () => {
     expect((await call("GET", "/api/guidelines?period=2026-13")).status).toBe(400);
     expect((await call("GET", "/api/guidelines?account=")).status).toBe(400);
   });
