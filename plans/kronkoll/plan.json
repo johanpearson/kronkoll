@@ -108,12 +108,13 @@
     {
       "id": "transaktioner", "title": "Transaktioner", "group": "Huvudvyer", "nav_parent": "transaktioner",
       "description": "Lista grupperad per dag med sökning och filter. Preliminära transaktioner har en badge. Uppdelade transaktioner har ikonen ⑂. Interna överföringar och transaktioner markerade Räknas inte (KK-39) är nedtonade och har en text som säger det.",
-      "satisfies": ["KK-9", "KK-18", "KK-4", "KK-39"],
+      "satisfies": ["KK-9", "KK-18", "KK-4", "KK-39", "KK-41-C"],
       "elements": [
         { "id": "search", "type": "search", "placeholder": "Sök motpart, belopp, kategori…" },
         { "type": "row", "elements": [
           { "id": "f-month", "type": "select", "label": "Månad", "options": ["November 2026", "Oktober 2026", "September 2026"], "value": "November 2026" },
-          { "id": "f-cat", "type": "select", "label": "Kategori", "options": ["Alla", "Okategoriserade (4)", "Mat", "Transport", "Boende"], "value": "Alla" }
+          { "id": "f-cat", "type": "select", "label": "Kategori", "options": ["Alla", "Okategoriserade (4)", "Mat", "Transport", "Boende"], "value": "Alla" },
+          { "id": "f-account", "type": "select", "label": "Konto", "options": ["Alla konton", "Gemensamt konto", "Privat konto"], "value": "Alla konton", "satisfies": ["KK-41-C"] }
         ] },
         { "id": "list-today", "type": "list", "title": "I dag, 1 nov.", "satisfies": ["KK-4-B", "KK-9-B"], "items": [
           { "title": "ICA Nära Sofo", "subtitle": "Mat › Livsmedel · regel", "meta": "−412,50 kr", "badge": "Preliminär", "tone": "warn", "goto": "transaktion" },
@@ -234,11 +235,12 @@
     },
     {
       "id": "konto-namn", "title": "Namn på kontot", "modal": true, "group": "Inställningar",
-      "description": "Eget namn på ett konto (KK-37). Bankens maskerade namn står kvar under, så att kontot går att känna igen.",
-      "satisfies": ["KK-37"],
+      "description": "Eget namn på ett konto (KK-37) och om kontot räknas med (KK-41). Bankens maskerade namn står kvar under, så att kontot går att känna igen.",
+      "satisfies": ["KK-37", "KK-41"],
       "elements": [
         { "id": "nickname", "type": "input", "label": "Namn", "value": "Privat kort", "hint": "Privatkonto ••4821 hos Skandia. Lämna tomt för bankens namn.", "satisfies": ["KK-37-A", "KK-37-C"] },
-        { "type": "button", "label": "Spara", "variant": "primary", "close": true, "toast": "Kontot heter nu Privat kort", "satisfies": ["KK-37-A"] }
+        { "id": "counted", "type": "toggle", "label": "Räknas med i budget, översikt och insikter", "checked": true, "hint": "Av: kontot syns nedtonat i Transaktioner men räknas inte. En överföring dit räknas då som utgift.", "satisfies": ["KK-41-A", "KK-41-B"] },
+        { "type": "button", "label": "Spara", "variant": "primary", "close": true, "toast": "Kontot heter nu Privat kort", "satisfies": ["KK-37-A", "KK-41-A"] }
       ]
     },
     {
@@ -676,17 +678,17 @@
     {
       "id": "api-accounts", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/accounts",
       "summary": "Kontona med eget namn, bankens maskerade namn och bank, för Inställningar",
-      "responses": { "200": { "body": { "items": [{ "id": "acc_1", "name": "Privat kort", "nickname": "Privat kort", "bank_name": "Privatkonto ••4821", "bank": "Skandia", "type": "checking" }] } } },
-      "description": "`name` är det egna namnet om det finns, annars bankens maskerade namn. Samma regel gäller överallt där ett konto visas.",
-      "satisfies": ["KK-37"]
+      "responses": { "200": { "body": { "items": [{ "id": "acc_1", "name": "Privat kort", "nickname": "Privat kort", "bank_name": "Privatkonto ••4821", "bank": "Skandia", "type": "checking", "counted": true }] } } },
+      "description": "`name` är det egna namnet om det finns, annars bankens maskerade namn. Samma regel gäller överallt där ett konto visas. `counted` är kontots Räknas med (KK-41-A) och är sant som standard.",
+      "satisfies": ["KK-37", "KK-41-A"]
     },
     {
       "id": "api-account-patch", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PATCH", "path": "/api/accounts/{id}",
       "summary": "Sätt eller ta bort kontots egna namn",
-      "request": { "nickname": "Privat kort | null" },
-      "responses": { "200": { "body": { "id": "acc_1", "name": "Privat kort", "nickname": "Privat kort" } }, "400": { "body": { "error": "invalid_request" } }, "404": { "body": { "error": "not_found" } } },
-      "description": "Namnet trimmas och får vara högst 40 tecken utan styrtecken. Tomt eller null tar bort det. Kräver CSRF-skydd som andra ändringar.",
-      "satisfies": ["KK-37-A", "KK-37-C"]
+      "request": { "nickname": "Privat kort | null (valfritt)", "counted": "true | false (valfritt)" },
+      "responses": { "200": { "body": { "id": "acc_1", "name": "Privat kort", "nickname": "Privat kort", "counted": true } }, "400": { "body": { "error": "invalid_request" } }, "404": { "body": { "error": "not_found" } } },
+      "description": "Namnet trimmas och får vara högst 40 tecken utan styrtecken. Tomt eller null tar bort det. `counted` sparas som `accounts.included` och räknar om överföringsmarkeringarna (KK-41-D). Minst ett av fälten krävs. Kräver CSRF-skydd som andra ändringar.",
+      "satisfies": ["KK-37-A", "KK-37-C", "KK-41-A", "KK-41-D"]
     },
     {
       "id": "api-budget", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PUT", "path": "/api/budgets/{period}",
@@ -1327,6 +1329,7 @@
   ],
 
   "decisions": [
+    {"id": "D-account-scope", "title": "Konton som räknas med och kontofilter", "status": "accepted", "context": "Ägarens önskemål 2026-11-23: det gemensamma kontot blandas med privat konto och sparande.", "options": ["Kontofilter + Räknas med per konto", "Namngivna grupper av konton", "Bara Räknas med"], "chosen": "Kontofilter + Räknas med per konto (återanvänder accounts.included). En överföring till ett konto som inte räknas med blir en utgift, inte en intern överföring.", "satisfies": ["KK-41-A", "KK-41-B", "KK-41-C"]},
     {
       "id": "D-origin", "title": "Hur når PWA:n API:t – samma origin eller separat workers.dev?", "status": "proposed",
       "context": "Båda värdarna kan skyddas av Access. Men med två origins krävs CORS med credentials mot en annan Access-skyddad värd, och CF_Authorization-cookien är per värd. Det blir krångligt och ökar attackytan.",
