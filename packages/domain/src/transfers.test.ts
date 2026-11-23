@@ -282,3 +282,53 @@ describe("egenskaper", () => {
     );
   });
 });
+
+describe("konton som inte räknas med (KK-41)", () => {
+  const WITH_PRIVATE_SAVINGS: OwnAccount[] = [
+    { id: "gemensamt", type: "checking" },
+    { id: "sparande", type: "savings", counted: false },
+  ];
+  const run = (transactions: TransferInput[], accounts = WITH_PRIVATE_SAVINGS) =>
+    Object.fromEntries(classifyTransfers({ transactions, accounts, cardPaymentCounterparties: [], excludeRules: [] }).map((c) => [c.id, c]));
+
+  it("KK-41-B: −2 000 kr från Gemensamt och +2 000 kr på ett konto som inte räknas med är inget par, så utgiften räknas", () => {
+    const result = run([
+      tx({ id: "ut", accountId: "gemensamt", amountMinor: -200000 }),
+      tx({ id: "in", accountId: "sparande", amountMinor: 200000 }),
+    ]);
+    expect(result.ut).toEqual({ id: "ut", internal: false, pairId: null, reason: "none" });
+  });
+
+  it("KK-41-A: en transaktion på ett konto som inte räknas med räknas inte, med orsaken account", () => {
+    const result = run([tx({ id: "kop", accountId: "sparande", amountMinor: -12900 })]);
+    expect(result.kop).toEqual({ id: "kop", internal: true, pairId: null, reason: "account" });
+  });
+
+  it("ett konto utan counted räknas med, som innan KK-41", () => {
+    const result = run([tx({ id: "ut", accountId: "gemensamt", amountMinor: -200000 })]);
+    expect(result.ut?.internal).toBe(false);
+  });
+
+  it("två konton som räknas med bildar fortfarande ett par när ett tredje inte räknas med", () => {
+    const accounts: OwnAccount[] = [...WITH_PRIVATE_SAVINGS, { id: "buffert", type: "savings" }];
+    const result = run(
+      [tx({ id: "ut", accountId: "gemensamt", amountMinor: -300000 }), tx({ id: "in", accountId: "buffert", amountMinor: 300000 })],
+      accounts,
+    );
+    expect(result.ut).toMatchObject(internal("in", "pair"));
+  });
+
+  it("KK-41-D: en egen markering som Räknas vinner över kontot, och en egen markering som Räknas inte gäller som förut", () => {
+    const result = run([
+      tx({ id: "raknas", accountId: "sparande", amountMinor: -500, manualTransfer: false }),
+      tx({ id: "inte", accountId: "gemensamt", amountMinor: -500, manualTransfer: true }),
+    ]);
+    expect(result.raknas).toEqual({ id: "raknas", internal: false, pairId: null, reason: "manual" });
+    expect(result.inte).toMatchObject({ internal: true, reason: "manual" });
+  });
+
+  it("en borttagen transaktion på ett konto som inte räknas med får ingen orsak", () => {
+    const result = run([tx({ id: "borta", accountId: "sparande", status: "removed" })]);
+    expect(result.borta).toEqual({ id: "borta", internal: false, pairId: null, reason: "none" });
+  });
+});
