@@ -787,6 +787,33 @@
           "text": "Avbryt ändrar ingenting, och andra perioders budget påverkas inte."
         }
       ]
+    },
+    {
+      "id": "KK-41",
+      "title": "Följ och räkna bort konton",
+      "normative_strength": "should",
+      "statement": "Användaren kan välja vilka konton som räknas med, och titta på ett konto i taget, så att det går att se vart pengarna från det gemensamma kontot tar vägen. Ett konto som inte räknas med ingår inte i budget, översikt, insikter eller inkomst. Ett kontofilter i Transaktioner, Budget och Insikter visar bara de valda kontona. (Motiv: lönen kommer in på ett gemensamt konto medan privat konto och privat sparande blandas in. Ägarens önskemål 2026-11-23.)",
+      "verification_note": "Unit-tester (TDD) för att transaktioner på ett bortvalt konto inte räknas och att en överföring till ett bortvalt konto räknas som utgift; API-test av inställningen och filtret mot lokal D1; komponenttest av filtret; E2E att välja bort ett konto och filtrera på ett.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-41-A",
+          "text": "Under Inställningar har varje konto en brytare Räknas med (standard på). Är den av ingår kontot inte i budget, översikt, insikter, inkomst eller totalsaldot, men transaktionerna syns nedtonade i Transaktioner med texten Räknas inte (inte bara färg)."
+        },
+        {
+          "id": "KK-41-B",
+          "given": "en överföring på 2 000 kr från Gemensamt konto till Privat sparande, och Privat sparande räknas inte med",
+          "when": "november räknas",
+          "then": "räknas överföringen som en utgift på 2 000 kr från Gemensamt konto (och kan kategoriseras, t.ex. Sparande), i stället för en intern överföring som döljs"
+        },
+        {
+          "id": "KK-41-C",
+          "text": "Transaktioner, Budget och Insikter har ett kontofilter där ett eller flera konton som räknas med kan väljas. Utan val visas alla konton som räknas med. Summor, utfall och diagram följer filtret, och aktivt filter står med text i vyn."
+        },
+        {
+          "id": "KK-41-D",
+          "text": "Att byta Räknas med räknar om tidigare perioder direkt och ändrar inga transaktioner eller kontosaldon i banken. Överföringsmarkeringar från par räknas om som vid en regel enligt KK-39-C, och en egen markering (KK-39-A) ändras aldrig."
+        }
+      ]
     }
   ]
 }
