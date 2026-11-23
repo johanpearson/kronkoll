@@ -11,6 +11,9 @@
  * 4. Regler med åtgärden Räkna inte (KK-39-C): det användaren vill hålla utanför budget och översikt,
  *    t.ex. utlägg som betalas tillbaka. De är inte överföringar, men räknas inte på samma sätt.
  *
+ * 5. Konton som inte räknas med (KK-41): deras transaktioner räknas inte, och ett konto som inte räknas
+ *    med ingår aldrig i ett par. En överföring dit blir därför en vanlig utgift på det andra kontot.
+ *
  * En insättning på kortkontot utan motpost räknas inte som intern: det kan vara en återbetalning.
  */
 import { daysBetween, parseDate } from "./calendar.ts";
@@ -22,6 +25,8 @@ export const TRANSFER_WINDOW_DAYS = 3;
 export interface OwnAccount {
   readonly id: string;
   readonly type: "checking" | "savings" | "credit_card" | "manual";
+  /** Kontot räknas med (KK-41-A). Utelämnat betyder att det räknas med. */
+  readonly counted?: boolean;
 }
 
 export interface TransferInput {
@@ -45,7 +50,7 @@ export interface TransferClassification {
   readonly internal: boolean;
   /** Den andra halvan av en överföring, om den finns. */
   readonly pairId: string | null;
-  readonly reason: "manual" | "pair" | "card_payment" | "rule" | "none";
+  readonly reason: "manual" | "pair" | "card_payment" | "rule" | "account" | "none";
 }
 
 export interface ClassifyTransfersInput {
@@ -66,6 +71,7 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
     parseDate(tx.transactionDate);
   }
   const accountType = new Map(input.accounts.map((a) => [a.id, a.type]));
+  const uncounted = new Set(input.accounts.filter((a) => a.counted === false).map((a) => a.id));
   const cardPayees = new Set(input.cardPaymentCounterparties);
   const result = new Map<string, TransferClassification>();
 
@@ -78,7 +84,7 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
 
   // 2. Par mellan olika egna konton.
   const eligible = input.transactions
-    .filter((tx) => tx.manualTransfer === null && tx.status !== "removed" && accountType.has(tx.accountId))
+    .filter((tx) => tx.manualTransfer === null && tx.status !== "removed" && accountType.has(tx.accountId) && !uncounted.has(tx.accountId))
     .sort(byDateThenId);
   const paired = new Set<string>();
   for (const out of eligible.filter((tx) => tx.amountMinor < 0)) {
@@ -114,6 +120,13 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
   for (const tx of eligible) {
     if (!result.has(tx.id) && matchingRule(tx, input.excludeRules) !== null) {
       result.set(tx.id, { id: tx.id, internal: true, pairId: null, reason: "rule" });
+    }
+  }
+
+  // 5. Konton som inte räknas med (KK-41-A), för det som inte redan är avgjort av ett eget val.
+  for (const tx of input.transactions) {
+    if (tx.manualTransfer === null && tx.status !== "removed" && uncounted.has(tx.accountId)) {
+      result.set(tx.id, { id: tx.id, internal: true, pairId: null, reason: "account" });
     }
   }
 
