@@ -35,7 +35,7 @@ const GUIDELINES = {
 const BUDGET = {
   period: GUIDELINES.period,
   lines: [{ category_id: "mat", budget_minor: 620000 }],
-  groups: [],
+  groups: [{ category_id: "mat", budget_minor: 620000, actual_minor: 650000, remaining_minor: -30000, percent: 105, over: true, subcategories: [] }],
   uncategorized_minor: 0,
   total_budget_minor: 620000,
   total_actual_minor: 650000,

@@ -29,7 +29,7 @@ const money = (minor: number): Cell => ({ minor });
 
 export function buildExportDoc(
   g: Guidelines,
-  budgetLines: readonly { readonly categoryId: string; readonly budgetMinor: number }[],
+  budgetLines: readonly { readonly categoryId: string; readonly budgetMinor: number | null }[],
   nameOf: (categoryId: string) => string,
 ): ExportDoc {
   const mode: ExportMode = g.mode;
