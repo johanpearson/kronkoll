@@ -114,7 +114,7 @@
         { "type": "row", "elements": [
           { "id": "f-month", "type": "select", "label": "Månad", "options": ["November 2026", "Oktober 2026", "September 2026"], "value": "November 2026" },
           { "id": "f-cat", "type": "select", "label": "Kategori", "options": ["Alla", "Okategoriserade (4)", "Mat", "Transport", "Boende"], "value": "Alla" },
-          { "id": "f-account", "type": "select", "label": "Konto", "options": ["Alla konton", "Gemensamt konto", "Privat konto"], "value": "Alla konton", "satisfies": ["KK-41-C"] }
+          { "id": "f-account", "type": "select", "label": "Konto", "options": ["Alla konton", "Gemensamt konto", "Privat konto"], "value": "Alla konton", "hint": "I appen är det knappar där flera konton kan väljas, och ett aktivt filter står som text: Visar bara Gemensamt konto.", "satisfies": ["KK-41-C"] }
         ] },
         { "id": "list-today", "type": "list", "title": "I dag, 1 nov.", "satisfies": ["KK-4-B", "KK-9-B"], "items": [
           { "title": "ICA Nära Sofo", "subtitle": "Mat › Livsmedel · regel", "meta": "−412,50 kr", "badge": "Preliminär", "tone": "warn", "goto": "transaktion" },
@@ -596,11 +596,12 @@
       "params": [
         { "name": "period", "in": "query", "type": "YYYY-MM", "description": "Budgetperiodens nyckel enligt startdagen (KK-34). Utan period: pågående period." }, { "name": "category_id", "in": "query", "type": "string" },
         { "name": "q", "in": "query", "type": "string" }, { "name": "uncategorized", "in": "query", "type": "bool" }, { "name": "cursor", "in": "query", "type": "string" },
-        { "name": "limit", "in": "query", "type": "int", "description": "1–200, standard 50" }
+        { "name": "limit", "in": "query", "type": "int", "description": "1–200, standard 50" },
+        { "name": "account", "in": "query", "type": "string (upprepas)", "description": "Kontofilter (KK-41-C): `?account=acc_1&account=acc_2` räknar bara på de kontona, högst 10. Utan parameter: alla konton. Tomt eller för långt id ger 400." }
       ],
       "responses": { "200": { "body": { "period": { "key": "2026-11", "start": "2026-11-01", "end": "2026-11-30" }, "items": [{ "id": "tx_01J…", "account_id": "acc_visa", "status": "pending", "booking_date": null, "transaction_date": "2026-11-01", "amount_minor": -41250, "counterparty": "ICA Nära Sofo", "description": "Kortköp", "category_id": "mat-livsmedel", "category_source": "template", "is_internal_transfer": false, "split": false }], "next_cursor": "eyJ…" } }, "400": { "body": { "error": "invalid_request" } } },
       "description": "Byggt i #106. Borttagna preliminära visas inte. Inget currency-fält: alla belopp är öre i SEK (D-money).",
-      "satisfies": ["KK-9", "KK-18", "KK-20-C"]
+      "satisfies": ["KK-9", "KK-18", "KK-20-C", "KK-41-C"]
     },
     {
       "id": "api-tx-patch", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PATCH", "path": "/api/transactions/{id}",
@@ -695,8 +696,8 @@
       "summary": "Sätt budget för en period (och valfritt framåt); GET samma path ger utfall vs plan",
       "request": { "lines": [{ "category_id": "cat_mat", "amount_minor": 630000 }], "apply_forward": true, "source": "manual | copy_previous | average_3m" },
       "responses": { "200": { "body": { "period": "2026-11", "lines": [{ "category_id": "cat_mat", "budget_minor": 630000, "actual_minor": 655200, "remaining_minor": -25200, "ratio": 1.04, "over": true }], "excluded": { "internal_transfers_minor": 1500000, "card_payment_minor": 821400 } } } },
-      "description": "GET ger också `groups`: en rad per huvudkategori med budget eller utgifter, där utfallet alltid är huvudkategorin plus underkategorierna. Har huvudkategorin egen budget är den taket; annars är gruppens budget summan av underkategoriernas. `total_budget_minor` räknar varje grupp en gång.",
-      "satisfies": ["KK-20-A", "KK-20-B", "KK-20-C"]
+      "description": "GET ger också `groups`: en rad per huvudkategori med budget eller utgifter, där utfallet alltid är huvudkategorin plus underkategorierna. Har huvudkategorin egen budget är den taket; annars är gruppens budget summan av underkategoriernas. `total_budget_minor` räknar varje grupp en gång. GET tar kontofilter (KK-41-C): `?account=acc_1&account=acc_2` räknar utfallet och uppdelningarna bara på de kontona (högst 10); ett tomt eller för långt id ger 400.",
+      "satisfies": ["KK-20-A", "KK-20-B", "KK-20-C", "KK-41-C"]
     },
     {
       "id": "api-budget-delete", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "DELETE", "path": "/api/budgets/{period}",
@@ -752,9 +753,9 @@
     {
       "id": "api-insights", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/insights",
       "summary": "Avvikelser, återkommande dragningar och topplistor",
-      "params": [{ "name": "period", "in": "query", "type": "YYYY-MM" }],
+      "params": [{ "name": "period", "in": "query", "type": "YYYY-MM" }, { "name": "account", "in": "query", "type": "string (upprepas)", "description": "Kontofilter (KK-41-C): `?account=acc_1&account=acc_2` räknar bara på de kontona, högst 10. Utan parameter: alla konton. Tomt eller för långt id ger 400." }],
       "responses": { "200": { "body": { "anomalies": [{ "category_id": "cat_rest", "actual_minor": 375000, "baseline_minor": 257000, "pct": 46 }], "recurring": [{ "counterparty": "Netflix", "interval": "monthly", "amount_minor": 14900, "next_expected": "2026-11-19", "yearly_minor": 178800 }], "top_expenses": [], "top_categories": [] } } },
-      "satisfies": ["KK-24-A", "KK-24-B", "KK-24-C"]
+      "satisfies": ["KK-24-A", "KK-24-B", "KK-24-C", "KK-41-C"]
     },
     {
       "id": "api-conn-list", "group": "API: bankkoppling", "method": "GET", "path": "/api/connections",
