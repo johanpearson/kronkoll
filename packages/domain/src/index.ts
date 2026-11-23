@@ -217,3 +217,4 @@ export {
   type PeriodSpending,
   type VariableCategory,
 } from "./guidelines.ts";
+export { budgetExport, type BudgetExport, type ExportCategory, type ExportMode, type ExportRow } from "./budget-export.ts";

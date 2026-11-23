@@ -12,6 +12,7 @@ import { PeriodNav } from "../icon-button.tsx";
 import { Link } from "../router.tsx";
 import { useToast } from "../toast.tsx";
 import { fetchCategories, NO_CATEGORIES, shiftPeriodKey, type Categories } from "../transactions/TransactionsView.tsx";
+import { ExportSection } from "./ExportSection.tsx";
 import { fetchGuidelines, type Guidelines, type Mode } from "./guidelines.ts";
 
 const MODES: readonly { readonly mode: Mode; readonly label: string; readonly hint: string }[] = [
@@ -213,6 +214,7 @@ export function GuidelinesView() {
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta riktlinjerna. Försök igen om en stund.</p>}
       {guidelines && <GuidelinesForm key={`${guidelines.period.key}-${String(reload)}-${accountIds.join(",")}`} guidelines={guidelines} categories={categories} onSaved={() => { setReload((n) => n + 1); }} />}
+      {guidelines && <ExportSection guidelines={guidelines} categories={categories} accountIds={accountIds} />}
     </main>
   );
 }
