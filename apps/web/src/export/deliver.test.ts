@@ -7,7 +7,7 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-const file = new File(["x"], "kronkoll-budget-2026-11.pdf", { type: "application/pdf" });
+const file = new File(["x"], "kronkoll-budget-2026-11.xlsx", { type: "application/octet-stream" });
 
 function stubDownload() {
   const created = vi.fn(() => "blob:test");
@@ -34,7 +34,7 @@ describe("deliverFile (KK-43-C)", () => {
     expect(await deliverFile(file, "Budget", { canShare: () => false, share })).toBe("downloaded");
     expect(share).not.toHaveBeenCalled();
     expect(created).toHaveBeenCalledWith(file);
-    expect(clicks).toEqual(["kronkoll-budget-2026-11.pdf|blob:test"]);
+    expect(clicks).toEqual(["kronkoll-budget-2026-11.xlsx|blob:test"]);
     expect(document.querySelector("a")).toBeNull();
   });
 

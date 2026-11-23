@@ -81,10 +81,10 @@ test("slå på sparläge med ett sparmål och se kvar att spendera fritt (V-e2e-
   await expect(page.getByRole("list", { name: "Kategorier" }).getByRole("listitem").filter({ hasText: "Mat" })).toContainText("Över takt");
 });
 
-test("exportera budget och riktlinjer som Excel och som PDF (V-e2e-export, KK-43)", async ({ page }) => {
+test("exportera budget och riktlinjer som Excel (V-e2e-export, KK-43)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/budget/riktlinjer");
-  // Skrivbordswebbläsaren har ingen delningsmeny, så filerna laddas ned. Excel-biblioteket hämtas först här
+  // Skrivbordswebbläsaren har ingen delningsmeny, så filen laddas ned. Excel-biblioteket hämtas först här
   // och måste få köra under samma CSP som i drift.
   const excel = page.waitForEvent("download");
   await page.getByRole("button", { name: "Excel (.xlsx)" }).click();
@@ -93,11 +93,6 @@ test("exportera budget och riktlinjer som Excel och som PDF (V-e2e-export, KK-43
   // En .xlsx-fil är ett zip-arkiv.
   expect((await readFile((await xlsx.path()))).subarray(0, 4).toString("hex")).toBe("504b0304");
   await expect(page.getByRole("status")).toHaveText("Filen är nedladdad.");
-
-  const sheet = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Lättläst sida (PDF)" }).click();
-  expect((await sheet).suggestedFilename()).toBe("kronkoll-budget-2026-11.pdf");
-  await expect(page.getByRole("alert")).toHaveCount(0);
 });
 
 test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {

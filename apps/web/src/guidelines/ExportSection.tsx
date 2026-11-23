@@ -1,16 +1,13 @@
-// Dela eller exportera perioden (KK-43): Excel och en lättläst PDF. Filen byggs i webbläsaren av det som är
+// Dela eller exportera perioden (KK-43): Excel. Filen byggs i webbläsaren av det som är
 // sparat för perioden, och på en telefon öppnas delningsmenyn. Inget lämnar enheten (KK-43-B).
 import { useState } from "react";
 import { fetchBudget } from "../budget/BudgetView.tsx";
 import { deliverFile } from "../export/deliver.ts";
 import { buildExportDoc } from "../export/export-doc.ts";
-import { buildPdf } from "../export/pdf.ts";
 import { buildXlsx } from "../export/xlsx.ts";
 import { useToast } from "../toast.tsx";
 import type { Categories } from "../transactions/TransactionsView.tsx";
 import type { Guidelines } from "./guidelines.ts";
-
-type Format = "xlsx" | "pdf";
 
 const XLSX_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -19,7 +16,7 @@ export function ExportSection(props: { guidelines: Guidelines; categories: Categ
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const run = async (format: Format) => {
+  const run = async () => {
     setBusy(true);
     setMessage(null);
     try {
@@ -29,8 +26,7 @@ export function ExportSection(props: { guidelines: Guidelines; categories: Categ
         return;
       }
       const doc = buildExportDoc(props.guidelines, budget.lines, (id) => props.categories.names.get(id) ?? id);
-      const blob = format === "xlsx" ? await buildXlsx(doc) : buildPdf(doc);
-      const file = new File([blob], `${doc.fileStem}.${format}`, { type: format === "xlsx" ? XLSX_TYPE : "application/pdf" });
+      const file = new File([await buildXlsx(doc)], `${doc.fileStem}.xlsx`, { type: XLSX_TYPE });
       const result = await deliverFile(file, doc.title);
       if (result === "shared") toast.done("Filen är delad.");
       else if (result === "downloaded") toast.done("Filen är nedladdad.");
@@ -48,11 +44,8 @@ export function ExportSection(props: { guidelines: Guidelines; categories: Categ
         Budget och riktlinjer för perioden som visas, som sparade. På telefonen öppnas delningsmenyn, annars laddas filen ned. Filen skapas här på enheten.
       </p>
       <p className="actions">
-        <button type="button" disabled={busy} onClick={() => void run("xlsx")}>
+        <button type="button" disabled={busy} onClick={() => void run()}>
           Excel (.xlsx)
-        </button>
-        <button type="button" disabled={busy} onClick={() => void run("pdf")}>
-          Lättläst sida (PDF)
         </button>
       </p>
       {message && <p role="alert">{message}</p>}

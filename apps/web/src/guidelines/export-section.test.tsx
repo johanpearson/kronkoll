@@ -77,7 +77,7 @@ async function open() {
 const head = async (file: File, bytes: number) => [...new Uint8Array(await file.slice(0, bytes).arrayBuffer())];
 
 describe("Dela eller exportera (KK-43)", () => {
-  it("Excel: hämtar periodens budget, bygger en .xlsx-fil på enheten och ger den till delning eller nedladdning (KK-43-A, KK-43-B)", async () => {
+  it("Excel: hämtar periodens budget, bygger en .xlsx-fil på enheten och ger den till delning eller nedladdning (KK-43-A, KK-43-B, KK-43-C)", async () => {
     const paths = api();
     await open();
     fireEvent.click(screen.getByRole("button", { name: "Excel (.xlsx)" }));
@@ -91,16 +91,12 @@ describe("Dela eller exportera (KK-43)", () => {
     expect(screen.getByRole("status").textContent).toBe("Filen är nedladdad.");
   });
 
-  it("PDF: ger en lättläst PDF som delas via telefonens delningsmeny (KK-43-C)", async () => {
+  it("delad via telefonens delningsmeny säger det", async () => {
     api();
     deliver.mockResolvedValue("shared");
     await open();
-    fireEvent.click(screen.getByRole("button", { name: "Lättläst sida (PDF)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Excel (.xlsx)" }));
     await settle();
-    const [file] = deliver.mock.calls[0] ?? [];
-    expect(file?.name).toBe("kronkoll-budget-2026-11.pdf");
-    expect(file?.type).toBe("application/pdf");
-    expect(await head(file as File, 5)).toEqual([...new TextEncoder().encode("%PDF-")]);
     expect(screen.getByRole("status").textContent).toBe("Filen är delad.");
   });
 
@@ -108,7 +104,7 @@ describe("Dela eller exportera (KK-43)", () => {
     api();
     deliver.mockResolvedValue("cancelled");
     await open();
-    fireEvent.click(screen.getByRole("button", { name: "Lättläst sida (PDF)" }));
+    fireEvent.click(screen.getByRole("button", { name: "Excel (.xlsx)" }));
     await settle();
     expect(deliver).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("status")).toBeNull();

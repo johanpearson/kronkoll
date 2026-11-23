@@ -1,5 +1,5 @@
 // Innehållet i en export av budget och riktlinjer (KK-43-A): en period, läget, några nyckeltal och en rad per
-// kategori. Samma dokument blir både Excel och en delbar PDF. Belopp ligger kvar i öre tills de visas, så
+// kategori. Samma dokument kan bli både Excel och en delbar PDF. Belopp ligger kvar i öre tills de visas, så
 // att Excel får riktiga tal. Banktexter ingår inte, bara kategorinamn och summor.
 import { budgetExport, formatDateShort, type ExportMode } from "@kronkoll/domain";
 import type { Guidelines } from "../guidelines/guidelines.ts";
