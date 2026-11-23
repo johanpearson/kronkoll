@@ -17,6 +17,7 @@ import {
   topExpenses,
   type BudgetPeriod,
 } from "@kronkoll/domain";
+import { readAccountFilter } from "./account-filter.ts";
 import type { SyncDeps } from "./sync.ts";
 
 const HISTORY_PERIODS = 3;
@@ -32,7 +33,10 @@ const previousKey = (key: string, back: number) => {
 };
 
 export async function getInsights(request: Request, env: { DB: D1Database }, sync: SyncDeps): Promise<Response> {
-  const key = new URL(request.url).searchParams.get("period");
+  const url = new URL(request.url);
+  const key = url.searchParams.get("period");
+  const accountIds = readAccountFilter(url);
+  if (accountIds === null) return json({ error: "invalid_request" }, 400);
   try {
     const { budgetPeriodStartDay: startDay } = await settingsRepository(env.DB).get();
     let period: BudgetPeriod;
@@ -47,9 +51,9 @@ export async function getInsights(request: Request, env: { DB: D1Database }, syn
     const budget = budgetRepository(env.DB);
     const [categories, current, earlier, charges] = await Promise.all([
       categoryRepository(env.DB).list(),
-      budget.actuals(period),
-      Promise.all(history.map((p) => budget.actuals(p))),
-      insightsRepository(env.DB).charges(period.start < from ? period.start : from, period.end > today ? period.end : today),
+      budget.actuals(period, accountIds),
+      Promise.all(history.map((p) => budget.actuals(p, accountIds))),
+      insightsRepository(env.DB).charges(period.start < from ? period.start : from, period.end > today ? period.end : today, accountIds),
     ]);
 
     const input = { period, ...current, categories };

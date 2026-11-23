@@ -16,11 +16,16 @@ const budgetDate = sql<string>`coalesce(${transactions.bookingDate}, ${transacti
 
 export function budgetRepository(d1: D1Database) {
   const db = drizzle(d1);
-  const inPeriod = (period: BudgetPeriod) => and(ne(transactions.status, "removed"), between(budgetDate, period.start, period.end));
+  const inPeriod = (period: BudgetPeriod, accountIds?: readonly string[]) =>
+    and(
+      ne(transactions.status, "removed"),
+      between(budgetDate, period.start, period.end),
+      accountIds === undefined ? undefined : inArray(transactions.accountId, [...accountIds]),
+    );
 
   return {
-    /** Periodens transaktioner och deras uppdelningar, i domänens form. */
-    async actuals(period: BudgetPeriod): Promise<{ transactions: BudgetTransaction[]; splits: Map<string, SplitPart[]> }> {
+    /** Periodens transaktioner och deras uppdelningar, i domänens form. Bara `accountIds` om de anges (KK-41-C). */
+    async actuals(period: BudgetPeriod, accountIds?: readonly string[]): Promise<{ transactions: BudgetTransaction[]; splits: Map<string, SplitPart[]> }> {
       const rows = await db
         .select({
           id: transactions.id,
@@ -31,13 +36,13 @@ export function budgetRepository(d1: D1Database) {
           internal: transactions.isInternalTransfer,
         })
         .from(transactions)
-        .where(inPeriod(period))
+        .where(inPeriod(period, accountIds))
         .all();
       // Underfråga i stället för en lista med id:n, eftersom D1 tillåter högst 100 parametrar per fråga.
       const parts = await db
         .select({ transactionId: transactionSplits.transactionId, categoryId: transactionSplits.categoryId, amountMinor: transactionSplits.amountMinor })
         .from(transactionSplits)
-        .where(inArray(transactionSplits.transactionId, db.select({ id: transactions.id }).from(transactions).where(inPeriod(period))))
+        .where(inArray(transactionSplits.transactionId, db.select({ id: transactions.id }).from(transactions).where(inPeriod(period, accountIds))))
         .orderBy(asc(sql`${transactionSplits}.rowid`))
         .all();
       const splits = new Map<string, SplitPart[]>();
