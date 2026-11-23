@@ -172,3 +172,53 @@ export function isOverPace({ levelMinor, actualMinor, today, period }: PaceInput
   if (levelMinor === null) return false;
   return assertMinor(actualMinor) * periodDays(period) > assertMinor(levelMinor) * elapsedDays(today, period);
 }
+
+export interface GuidelineLineInput {
+  readonly levels: readonly CategoryLevels[];
+  /** Fasta kostnader per kategori i öre per period, t.ex. återkommande dragningar (KK-24-A). */
+  readonly fixedByCategory: ReadonlyMap<string, number>;
+  /** Utrymme att spendera fritt, från {@link freeSpending}. */
+  readonly freeMinor: number;
+  /** Manuella sparlägesnivåer per kategori (KK-42-A). */
+  readonly overrides: ReadonlyMap<string, number>;
+}
+
+export interface GuidelineLine extends CategoryLevels {
+  /** Fast del av normalnivån, högst normalnivån. */
+  readonly fixedMinor: number;
+  /** Sparlägesnivån: fast del plus kategorins andel av det fria utrymmet, eller den manuella nivån. */
+  readonly savingMinor: number;
+}
+
+/**
+ * Sparlägesnivå per kategori (KK-42-A, KK-42-B). Den fasta delen behålls och det fria utrymmet fördelas
+ * på den rörliga delen av normalnivån. En manuell nivå är kategorins hela nivå och dras av från det
+ * som fördelas, men bara den del som överstiger de fasta kostnaderna.
+ */
+export function guidelineLines({ levels, fixedByCategory, freeMinor, overrides }: GuidelineLineInput): GuidelineLine[] {
+  const parts = levels.map((l) => ({ ...l, fixedMinor: Math.min(fixedByCategory.get(l.categoryId) ?? 0, l.normalMinor) }));
+  const variable = parts
+    .filter((p) => p.normalMinor - p.fixedMinor > 0 || overrides.has(p.categoryId))
+    .map((p) => ({ categoryId: p.categoryId, normalMinor: p.normalMinor - p.fixedMinor }));
+  const manual = new Map(
+    parts.flatMap((p) => {
+      const override = overrides.get(p.categoryId);
+      return override === undefined ? [] : [[p.categoryId, Math.max(0, override - p.fixedMinor)] as const];
+    }),
+  );
+  const shares = allocateFreeSpending(freeMinor, variable, manual);
+  return parts.map((p) => ({ ...p, savingMinor: overrides.get(p.categoryId) ?? p.fixedMinor + (shares.get(p.categoryId) ?? 0) }));
+}
+
+/**
+ * Kvar att spendera fritt hittills (KK-42-C): det fria utrymmet minus det rörliga som spenderats.
+ * Rörligt är utfallet över kategorins fasta del, okategoriserat och kategorier utan nivå. Kan bli negativt.
+ */
+export function remainingFree(freeMinor: number, lines: readonly GuidelineLine[], actualByCategory: ReadonlyMap<string | null, number>): number {
+  const fixed = new Map<string | null, number>(lines.map((l) => [l.categoryId, l.fixedMinor]));
+  let spent = 0;
+  for (const [categoryId, actual] of actualByCategory) {
+    spent += Math.max(0, assertMinor(actual) - (fixed.get(categoryId) ?? 0));
+  }
+  return assertMinor(freeMinor) - spent;
+}

@@ -14,6 +14,7 @@ import { getConnection, listConnections } from "./connection-list.ts";
 import { addContribution, createGoal, deleteContribution, deleteGoal, getGoal, listGoals, patchGoal } from "./goals.ts";
 import { deleteLoan, listLoans, putLoan } from "./loans.ts";
 import { getIncome } from "./income.ts";
+import { getGuidelines, putGuidelines } from "./guidelines.ts";
 import { getInsights } from "./insights.ts";
 import { createLeavePeriod, deleteLeavePeriod, listLeavePeriods } from "./leave.ts";
 import { getOverview } from "./overview.ts";
@@ -249,6 +250,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/income") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
     return getIncome(request, env, context.sync);
+  }
+  if (pathname === "/api/guidelines") {
+    if (request.method === "GET") return getGuidelines(request, env, context.sync);
+    if (request.method === "PUT") return putGuidelines(request, env);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, PUT" });
   }
   if (pathname === "/api/insights") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });

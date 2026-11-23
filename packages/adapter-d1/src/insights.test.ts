@@ -33,6 +33,7 @@ beforeAll(async () => {
         .bind(id, status, date, date, booking, amount, counterparty, counterparty, description, internal),
     ),
   );
+  await db.prepare(`UPDATE transactions SET category_id = 'fritid-hobby', category_source = 'template' WHERE id = 'netflix'`).run();
 });
 afterAll(async () => {
   await dispose();
@@ -42,8 +43,8 @@ describe("utbetalningar för insikter i D1 (KK-24)", () => {
   it("ger utbetalningar i intervallet, äldst först, med bokföringsdagen som datum och utan inkomster och borttagna", async () => {
     const rows = await insightsRepository(db).charges("2026-09-01", "2026-10-31");
     expect(rows.map((r) => r.id)).toEqual(["lidl", "intern", "netflix"]);
-    expect(rows[2]).toEqual({ id: "netflix", date: "2026-10-19", amountMinor: -14900, counterparty: "Netflix", counterpartyNorm: "NETFLIX", description: "", status: "booked", internal: false });
-    expect(rows[0]).toMatchObject({ date: "2026-10-02", counterparty: "", description: "LIDL188PAHITTAD, STOCKHOLM", status: "pending" });
+    expect(rows[2]).toEqual({ id: "netflix", date: "2026-10-19", amountMinor: -14900, counterparty: "Netflix", counterpartyNorm: "NETFLIX", description: "", status: "booked", internal: false, categoryId: "fritid-hobby" });
+    expect(rows[0]).toMatchObject({ categoryId: null, date: "2026-10-02", counterparty: "", description: "LIDL188PAHITTAD, STOCKHOLM", status: "pending" });
     expect(rows[1]).toMatchObject({ internal: true });
   });
 
