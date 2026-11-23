@@ -217,10 +217,40 @@
           { "id": "copy-prev", "type": "button", "label": "Kopiera oktober", "variant": "secondary", "toast": "Budget kopierad från oktober", "satisfies": ["KK-20-A"] },
           { "id": "suggest", "type": "button", "label": "Föreslå från snitt", "variant": "secondary", "toast": "Förslag baserat på aug–okt", "satisfies": ["KK-20-A"] }
         ] },
+        { "id": "open-guidelines", "type": "button", "label": "Riktlinjer och sparläge", "variant": "secondary", "goto": "riktlinjer", "satisfies": ["KK-42"] },
         { "id": "delete-budget", "type": "button", "label": "Ta bort budget", "variant": "danger", "opens": "budget-ta-bort", "satisfies": ["KK-40-A"] }
       ],
       "states": [
         { "id": "leave-month", "label": "Månad med föräldraledighet", "satisfies": ["KK-23-C"], "description": "**April 2027: planerad föräldraledighet.** Uppskattad inkomst 20 140 kr (−13 470 kr mot normal månad). Kvar att spendera och sparmål är omräknade. [Se inkomst]" }
+      ]
+    },
+    {
+      "id": "riktlinjer", "title": "Riktlinjer", "group": "Huvudvyer", "nav_parent": "budget",
+      "description": "Ingen budget, budget eller sparläge (KK-42). Sparläget gäller tills det stängs av. Överst står vad som finns kvar att spendera fritt. Per kategori visas historiskt snitt, normalt (median) och sparläge, och varje nivå kan ändras för hand.",
+      "satisfies": ["KK-42", "KK-43-C"],
+      "elements": [
+        { "id": "mode", "type": "select", "label": "Läge", "options": ["Ingen budget – bara riktlinjer", "Budget", "Sparläge"], "value": "Sparläge", "satisfies": ["KK-42-D"] },
+        { "id": "saving-goal", "type": "input", "label": "Sparmål per månad", "value": "8 000", "hint": "Gäller tills du stänger av sparläget.", "satisfies": ["KK-42-B"] },
+        { "type": "row", "satisfies": ["KK-42-C"], "elements": [
+          { "type": "stat", "label": "Kvar att spendera fritt", "value": "6 240 kr" },
+          { "type": "stat", "label": "Per dag, resten av perioden", "value": "312 kr" }
+        ] },
+        { "id": "guide-list", "type": "list", "title": "Per kategori: snitt · normalt · sparläge", "satisfies": ["KK-42-A"], "items": [
+          { "title": "Mat", "subtitle": "Snitt 6 550 · normalt 6 100 · sparläge 5 400 kr", "badge": "Över takt", "tone": "bad", "satisfies": ["KK-42-D"] },
+          { "title": "Nöje & restaurang", "subtitle": "Snitt 2 900 · normalt 2 400 · sparläge 1 500 kr", "badge": "I takt", "tone": "ok" },
+          { "title": "Shopping", "subtitle": "Snitt 5 200 · normalt 1 800 · sparläge 900 kr", "badge": "Engångsperiod i sept.", "tone": "info", "satisfies": ["KK-42-A"] }
+        ] },
+        { "id": "infeasible", "type": "alert", "tone": "warn", "text": "Sparmålet går inte ihop med inkomsten och de fasta kostnaderna. Sänk sparmålet eller se över de fasta kostnaderna.", "satisfies": ["KK-42-C"] },
+        { "id": "share", "type": "button", "label": "Dela eller exportera", "variant": "secondary", "opens": "exportera-budget", "satisfies": ["KK-43"] }
+      ]
+    },
+    {
+      "id": "exportera-budget", "title": "Dela budget", "modal": true, "group": "Huvudvyer",
+      "description": "Exportera vald period som Excel eller som lättläst sida (KK-43). Filen skapas på enheten och ingen bankdata lämnar appen.",
+      "satisfies": ["KK-43"],
+      "elements": [
+        { "id": "export-xlsx", "type": "button", "label": "Excel (.xlsx)", "variant": "secondary", "close": true, "toast": "Excel-filen är skapad", "satisfies": ["KK-43-A", "KK-43-B"] },
+        { "id": "export-share", "type": "button", "label": "Dela lättläst sida", "variant": "primary", "close": true, "toast": "Öppnar delningsmenyn", "satisfies": ["KK-43-C"] }
       ]
     },
     {
@@ -698,6 +728,22 @@
       "responses": { "200": { "body": { "period": "2026-11", "lines": [{ "category_id": "cat_mat", "budget_minor": 630000, "actual_minor": 655200, "remaining_minor": -25200, "ratio": 1.04, "over": true }], "excluded": { "internal_transfers_minor": 1500000, "card_payment_minor": 821400 } } } },
       "description": "GET ger också `groups`: en rad per huvudkategori med budget eller utgifter, där utfallet alltid är huvudkategorin plus underkategorierna. Har huvudkategorin egen budget är den taket; annars är gruppens budget summan av underkategoriernas. `total_budget_minor` räknar varje grupp en gång. GET tar kontofilter (KK-41-C): `?account=acc_1&account=acc_2` räknar utfallet och uppdelningarna bara på de kontona (högst 10); ett tomt eller för långt id ger 400.",
       "satisfies": ["KK-20-A", "KK-20-B", "KK-20-C", "KK-41-C"]
+    },
+    {
+      "id": "api-guidelines", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "GET", "path": "/api/guidelines",
+      "summary": "Läge, sparmål och riktlinjer per kategori för en period",
+      "params": [{ "name": "period", "in": "query", "type": "YYYY-MM" }, { "name": "account", "in": "query", "type": "string (upprepas)", "description": "Kontofilter (KK-41-C), som för budget." }],
+      "responses": { "200": { "body": { "period": "2026-11", "mode": "saving", "saving_goal_minor": 800000, "free_to_spend_minor": 624000, "per_day_minor": 31200, "feasible": true, "categories": [{ "category_id": "cat_mat", "average_minor": 655000, "normal_minor": 610000, "saving_minor": 540000, "override_minor": null, "over_pace": true }] } } },
+      "description": "`normal_minor` är medianen av de senaste 6 månaderna utan månader markerade som engångsperiod. `override_minor` är ett manuellt värde som ersätter beräknat. Sparläget lagras en gång och gäller tills det stängs av (D-guidelines).",
+      "satisfies": ["KK-42-A", "KK-42-B", "KK-42-C", "KK-42-D"]
+    },
+    {
+      "id": "api-guidelines-put", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PUT", "path": "/api/guidelines",
+      "summary": "Sätt läge, sparmål, manuella nivåer och engångsperioder",
+      "request": { "mode": "none | budget | saving", "saving_goal_minor": 800000, "overrides": [{ "category_id": "cat_mat", "amount_minor": 560000 }], "one_off_periods": ["2026-09"] },
+      "responses": { "200": { "body": { "mode": "saving" } }, "400": { "body": { "error": "invalid_request" } } },
+      "description": "Kräver CSRF-skydd som andra ändringar. Att stänga av sparläget ändrar varken budget eller transaktioner (KK-42-D).",
+      "satisfies": ["KK-42-A", "KK-42-D"]
     },
     {
       "id": "api-budget-delete", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "DELETE", "path": "/api/budgets/{period}",
@@ -1330,6 +1376,8 @@
   ],
 
   "decisions": [
+    {"id": "D-guidelines", "title": "Riktlinjer och sparläge", "status": "accepted", "context": "Ägarens önskemål 2026-11-23: efter mycket shopping och renovering vill man gå in i ett sparläge och få tydlighet.", "options": ["Tre lägen per period, sparläge tills vidare", "Tidsbegränsat sparläge", "Bara fler förslag i budgetvyn"], "chosen": "Tre lägen (ingen budget, budget, sparläge). Sparläget gäller tills vidare. Normalnivån är medianen av de senaste 6 månaderna, med manuell justering och markering av engångsperioder. Utrymmet räknas som inkomst minus fasta kostnader minus sparmål.", "satisfies": ["KK-42-A", "KK-42-B", "KK-42-C"]},
+    {"id": "D-export", "title": "Export av budget", "status": "accepted", "context": "Ägarens önskemål 2026-11-23: dela budgeten som Excel eller lättläst format över telefon. Workern har 10 ms CPU på free tier.", "options": ["Skapa filen i webbläsaren, dela via Web Share", "Skapa filen i Workern", "Extern tjänst"], "chosen": "Skapa .xlsx och PDF i webbläsaren och dela via telefonens delningsmeny. Ingen bankdata lämnar enheten och Workerns CPU-gräns berörs inte. Formelinjektion i celler förhindras.", "satisfies": ["KK-43-A", "KK-43-B", "KK-43-C"]},
     {"id": "D-account-scope", "title": "Konton som räknas med och kontofilter", "status": "accepted", "context": "Ägarens önskemål 2026-11-23: det gemensamma kontot blandas med privat konto och sparande.", "options": ["Kontofilter + Räknas med per konto", "Namngivna grupper av konton", "Bara Räknas med"], "chosen": "Kontofilter + Räknas med per konto (återanvänder accounts.included). En överföring till ett konto som inte räknas med blir en utgift, inte en intern överföring.", "satisfies": ["KK-41-A", "KK-41-B", "KK-41-C"]},
     {
       "id": "D-origin", "title": "Hur når PWA:n API:t – samma origin eller separat workers.dev?", "status": "proposed",
@@ -1582,7 +1630,7 @@
     {
       "id": "M2", "title": "M2 · Sparmål, lån och inkomst (föräldraledighet)", "target": "Vecka 9–11",
       "description": "Sparmål med prognos, lånöversikt med ränta och amortering (KK-36), inkomstklassning, inkomsthistorik, planering av ledighet med omräkning av budget och sparmål. Se Q-mvp-scope om detta ska tidigareläggas.",
-      "includes": ["sparmal", "sparmal-detalj", "sparmal-nytt", "lan", "api-loans", "Loan", "inkomst", "ledighet-ny", "api-goals", "api-goal-edit", "api-income", "api-leave", "F-leave", "SavingsGoal", "GoalContribution", "LeavePeriod", "IncomeParameters"]
+      "includes": ["riktlinjer", "exportera-budget", "api-guidelines", "api-guidelines-put", "D-guidelines", "D-export", "sparmal", "sparmal-detalj", "sparmal-nytt", "lan", "api-loans", "Loan", "inkomst", "ledighet-ny", "api-goals", "api-goal-edit", "api-income", "api-leave", "F-leave", "SavingsGoal", "GoalContribution", "LeavePeriod", "IncomeParameters"]
     },
     {
       "id": "M3", "title": "M3 · Insikter och notiser", "target": "Vecka 12–13",
@@ -1642,6 +1690,10 @@
     { "id": "V-u-catcolor", "title": "En färg per huvudkategori", "type": "unit", "given": "mallens huvudkategorier, en underkategori och en egen kategori", "when": "färgen väljs och tokens.css läses", "then": "varje mallkategori har en egen färg, underkategorin får huvudkategorins, en egen kategori får alltid samma färg, och alla färger har minst 3:1 mot ytan i båda lägena", "satisfies": ["KK-26-D"] },
     { "id": "V-u-iconbutton", "title": "Ikonknappar har namn", "type": "unit", "given": "en ikonknapp", "when": "den ritas", "then": "den har sin etikett som aria-label och title och ingen synlig text; axe i E2E hittar inga knappar utan namn", "satisfies": ["KK-26-E"] },
     { "id": "V-e2e-csp", "title": "Säkerhetsheaders", "type": "e2e", "given": "preview-deploy", "when": "hämta / och /api/overview", "then": "CSP enligt KK-30-B, no-store på API", "satisfies": ["KK-30-B"] },
+    { "id": "V-u-guidelines", "title": "domain/guidelines: normalnivå och utrymme (TDD)", "type": "unit", "given": "syntetisk serie där en shoppingmånad är 3 gånger normal, inkomst 40 000 kr, fasta kostnader 22 000 kr, sparmål 8 000 kr", "when": "riktlinjerna räknas", "then": "normalnivån är medianen och påverkas inte av extrema månader eller månader markerade som engångsperiod; utrymmet är 10 000 kr och fördelas i proportion till normalnivå; omöjligt sparmål ger feasible=false", "satisfies": ["KK-42-A", "KK-42-B", "KK-42-C"] },
+    { "id": "V-u-export", "title": "Export: innehåll, format och formelskydd", "type": "unit", "given": "en periods budget med belopp i öre och en kategori som heter \"=SUMMA(A1)\"", "when": "exporten byggs", "then": "belopp i SEK med svenska format, summor stämmer, ingen motpart ingår och cellen börjar med apostrof så att den inte blir en formel", "satisfies": ["KK-43-A", "KK-43-B"] },
+    { "id": "V-e2e-guidelines", "title": "Slå på sparläge och exportera", "type": "e2e", "given": "syntetisk data med en extrem månad", "when": "sparläge slås på med sparmål och Excel exporteras", "then": "kvar att spendera visas, överskridna kategorier har text och Excel-filen laddas ned", "satisfies": ["KK-42-C", "KK-42-D", "KK-43-A"] },
+    { "id": "V-m-share", "title": "Delning via telefonens delningsmeny", "type": "manual", "given": "iPhone och Android med den installerade appen", "when": "Dela lättläst sida", "then": "delningsmenyn öppnas och mottagaren kan läsa sidan; utan Web Share laddas en PDF ned", "satisfies": ["KK-43-C"] },
     { "id": "V-e2e-logout", "title": "Logga ut rensar enheten", "type": "e2e", "given": "inloggad med cachad översikt", "when": "Logga ut och rensa enheten", "then": "Cache Storage och IndexedDB tomma; omdirigering till Access", "satisfies": ["KK-35-A"] },
     { "id": "V-m-spike", "title": "Spike-protokoll Skandia", "type": "manual", "given": "EB sandbox + Restricted Production", "when": "ASPSP-lista, koppling och hämtning", "then": "protokollet besvarar KK-6-A; Amex-notisen finns i UI och plan", "satisfies": ["KK-6-A", "KK-6-B"] },
     { "id": "V-m-access", "title": "Manuell Access-kontroll", "type": "manual", "given": "en icke inbjuden e-post", "when": "öppna kronkoll-25e.pages.dev", "then": "nekad; inga /api-anrop når Workern (kontrollera Workers-analytics)", "satisfies": ["KK-2-A"] },
