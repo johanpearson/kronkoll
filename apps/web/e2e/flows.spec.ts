@@ -61,6 +61,25 @@ test("sätt budget från snittet, justera Mat och se att den är över (V-e2e-bu
   await expect(page.getByRole("list", { name: "Kategorier" }).getByRole("listitem").filter({ hasText: "Mat" })).toContainText("104 % – över");
 });
 
+test("slå på sparläge med ett sparmål och se kvar att spendera fritt (V-e2e-guidelines, KK-42)", async ({ page }) => {
+  const api = await useFakeApi(page);
+  await page.goto("/budget");
+  await page.getByRole("link", { name: "Riktlinjer och sparläge" }).click();
+  await expect(page.getByRole("heading", { name: "Riktlinjer" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "Kvar att spendera fritt" })).toHaveCount(0);
+
+  await page.getByRole("radio", { name: "Sparläge" }).check();
+  await page.getByLabel("Sparmål per period (kr)").fill("8000");
+  await page.getByRole("button", { name: "Spara" }).click();
+  await expect.poll(() => api.guidelinePuts).toEqual([{ mode: "saving", saving_goal_minor: 800000, overrides: [], one_off_periods: [] }]);
+
+  const card = page.getByRole("region", { name: "Kvar att spendera fritt" });
+  await expect(card).toContainText("16 448,00 kr");
+  await expect(card).toContainText("= 23 000,00 kr att spendera fritt");
+  // Överskridet syns med text, inte bara färg (KK-42-D).
+  await expect(page.getByRole("list", { name: "Kategorier" }).getByRole("listitem").filter({ hasText: "Mat" })).toContainText("Över takt");
+});
+
 test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/budget");

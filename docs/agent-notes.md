@@ -43,6 +43,11 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Överlevande mutanter dödas med tester, inte med `// Stryker disable`. Felmeddelanden testas med texten,
   t.ex. `toThrow("Ogiltigt belopp")`, inte bara `toThrow(RangeError)`.
 
+- E2E i molnsessioner (Claude Code på webben): Playwrights egen webbläsare saknas där, men Chromium finns i
+  `/opt/pw-browsers/chromium`. Kör med en tillfällig config utanför git som sätter
+  `launchOptions.executablePath` till den sökvägen. Testet `pwa.spec.ts` (installerbarhet) fallerar där med
+  `in-incognito`, vilket beror på miljön och inte på koden.
+
 ## Integrationstester (Workers-miljön)
 
 - `pnpm --filter @kronkoll/api test:integration` kör den riktiga API-workern i workerd med en migrerad lokal D1

@@ -3,6 +3,7 @@
 import { Goal, House, PiggyBank, ReceiptText, Wallet } from "lucide-react";
 import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
+import { GuidelinesView } from "./guidelines/GuidelinesView.tsx";
 import { GoalDetail } from "./goals/GoalDetail.tsx";
 import { GoalsView } from "./goals/GoalsView.tsx";
 import { NewGoal } from "./goals/NewGoal.tsx";
@@ -35,6 +36,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/": OverviewView,
   "/transaktioner": TransactionsView,
   "/budget": BudgetView,
+  "/budget/riktlinjer": GuidelinesView,
   "/sparmal": GoalsView,
   "/sparmal/nytt": NewGoal,
   "/sparmal/lan": LoansView,
@@ -61,7 +63,7 @@ const TABS = [
     owns: (path: string) => path === "/" || path === "/insikter" || path === "/installningar" || path.startsWith("/installningar/") || path.startsWith("/koppla"),
   },
   { to: "/transaktioner", label: "Transaktioner", Icon: ReceiptText, owns: (path: string) => path === "/transaktioner" || path.startsWith("/transaktioner/") },
-  { to: "/budget", label: "Budget", Icon: PiggyBank, owns: (path: string) => path === "/budget" },
+  { to: "/budget", label: "Budget", Icon: PiggyBank, owns: (path: string) => path === "/budget" || path.startsWith("/budget/") },
   { to: "/sparmal", label: "Sparmål", Icon: Goal, owns: (path: string) => path === "/sparmal" || path.startsWith("/sparmal/") },
   { to: "/inkomst", label: "Inkomst", Icon: Wallet, owns: (path: string) => path === "/inkomst" || path.startsWith("/inkomst/") },
 ];

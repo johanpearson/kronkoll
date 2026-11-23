@@ -17,10 +17,10 @@ export interface PeriodData {
 }
 
 /** Öre som text för ett fält: hela kronor utan decimaler, annars med ören, t.ex. "6300" eller "6300,50". */
-const toText = (ore: number) => (ore % 100 === 0 ? String(ore / 100) : (ore / 100).toFixed(2).replace(".", ","));
+export const toText = (ore: number) => (ore % 100 === 0 ? String(ore / 100) : (ore / 100).toFixed(2).replace(".", ","));
 
 /** Fältets belopp i öre: null för tomt eller noll (ingen budget), undefined om texten inte är ett belopp. */
-function parseField(text: string): number | null | undefined {
+export function parseField(text: string): number | null | undefined {
   // \s tar även hårda mellanslag, som Intl använder mellan tusental.
   const normalized = text.replace(/\s/gu, "").replace(",", ".");
   if (normalized === "") return null;
