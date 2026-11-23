@@ -39,8 +39,8 @@ function api(pages: unknown[], status = 200) {
     "fetch",
     vi.fn((input: RequestInfo | URL) => {
       const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "https://app.test");
-      // Kategorierna hämtas en gång vid start och räknas inte som en sida.
-      if (url.pathname === "/api/categories") return Promise.resolve(new Response(JSON.stringify({ items: [] }), { status: 200 }));
+      // Kategorierna och kontona hämtas en gång vid start och räknas inte som en sida.
+      if (url.pathname === "/api/categories" || url.pathname === "/api/accounts") return Promise.resolve(new Response(JSON.stringify({ items: [] }), { status: 200 }));
       urls.push(url);
       const body = pages[Math.min(urls.length - 1, pages.length - 1)];
       return Promise.resolve(new Response(JSON.stringify(body), { status }));

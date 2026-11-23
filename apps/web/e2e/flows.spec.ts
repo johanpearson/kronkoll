@@ -184,3 +184,15 @@ test("välj bort ett konto i Inställningar så att det inte räknas med (V-e2e-
   await page.reload();
   await expect(page.getByRole("switch", { name: "Räknas med: Sparkonto ••5678" })).not.toBeChecked();
 });
+
+test("välj ett konto i Transaktioner och se vilket filter som gäller (V-e2e-account-filter, KK-41-C)", async ({ page }) => {
+  await useFakeApi(page);
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(request.url()));
+  await page.goto("/transaktioner");
+  await page.getByRole("button", { name: "Vardag", exact: true }).click();
+  await expect(page.getByText("Visar bara Vardag")).toBeVisible();
+  await expect.poll(() => requests.some((url) => url.includes("/api/transactions?") && url.includes("account=acc_1"))).toBe(true);
+  await page.getByRole("button", { name: "Visa alla konton" }).click();
+  await expect(page.getByText(/Visar bara/u)).toHaveCount(0);
+});

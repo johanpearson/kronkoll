@@ -3,6 +3,7 @@
 // visas alltid som text (KK-30).
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
+import { AccountFilter, accountParams, useAccountChoices } from "../accounts/account-filter.tsx";
 import { field, getJson } from "../api.ts";
 import { CategoryDot } from "../category-color.tsx";
 import { PeriodNav } from "../icon-button.tsx";
@@ -58,8 +59,9 @@ export function toInsights(body: unknown): Insights | null {
   };
 }
 
-async function fetchInsights(key: string): Promise<Insights | null> {
-  const { status, body } = await getJson(key === "current" ? "/api/insights" : `/api/insights?period=${encodeURIComponent(key)}`);
+async function fetchInsights(key: string, accountIds: readonly string[]): Promise<Insights | null> {
+  const params = [key === "current" ? "" : `period=${encodeURIComponent(key)}`, accountParams(accountIds)].filter((p) => p !== "").join("&");
+  const { status, body } = await getJson(params === "" ? "/api/insights" : `/api/insights?${params}`);
   return status === 200 ? toInsights(body) : null;
 }
 
@@ -169,6 +171,8 @@ export function InsightsView() {
   const [key, setKey] = useState("current");
   const [state, setState] = useState<State>({ kind: "loading" });
   const [categories, setCategories] = useState<Categories>(NO_CATEGORIES);
+  const [accountIds, setAccountIds] = useState<string[]>([]);
+  const accounts = useAccountChoices();
 
   useEffect(() => {
     void fetchCategories().then(setCategories);
@@ -177,13 +181,13 @@ export function InsightsView() {
   useEffect(() => {
     let current = true;
     setState({ kind: "loading" });
-    void fetchInsights(key).then((insights) => {
+    void fetchInsights(key, accountIds).then((insights) => {
       if (current) setState(insights ? { kind: "ready", insights } : { kind: "error" });
     });
     return () => {
       current = false;
     };
-  }, [key]);
+  }, [key, accountIds]);
 
   const insights = state.kind === "ready" ? state.insights : null;
   const go = (months: number) => {
@@ -196,6 +200,7 @@ export function InsightsView() {
       </p>
       <h1>Insikter</h1>
       <PeriodNav period={insights?.period ?? null} onGo={go} />
+      <AccountFilter choices={accounts} selected={accountIds} onChange={setAccountIds} />
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta insikterna. Försök igen om en stund.</p>}
       {insights && <Sections key={insights.period.key} insights={insights} categories={categories} />}

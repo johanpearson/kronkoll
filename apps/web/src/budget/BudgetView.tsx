@@ -6,6 +6,7 @@
 // tryck på en kategori visar transaktionerna bakom utgifterna.
 import { formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
+import { AccountFilter, accountParams, useAccountChoices } from "../accounts/account-filter.tsx";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { CategoryDot } from "../category-color.tsx";
@@ -56,8 +57,9 @@ function toFigures(raw: unknown): Figures | null {
   };
 }
 
-export async function fetchBudget(key: string): Promise<Budget | null> {
-  const { status, body } = await getJson(`/api/budgets/${encodeURIComponent(key)}`);
+export async function fetchBudget(key: string, accountIds: readonly string[] = []): Promise<Budget | null> {
+  const query = accountParams(accountIds);
+  const { status, body } = await getJson(`/api/budgets/${encodeURIComponent(key)}${query === "" ? "" : `?${query}`}`);
   const period = toPeriod(field(body, "period"));
   if (status !== 200 || !period || !Array.isArray(field(body, "groups"))) return null;
   return {
@@ -134,6 +136,8 @@ export function BudgetView() {
   const [editing, setEditing] = useState(false);
   const [open, setOpen] = useState<ReadonlySet<string>>(new Set());
   const [reload, setReload] = useState(0);
+  const [accountIds, setAccountIds] = useState<string[]>([]);
+  const accounts = useAccountChoices();
   const toast = useToast();
 
   useEffect(() => {
@@ -149,13 +153,13 @@ export function BudgetView() {
   useEffect(() => {
     let current = true;
     setState({ kind: "loading" });
-    void fetchBudget(key).then((budget) => {
+    void fetchBudget(key, accountIds).then((budget) => {
       if (current) setState(budget ? { kind: "ready", budget } : { kind: "error" });
     });
     return () => {
       current = false;
     };
-  }, [key, reload]);
+  }, [key, reload, accountIds]);
 
   const budget = state.kind === "ready" ? state.budget : null;
   const nameOf = (id: string) => categories.names.get(id) ?? id;
@@ -175,6 +179,7 @@ export function BudgetView() {
     <main>
       <h1>Budget</h1>
       <PeriodNav period={budget?.period ?? null} onGo={go} />
+      <AccountFilter choices={accounts} selected={accountIds} onChange={setAccountIds} />
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta budgeten. Försök igen om en stund.</p>}
       {budget && (

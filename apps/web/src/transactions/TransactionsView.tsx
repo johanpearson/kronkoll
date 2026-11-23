@@ -5,6 +5,7 @@
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { Pencil, Search, Split } from "lucide-react";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
+import { AccountFilter, accountParams, useAccountChoices } from "../accounts/account-filter.tsx";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { CategoryDot } from "../category-color.tsx";
@@ -77,6 +78,8 @@ type Filters = {
   readonly uncategorized: boolean;
   /** En kategori med underkategorier, t.ex. från budgeten (KK-20). */
   readonly categoryId: string | null;
+  /** Bara dessa konton (KK-41-C). Tomt betyder alla. */
+  readonly accountIds: readonly string[];
 };
 
 /** Filtret ur adressen, t.ex. /transaktioner?period=2026-11&kategori=mat från en budgetrad. */
@@ -90,6 +93,7 @@ function filtersFromAddress(): Filters {
     // Från budgetens rad med okategoriserade utgifter, så att de går att kategorisera direkt.
     uncategorized: params.get("okategoriserade") === "1",
     categoryId: categoryId === "" ? null : categoryId,
+    accountIds: [],
   };
 }
 
@@ -105,7 +109,7 @@ function url(filters: Filters, cursor: string | null): string {
   if (filters.uncategorized) params.set("uncategorized", "true");
   if (filters.categoryId) params.set("category_id", filters.categoryId);
   if (cursor) params.set("cursor", cursor);
-  const query = params.toString();
+  const query = [params.toString(), accountParams(filters.accountIds)].filter((p) => p !== "").join("&");
   return query === "" ? "/api/transactions" : `/api/transactions?${query}`;
 }
 
@@ -236,6 +240,7 @@ export function TransactionsView() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
   const [categories, setCategories] = useState<Categories>(NO_CATEGORIES);
   const [editing, setEditing] = useState<{ id: string; mode: "category" | "split" } | null>(null);
+  const accounts = useAccountChoices();
   const toast = useToast();
 
   useEffect(() => {
@@ -304,6 +309,7 @@ export function TransactionsView() {
         </p>
       )}
       <PeriodNav period={period} onGo={go} />
+      <AccountFilter choices={accounts} selected={filters.accountIds} onChange={(accountIds) => { setFilters({ ...filters, period: period?.key ?? filters.period, accountIds }); }} />
       <form role="search" onSubmit={onSearch}>
         <input type="search" aria-label="Sök" placeholder="Sök motpart eller beskrivning" value={search} onChange={(e) => { setSearch(e.target.value); }} />{" "}
         <IconButton type="submit" label="Sök" icon={Search} />
