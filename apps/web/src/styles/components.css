@@ -751,7 +751,8 @@ fieldset.card > legend + * {
   border-top: 1px solid var(--border);
 }
 
-.switch-list label {
+.switch-list label,
+.account-counted {
   display: flex;
   align-items: center;
   justify-content: space-between;

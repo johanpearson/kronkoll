@@ -170,3 +170,17 @@ test("insikterna nås från översikten och visar avvikelse, återkommande dragn
   await page.getByRole("link", { name: "Möbelhuset Påhittat" }).click();
   await expect(page).toHaveURL(/\/transaktioner\/t1$/u);
 });
+
+test("välj bort ett konto i Inställningar så att det inte räknas med (V-e2e-account-counted, KK-41-A)", async ({ page }) => {
+  const api = await useFakeApi(page);
+  await page.goto("/installningar");
+  const sparkonto = page.getByRole("switch", { name: "Räknas med: Sparkonto ••5678" });
+  await expect(sparkonto).toBeChecked();
+  // Valet visas när servern har svarat, så läget kontrolleras efter klicket och inte av uncheck().
+  await sparkonto.click();
+  await expect(sparkonto).not.toBeChecked();
+  await expect(page.getByText("Räknas inte i budget, översikt eller insikter")).toBeVisible();
+  expect(api.accountPatches).toEqual([{ counted: false }]);
+  await page.reload();
+  await expect(page.getByRole("switch", { name: "Räknas med: Sparkonto ••5678" })).not.toBeChecked();
+});

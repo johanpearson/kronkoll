@@ -102,8 +102,8 @@ const CONNECTION = {
 };
 
 const ACCOUNTS = [
-  { id: "acc_1", name: "Vardag", nickname: "Vardag", bank_name: "Privatkonto ••1234", bank: "Exempelbanken", type: "checking" },
-  { id: "acc_2", name: "Sparkonto ••5678", nickname: null, bank_name: "Sparkonto ••5678", bank: "Exempelbanken", type: "savings" },
+  { id: "acc_1", name: "Vardag", nickname: "Vardag", bank_name: "Privatkonto ••1234", bank: "Exempelbanken", type: "checking", counted: true },
+  { id: "acc_2", name: "Sparkonto ••5678", nickname: null, bank_name: "Sparkonto ••5678", bank: "Exempelbanken", type: "savings", counted: true },
 ];
 
 /** Utfall per huvudkategori och period. November saknar budget tills ett test sparar en. */
@@ -117,6 +117,8 @@ const ACTUALS: Record<string, Record<string, number>> = {
 export interface FakeApi {
   readonly rules: { id: string; pattern: string; category_id: string; source: string; hits: number }[];
   readonly budgetPuts: unknown[];
+  /** Ändringar av Räknas med (KK-41-A), i den ordning de sparades. */
+  readonly accountPatches: unknown[];
 }
 
 /** Gör alla belopp (fält som slutar på _minor) `scale` gånger större, för att pröva långa belopp i UI:t. */
@@ -151,7 +153,8 @@ export async function useFakeApi(
     id: "lan1", name: "Bolån del 1", lender: "Exempelbanken", balance_minor: 120000000, interest_rate_bp: 350, rate_fixed_until: "2026-12-15", amortization_minor: 200000,
     monthly_interest_minor: 350000, monthly_amortization_minor: 200000, monthly_cost_minor: 550000, rate_fixed: true, rate_fixed_days_left: 41, rate_fixed_ending: true,
   }];
-  const state: FakeApi = { rules: [], budgetPuts: [] };
+  const state: FakeApi = { rules: [], budgetPuts: [], accountPatches: [] };
+  const accounts = ACCOUNTS.map((a) => ({ ...a }));
   // Utan bank visar översikten välkomstsidan. Kopplingen görs klar med koden som banken skickar tillbaka.
   let connected = options.connected ?? true;
   const overview = () =>
@@ -267,7 +270,14 @@ export async function useFakeApi(
       return [201, { connection_id: "c1", accounts: 3, initial_sync: "started", renewed: false }];
     }
     if (path === "/api/connections") return [200, { items: [CONNECTION] }];
-    if (path === "/api/accounts") return [200, { items: ACCOUNTS }];
+    if (path === "/api/accounts") return [200, { items: accounts }];
+    const accountPath = /^\/api\/accounts\/([^/]+)$/u.exec(path);
+    const account = accounts.find((a) => a.id === accountPath?.[1]);
+    if (account && method === "PATCH") {
+      state.accountPatches.push(body);
+      account.counted = Boolean(body["counted"]);
+      return [200, { id: account.id, name: account.name, nickname: account.nickname, counted: account.counted }];
+    }
     if (path === "/api/settings") return [200, { budget_period_start_day: 1, current_period: NOVEMBER }];
     // Web Push är påslaget på servern (KK-27). I E2E är service workers avstängda, så vyn säger att enheten saknar stöd.
     if (path === "/api/push") return [200, { configured: true, public_key: "BPublicKeyForE2E", topics: ["consent", "budget_over", "sync_failed"] }];
