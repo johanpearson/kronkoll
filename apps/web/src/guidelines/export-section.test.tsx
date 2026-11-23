@@ -91,6 +91,20 @@ describe("Dela eller exportera (KK-43)", () => {
     expect(screen.getByRole("status").textContent).toBe("Filen är nedladdad.");
   });
 
+  it("PDF: ger en lättläst PDF som delas via telefonens delningsmeny (KK-43-C)", async () => {
+    api();
+    deliver.mockResolvedValue("shared");
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Lättläst sida (PDF)" }));
+    await settle();
+    const [file, title] = deliver.mock.calls[0] ?? [];
+    expect(file?.name).toBe("kronkoll-budget-2026-11.pdf");
+    expect(file?.type).toBe("application/pdf");
+    expect(await head(file as File, 5)).toEqual([...new TextEncoder().encode("%PDF-")]);
+    expect(title).toBe("Budget och riktlinjer 1 nov. 2026 – 30 nov. 2026");
+    expect(screen.getByRole("status").textContent).toBe("Filen är delad.");
+  });
+
   it("delad via telefonens delningsmeny säger det", async () => {
     api();
     deliver.mockResolvedValue("shared");
