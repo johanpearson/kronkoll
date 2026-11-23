@@ -9,6 +9,7 @@ import {
   medianMinor,
   perDayMinor,
   remainingFree,
+  rollUpToMain,
   type CategoryLevels,
   type PeriodSpending,
 } from "./guidelines.ts";
@@ -334,5 +335,31 @@ describe("remainingFree: kvar att spendera fritt hittills (KK-42-C)", () => {
 
   it("blir negativt när det fria utrymmet är överskridet", () => {
     expect(remainingFree(kr(1_000), lines, new Map([["mat", kr(1_500)]]))).toBe(-kr(500));
+  });
+});
+
+describe("rollUpToMain: underkategorier summeras uppåt till huvudkategorin (KK-42)", () => {
+  const parentOf = new Map<string, string | null>([["mat", null], ["mat-livsmedel", "mat"], ["mat-restaurang", "mat"], ["boende", null]]);
+
+  it("summerar en underkategori in i sin huvudkategori och låter huvudkategorins egna belopp vara kvar", () => {
+    const result = rollUpToMain(new Map([["mat", 100], ["mat-livsmedel", 600], ["mat-restaurang", 50], ["boende", 900]]), parentOf);
+    expect(Object.fromEntries(result)).toEqual({ mat: 750, boende: 900 });
+  });
+
+  it("en underkategori utan egen rad i huvudkategorin ger ändå huvudkategorin", () => {
+    expect(Object.fromEntries(rollUpToMain(new Map([["mat-livsmedel", 600]]), parentOf))).toEqual({ mat: 600 });
+  });
+
+  it("okategoriserat och kategorier som inte finns i trädet behålls som de är", () => {
+    const result = rollUpToMain(new Map<string | null, number>([[null, 300], ["okand", 40]]), parentOf);
+    expect(result.get(null)).toBe(300);
+    expect(result.get("okand")).toBe(40);
+  });
+
+  it("ger tomt för tomt och ändrar inte indata", () => {
+    expect(rollUpToMain(new Map(), parentOf).size).toBe(0);
+    const input = new Map([["mat-livsmedel", 600]]);
+    rollUpToMain(input, parentOf);
+    expect([...input]).toEqual([["mat-livsmedel", 600]]);
   });
 });

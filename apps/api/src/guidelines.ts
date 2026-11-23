@@ -1,6 +1,6 @@
 // Riktlinjer och sparläge (KK-42): GET och PUT /api/guidelines. Läget, sparmålet, manuella nivåer och
 // engångsperioder gäller tills vidare och sparas som en helhet (PUT). GET räknar i domänen vid anropet:
-// normalnivå per kategori (median av de senaste 6 perioderna utan engångsperioder), fasta kostnader ur
+// normalnivå per huvudkategori (median av de senaste 6 perioderna utan engångsperioder), fasta kostnader ur
 // återkommande dragningar (KK-24-A), förväntad inkomst (median av lön och föräldrapenning de tre senaste
 // månaderna som har inkomst), utrymmet att spendera fritt och vad som är kvar hittills i perioden.
 import { budgetRepository, categoryRepository, guidelineRepository, incomeRepository, insightsRepository, settingsRepository, type GuidelineMode } from "@kronkoll/adapter-d1";
@@ -18,6 +18,7 @@ import {
   recurringCharges,
   remainingFree,
   ruleKey,
+  rollUpToMain,
   spendingByCategory,
   todayInStockholm,
   type BudgetPeriod,
@@ -58,7 +59,10 @@ export async function getGuidelines(request: Request, env: { DB: D1Database }, s
     const from = addDays(today, -RECURRING_DAYS);
     const budget = budgetRepository(env.DB);
     const categories = await categoryRepository(env.DB).list();
-    const spendingOf = (p: BudgetPeriod, actuals: Awaited<ReturnType<typeof budget.actuals>>) => spendingByCategory({ period: p, ...actuals, categories });
+    // Riktlinjerna räknas på huvudkategorier: underkategorierna summeras uppåt.
+    const parentOf = new Map(categories.map((c) => [c.id, c.parentId]));
+    const mainOf = (id: string) => parentOf.get(id) ?? id;
+    const spendingOf = (p: BudgetPeriod, actuals: Awaited<ReturnType<typeof budget.actuals>>) => rollUpToMain(spendingByCategory({ period: p, ...actuals, categories }), parentOf);
     const [state, current, earlier, charges, income] = await Promise.all([
       guidelineRepository(env.DB).get(),
       budget.actuals(period, accountIds),
@@ -85,7 +89,7 @@ export async function getGuidelines(request: Request, env: { DB: D1Database }, s
       const monthly = Math.round(r.yearlyMinor / 12);
       fixedMinor += monthly;
       const categoryId = categoryOfGroup.get(r.counterpartyNorm) ?? null;
-      if (categoryId !== null) fixedByCategory.set(categoryId, (fixedByCategory.get(categoryId) ?? 0) + monthly);
+      if (categoryId !== null) fixedByCategory.set(mainOf(categoryId), (fixedByCategory.get(mainOf(categoryId)) ?? 0) + monthly);
     }
 
     const earnings = income.map((m) => m.salaryMinor + m.parentalBenefitMinor).filter((total) => total > 0);
@@ -164,8 +168,8 @@ export async function putGuidelines(request: Request, env: { DB: D1Database }): 
   const guidelines = await readGuidelines(request);
   if (!guidelines) return invalid();
   try {
-    // Bara utgiftskategorier som inte är arkiverade går att ge en manuell nivå, som för budget.
-    const allowed = new Set((await categoryRepository(env.DB).list()).filter((c) => c.kind === "expense" && !c.archived).map((c) => c.id));
+    // Bara huvudkategorier för utgifter som inte är arkiverade går att ge en manuell nivå.
+    const allowed = new Set((await categoryRepository(env.DB).list()).filter((c) => c.kind === "expense" && !c.archived && c.parentId === null).map((c) => c.id));
     if (!guidelines.overrides.every((o) => allowed.has(o.categoryId))) return json({ error: "unknown_category" }, 400);
     await guidelineRepository(env.DB).save(guidelines);
     return json({ mode: guidelines.mode }, 200);

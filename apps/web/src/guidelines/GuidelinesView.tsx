@@ -102,13 +102,15 @@ function GuidelinesForm(props: { guidelines: Guidelines; categories: Categories;
       )}
 
       <form className="card" aria-label="Riktlinjer" onSubmit={(e) => void save(e)}>
-        <fieldset>
+        <fieldset className="choices">
           <legend>Läge</legend>
           {MODES.map((m) => (
-            <label key={m.mode} className="choice">
+            <label key={m.mode}>
               <input type="radio" name="mode" checked={mode === m.mode} onChange={() => { setMode(m.mode); }} />
-              {m.label}
-              <small>{m.hint}</small>
+              <span className="choice-text">
+                {m.label}
+                <small>{m.hint}</small>
+              </span>
             </label>
           ))}
         </fieldset>
@@ -119,11 +121,11 @@ function GuidelinesForm(props: { guidelines: Guidelines; categories: Categories;
           </label>
         )}
 
-        <fieldset>
+        <fieldset className="choices months">
           <legend>Engångsperioder</legend>
           <small>Markera perioder som inte var normala, till exempel en renovering. De räknas inte i normalnivån, men väl i snittet.</small>
           {history.map((key) => (
-            <label key={key} className="choice">
+            <label key={key}>
               <input type="checkbox" checked={oneOff.has(key)} onChange={() => { toggleOneOff(key); }} />
               {monthName(key)}
             </label>
@@ -146,15 +148,14 @@ function GuidelinesForm(props: { guidelines: Guidelines; categories: Categories;
                   {saving && ` · sparläge ${formatSek(c.savingMinor)}`}
                   {` · hittills ${formatSek(c.actualMinor)}`}
                 </small>
-                <label>
-                  Egen nivå för {nameOf(c.categoryId)} (kr)
-                  <input
-                    inputMode="decimal"
-                    placeholder="Beräknad"
-                    value={levels.get(c.categoryId) ?? ""}
-                    onChange={(e) => { setLevels(new Map(levels).set(c.categoryId, e.target.value)); }}
-                  />
-                </label>
+                <input
+                  className="level-input"
+                  inputMode="decimal"
+                  aria-label={`Egen nivå för ${nameOf(c.categoryId)} (kr)`}
+                  placeholder="Egen nivå (kr)"
+                  value={levels.get(c.categoryId) ?? ""}
+                  onChange={(e) => { setLevels(new Map(levels).set(c.categoryId, e.target.value)); }}
+                />
               </li>
             ))}
           </ul>

@@ -208,6 +208,7 @@ export {
   medianMinor,
   perDayMinor,
   remainingFree,
+  rollUpToMain,
   type CategoryLevels,
   type FreeSpending,
   type FreeSpendingInput,

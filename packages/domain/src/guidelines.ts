@@ -222,3 +222,16 @@ export function remainingFree(freeMinor: number, lines: readonly GuidelineLine[]
   }
   return assertMinor(freeMinor) - spent;
 }
+
+/**
+ * Summerar belopp per kategori uppåt till huvudkategorin, så att riktlinjerna räknas på huvudkategorier
+ * (KK-42). En kategori utan förälder, okategoriserat och en kategori som inte finns i trädet behålls som den är.
+ */
+export function rollUpToMain(amounts: ReadonlyMap<string | null, number>, parentOf: ReadonlyMap<string | null, string | null>): Map<string | null, number> {
+  const result = new Map<string | null, number>();
+  for (const [categoryId, amount] of amounts) {
+    const main = parentOf.get(categoryId) ?? categoryId;
+    result.set(main, assertMinor((result.get(main) ?? 0) + assertMinor(amount)));
+  }
+  return result;
+}

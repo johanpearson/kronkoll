@@ -127,6 +127,49 @@ button.small {
   cursor: pointer;
 }
 
+.choices {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.choices > legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+}
+
+.choices label:has(.choice-text) {
+  align-items: flex-start;
+  padding: var(--space-1) 0;
+}
+
+.choices .choice-text {
+  display: grid;
+  gap: 2px;
+}
+
+.choices .choice-text small {
+  color: var(--muted);
+}
+
+/* Perioderna i två kolumner, med förklaringen över båda. */
+.choices.months {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: var(--space-4);
+}
+
+.choices.months > legend,
+.choices.months > small {
+  grid-column: 1 / -1;
+}
+
+.choices input[type="radio"],
+.choices input[type="checkbox"] {
+  flex: none;
+}
+
 .choices input[type="radio"] {
   width: 18px;
   height: 18px;
@@ -834,4 +877,16 @@ fieldset.account-filter > legend {
 .account-filter button[aria-pressed="true"] {
   font-weight: 600;
   text-decoration: underline;
+}
+
+/* Riktlinjer (KK-42): en rad per huvudkategori, med eget fält för nivån under. */
+.guideline-list {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.guideline-list .level-input {
+  width: 100%;
+  max-width: 14rem;
+  margin-top: var(--space-2);
 }

@@ -28,7 +28,7 @@ export function ExportSection(props: { guidelines: Guidelines; categories: Categ
         setMessage("Det gick inte att hämta budgeten till filen. Försök igen om en stund.");
         return;
       }
-      const doc = buildExportDoc(props.guidelines, budget.lines, (id) => props.categories.names.get(id) ?? id);
+      const doc = buildExportDoc(props.guidelines, budget.groups, (id) => props.categories.names.get(id) ?? id);
       const blob = format === "xlsx" ? await buildXlsx(doc) : buildPdf(doc);
       const file = new File([blob], `${doc.fileStem}.${format}`, { type: format === "xlsx" ? XLSX_TYPE : "application/pdf" });
       const result = await deliverFile(file, doc.title);
