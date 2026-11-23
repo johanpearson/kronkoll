@@ -1,5 +1,6 @@
 // De kritiska flödena i mobil viewport (KK-15-B): översikten, att kategorisera med en regel som
 // lär sig och att sätta budget. Data kommer från det påhittade API:t i fake-api.ts.
+import { readFile } from "node:fs/promises";
 import { expect, test } from "@playwright/test";
 import { useFakeApi } from "./fake-api.ts";
 
@@ -78,6 +79,20 @@ test("slå på sparläge med ett sparmål och se kvar att spendera fritt (V-e2e-
   await expect(card).toContainText("= 23 000,00 kr att spendera fritt");
   // Överskridet syns med text, inte bara färg (KK-42-D).
   await expect(page.getByRole("list", { name: "Kategorier" }).getByRole("listitem").filter({ hasText: "Mat" })).toContainText("Över takt");
+});
+
+test("exportera budget och riktlinjer som Excel (V-e2e-export, KK-43)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/budget/riktlinjer");
+  // Skrivbordswebbläsaren har ingen delningsmeny, så filen laddas ned. Excel-biblioteket hämtas först här
+  // och måste få köra under samma CSP som i drift.
+  const excel = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Excel (.xlsx)" }).click();
+  const xlsx = await excel;
+  expect(xlsx.suggestedFilename()).toBe("kronkoll-budget-2026-11.xlsx");
+  // En .xlsx-fil är ett zip-arkiv.
+  expect((await readFile((await xlsx.path()))).subarray(0, 4).toString("hex")).toBe("504b0304");
+  await expect(page.getByRole("status")).toHaveText("Filen är nedladdad.");
 });
 
 test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {
