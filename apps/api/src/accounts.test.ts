@@ -31,7 +31,8 @@ afterAll(async () => {
   await dispose();
 });
 beforeEach(async () => {
-  await db.prepare(`UPDATE accounts SET nickname = NULL`).run();
+  await db.prepare(`UPDATE accounts SET nickname = NULL, included = 1`).run();
+  await db.prepare(`DELETE FROM transactions`).run();
 });
 
 async function call(method: string, path: string, body?: unknown, env: Partial<Env> = {}, csrf = true) {
@@ -56,8 +57,8 @@ describe("GET /api/accounts (KK-37)", () => {
     const res = await call("GET", "/api/accounts");
     expect(res.status).toBe(200);
     expect(await items()).toEqual([
-      { id: "acc_1", name: "Privatkonto ••4821", nickname: null, bank_name: "Privatkonto ••4821", bank: "Skandia", type: "checking" },
-      { id: "acc_2", name: "Sparkonto", nickname: null, bank_name: "Sparkonto", bank: "Skandia", type: "savings" },
+      { id: "acc_1", name: "Privatkonto ••4821", nickname: null, bank_name: "Privatkonto ••4821", bank: "Skandia", type: "checking", counted: true },
+      { id: "acc_2", name: "Sparkonto", nickname: null, bank_name: "Sparkonto", bank: "Skandia", type: "savings", counted: true },
     ]);
   });
 
@@ -75,18 +76,50 @@ describe("GET /api/accounts (KK-37)", () => {
   });
 });
 
+const insertTx = (id: string, account: string, date: string, amount: number) =>
+  db
+    .prepare(`INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor) VALUES (?, ?, ?, 'booked', '2026-11-15', ?, ?)`)
+    .bind(id, account, id, date, amount)
+    .run();
+const isInternal = async (id: string) => (await db.prepare(`SELECT is_internal_transfer AS i FROM transactions WHERE id = ?`).bind(id).first<{ i: number }>())?.i === 1;
+
+describe("PATCH /api/accounts/{id} counted (KK-41)", () => {
+  it("sparar att kontot inte räknas med och svarar med det, utan att ändra namnet", async () => {
+    await call("PATCH", "/api/accounts/acc_2", { nickname: "Privat sparande" });
+    const res = await call("PATCH", "/api/accounts/acc_2", { counted: false });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ id: "acc_2", name: "Privat sparande", nickname: "Privat sparande", counted: false });
+    expect((await items())[1]).toMatchObject({ nickname: "Privat sparande", counted: false });
+  });
+
+  it("KK-41-B: en överföring dit räknas som utgift, och den blir intern igen när kontot räknas med", async () => {
+    await insertTx("ut", "acc_1", "2026-11-10", -200000);
+    await insertTx("in", "acc_2", "2026-11-10", 200000);
+    await call("PATCH", "/api/accounts/acc_2", { counted: true });
+    expect([await isInternal("ut"), await isInternal("in")]).toEqual([true, true]);
+    await call("PATCH", "/api/accounts/acc_2", { counted: false });
+    expect([await isInternal("ut"), await isInternal("in")]).toEqual([false, true]);
+    await call("PATCH", "/api/accounts/acc_2", { counted: true });
+    expect([await isInternal("ut"), await isInternal("in")]).toEqual([true, true]);
+  });
+
+  it("ett okänt konto ger 404 och räknar inte om", async () => {
+    expect((await call("PATCH", "/api/accounts/finns-inte", { counted: false })).status).toBe(404);
+  });
+});
+
 describe("PATCH /api/accounts/{id} (KK-37-A)", () => {
   it("sätter ett trimmat eget namn, som sedan är kontots namn", async () => {
     const res = await call("PATCH", "/api/accounts/acc_1", { nickname: "  Privat kort " });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ id: "acc_1", name: "Privat kort", nickname: "Privat kort" });
+    expect(await res.json()).toEqual({ id: "acc_1", name: "Privat kort", nickname: "Privat kort", counted: true });
     expect((await items())[0]).toMatchObject({ name: "Privat kort", bank_name: "Privatkonto ••4821" });
   });
 
   it.each([null, "", "   "])("%j tar bort det egna namnet, och bankens namn visas igen", async (nickname) => {
     await call("PATCH", "/api/accounts/acc_1", { nickname: "Privat kort" });
     const res = await call("PATCH", "/api/accounts/acc_1", { nickname });
-    expect(await res.json()).toEqual({ id: "acc_1", name: "Privatkonto ••4821", nickname: null });
+    expect(await res.json()).toEqual({ id: "acc_1", name: "Privatkonto ••4821", nickname: null, counted: true });
   });
 
   it("sparar HTML-liknande text som den är; appen renderar den som text (KK-37-C)", async () => {
@@ -104,7 +137,9 @@ describe("PATCH /api/accounts/{id} (KK-37-A)", () => {
     ["styrtecken", { nickname: "Buffert\u0000" }],
     ["en radbrytning", { nickname: "Buf\nfert" }],
     ["ett tal", { nickname: 7 }],
-    ["inget namn", {}],
+    ["inget namn och inget val", {}],
+    ["ett räknas med som inte är sant eller falskt", { counted: "ja" }],
+    ["ett räknas med som är null", { counted: null }],
     ["inte JSON", "{"],
   ])("%s ger 400 och ändrar ingenting", async (_, body) => {
     const res = await call("PATCH", "/api/accounts/acc_2", body);
