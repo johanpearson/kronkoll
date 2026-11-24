@@ -231,7 +231,7 @@ export function BudgetView() {
             </>
           )}
           <p>
-            <Link to="/budget/riktlinjer">Riktlinjer och sparläge</Link>
+            <Link to="/budget/planera">Planera budget</Link>
           </p>
           {budget.lines.length === 0 && <p>Ingen budget är satt för perioden än.</p>}
           {budget.groups.length > 0 && (

@@ -175,8 +175,8 @@ export async function useFakeApi(
       remaining_free_minor: free - 655200,
       per_day_minor: Math.floor((free - 655200) / 16),
       categories: [
-        { category_id: "boende", average_minor: 980000, normal_minor: 980000, fixed_minor: 900000, saving_minor: 980000, override_minor: null, actual_minor: 980000, over_pace: false },
-        { category_id: "mat", average_minor: 606667, normal_minor: 610000, fixed_minor: 0, saving_minor: 1800000, override_minor: null, actual_minor: 655200, over_pace: saving },
+        { category_id: "boende", average_minor: 980000, normal_minor: 980000, fixed_minor: 900000, saving_minor: 980000, override_minor: null, actual_minor: 980000, last_minor: 980000, over_pace: false },
+        { category_id: "mat", average_minor: 606667, normal_minor: 610000, fixed_minor: 0, saving_minor: 1800000, override_minor: null, actual_minor: 655200, last_minor: 620000, over_pace: saving },
       ],
     };
   };
