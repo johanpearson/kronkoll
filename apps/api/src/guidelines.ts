@@ -72,6 +72,8 @@ export async function getGuidelines(request: Request, env: { DB: D1Database }, s
     ]);
     const actual = spendingOf(period, current);
     const levels = categoryLevels(earlier, state.oneOffPeriods);
+    // Förra periodens utfall per huvudkategori, för jämförelsen i planeraren (KK-42-B).
+    const last = earlier.reduce<ReadonlyMap<string | null, number>>((_, p) => p.spending, new Map());
 
     // Fasta kostnader: återkommande dragningar per månad, och vilken kategori de hör till.
     const categoryOfGroup = new Map<string, string | null>();
@@ -123,6 +125,7 @@ export async function getGuidelines(request: Request, env: { DB: D1Database }, s
             saving_minor: l.savingMinor,
             override_minor: overrides.get(l.categoryId) ?? null,
             actual_minor: spent,
+            last_minor: last.get(l.categoryId) ?? 0,
             // Takten gäller det rörliga: en hyra som dras första dagen är inte "över takt".
             over_pace: saving && isOverPace({ levelMinor: l.savingMinor - l.fixedMinor, actualMinor: Math.max(0, spent - l.fixedMinor), today, period }),
           };

@@ -817,28 +817,32 @@
     },
     {
       "id": "KK-42",
-      "title": "Riktlinjer och sparläge",
+      "title": "Budgetplanerare",
       "normative_strength": "should",
-      "statement": "Användaren får riktlinjer för vad som går att spendera, med tre lägen per period: ingen budget (bara riktlinje), budget (fast tak, KK-20) eller sparläge. I sparläge sätter användaren ett sparmål per period och appen räknar ut vad som finns kvar att spendera fritt. Sparläget gäller tills vidare tills användaren stänger av det. (Motiv: efter en period med mycket shopping och renovering vill ägarna gå in i ett sparläge och få tydlighet kring utgifterna. Ägarens önskemål 2026-11-23.)",
-      "verification_note": "Unit-tester (TDD) för normalnivå (median), fasta kostnader och utrymme efter sparmål, med syntetiska serier inklusive extrema månader; API-test mot lokal D1; komponenttest; E2E att slå på sparläge och se riktlinjerna.",
+      "statement": "Användaren kan planera en budget utifrån förväntad inkomst: skriva in en eller flera inkomstrader, få ett förslag på utgifter per huvudkategori ur historiken, ändra beloppen och se summan av utgifterna och vad som blir över. Planen kan sparas som periodens budget. Skärmen ersätter Riktlinjer och sparläge. (Motiv: efter en period med mycket shopping och renovering vill ägarna få översikt över vad utgifterna blir och hur mycket som blir över, som när man sätter upp en budget själv. Ägarens önskemål 2026-11-23, preciserat 2026-11-24.)",
+      "verification_note": "Unit-tester (TDD) för summering och normalnivå (median) med syntetiska serier inklusive extrema månader; API-test mot lokal D1 för förväntad inkomst och engångsperioder; komponenttester av planeraren; E2E att skriva in inkomst, ändra ett belopp och se summan.",
       "acceptance_criteria": [
         {
           "id": "KK-42-A",
-          "text": "Per kategori visas tre nivåer: historiskt snitt, normalt (median av de senaste 6 månaderna, så att enstaka extrema månader inte styr) och sparläge. Användaren kan ändra varje nivå manuellt och kan markera en månad som engångsperiod som då lämnas utanför normalnivån."
+          "text": "Inkomsten skrivs som en eller flera rader med namn och belopp per månad. Första raden är förifylld med förväntad inkomst (median av lön och föräldrapenning de tre senaste månaderna som har inkomst) och alla rader går att ändra, lägga till och ta bort."
         },
         {
           "id": "KK-42-B",
-          "given": "förväntad inkomst 40 000 kr, fasta kostnader 22 000 kr (hyra, lån och återkommande dragningar enligt KK-24-A) och sparmål 8 000 kr per period",
-          "when": "sparläget räknas",
-          "then": "är utrymmet att spendera fritt 10 000 kr per period, och det fördelas på rörliga kategorier i proportion till deras normalnivå"
+          "text": "Per huvudkategori visas ett förslag på utgift: normalnivån, alltså medianen av de senaste 6 perioderna utan engångsperioder. Fasta kostnader (återkommande dragningar enligt KK-24-A) är markerade. Varje belopp går att ändra, och förra periodens utfall och beloppets andel av inkomsten visas bredvid."
         },
         {
           "id": "KK-42-C",
-          "text": "Överst visas en siffra: kvar att spendera fritt i perioden, och per dag för resten av perioden. Går sparmålet inte ihop med inkomsten och de fasta kostnaderna säger appen det med text i stället för ett negativt utrymme."
+          "given": "inkomstrader på 40 000 kr och 5 000 kr, utgifter som summerar till 41 200 kr och sparande på 3 000 kr",
+          "when": "summeringen räknas",
+          "then": "är summan av utgifter och sparande 44 200 kr och det som blir över 800 kr; med utgifter på 43 200 kr står det Underskott 1 200 kr i text, inte bara i färg, och summan räknas om medan användaren skriver"
         },
         {
           "id": "KK-42-D",
-          "text": "En kategori som under perioden ligger över takt mot sin sparlägesnivå markeras med text och färg (inte bara färg). Kategorier utan budget markeras aldrig som överskridna. Sparläget går att stänga av, och då påverkas varken budget eller transaktioner."
+          "text": "Planen kan sparas som periodens budget med en knapp. Finns det redan en budget för perioden frågar appen först. Beloppen per huvudkategori blir budgetrader, sparande ingår inte i kategoribudgeten, och inga transaktioner ändras. Utkastet (inkomstrader, ändrade belopp och sparande) finns kvar i webbläsaren per period tills det sparas som budget eller förslaget återställs."
+        },
+        {
+          "id": "KK-42-E",
+          "text": "Användaren kan markera en period som engångsperiod, till exempel en renovering. Den lämnas då utanför normalnivån och förslagen räknas om."
         }
       ]
     },
