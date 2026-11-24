@@ -219,3 +219,4 @@ export {
   type VariableCategory,
 } from "./guidelines.ts";
 export { budgetExport, type BudgetExport, type ExportCategory, type ExportMode, type ExportRow } from "./budget-export.ts";
+export { budgetPlan, type BudgetPlan, type BudgetPlanInput, type PlanRow, type PlanRowInput } from "./budget-plan.ts";

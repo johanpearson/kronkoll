@@ -87,6 +87,7 @@ interface Line {
   saving_minor: number;
   override_minor: number | null;
   actual_minor: number;
+  last_minor: number;
   over_pace: boolean;
 }
 interface Guidelines {
@@ -114,6 +115,8 @@ describe("GET /api/guidelines (KK-42)", () => {
     // Median respektive snitt av de sex senaste månaderna: shopping-månaden styr inte normalnivån.
     expect(line(body, "fritid")).toMatchObject({ normal_minor: kr(1700), average_minor: kr(3850), override_minor: null, over_pace: false });
     expect(line(body, "mat")).toMatchObject({ normal_minor: kr(6150) });
+    // Förra periodens utfall (oktober) per huvudkategori, med underkategorierna summerade uppåt.
+    expect(body.categories.map((c) => [c.category_id, c.last_minor])).toEqual([["boende", kr(9000)], ["fritid", kr(1600)], ["mat", kr(6400)]]);
   });
 
   it("i sparläge räknas utrymmet efter fasta kostnader och sparmål och fördelas på det rörliga", async () => {
