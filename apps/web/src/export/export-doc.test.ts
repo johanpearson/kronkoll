@@ -16,8 +16,8 @@ const guidelines = (extra: Partial<Guidelines> = {}): Guidelines => ({
   remainingMinor: 1700000,
   perDayMinor: 106250,
   categories: [
-    { categoryId: "mat", averageMinor: 613333, normalMinor: 615000, fixedMinor: 0, savingMinor: 600000, overrideMinor: null, actualMinor: 650000, overPace: true },
-    { categoryId: "boende", averageMinor: 900000, normalMinor: 900000, fixedMinor: 900000, savingMinor: 900000, overrideMinor: null, actualMinor: 0, overPace: false },
+    { categoryId: "mat", averageMinor: 613333, normalMinor: 615000, fixedMinor: 0, savingMinor: 600000, overrideMinor: null, actualMinor: 650000, lastMinor: 0, overPace: true },
+    { categoryId: "boende", averageMinor: 900000, normalMinor: 900000, fixedMinor: 900000, savingMinor: 900000, overrideMinor: null, actualMinor: 0, lastMinor: 0, overPace: false },
   ],
   ...extra,
 });

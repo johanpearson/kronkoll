@@ -890,3 +890,35 @@ fieldset.account-filter > legend {
   max-width: 14rem;
   margin-top: var(--space-2);
 }
+
+/* Budgetplanerare (KK-42): inkomstrader och summeringen. */
+.planner h2 {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 1.125rem;
+}
+
+.income-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.income-row input:first-child {
+  flex: 1 1 8rem;
+  min-width: 0;
+}
+
+.income-row input:nth-child(2) {
+  flex: 0 1 8rem;
+  min-width: 0;
+}
+
+.plan-summary {
+  margin: var(--space-4) 0;
+}
+
+.plan-summary .deficit dd {
+  color: var(--danger);
+}
+

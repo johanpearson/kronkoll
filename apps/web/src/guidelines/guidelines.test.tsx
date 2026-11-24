@@ -220,8 +220,8 @@ describe("Riktlinjer och sparläge (KK-42)", () => {
       return json({ period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" }, lines: [], groups: [], uncategorized_minor: 0, total_budget_minor: 0, total_actual_minor: 0, excluded_internal_minor: 0 });
     }));
     await open("/budget");
-    const link = screen.getByRole("link", { name: "Riktlinjer och sparläge" });
-    expect(link.getAttribute("href")).toBe("/budget/riktlinjer");
+    const link = screen.getByRole("link", { name: "Planera budget" });
+    expect(link.getAttribute("href")).toBe("/budget/planera");
     expect(screen.getByRole("link", { name: "Budget" }).getAttribute("aria-current")).toBe("page");
   });
 

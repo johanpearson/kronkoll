@@ -3,6 +3,7 @@
 import { Goal, House, PiggyBank, ReceiptText, Wallet } from "lucide-react";
 import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
+import { PlannerView } from "./planner/PlannerView.tsx";
 import { GuidelinesView } from "./guidelines/GuidelinesView.tsx";
 import { GoalDetail } from "./goals/GoalDetail.tsx";
 import { GoalsView } from "./goals/GoalsView.tsx";
@@ -36,6 +37,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/": OverviewView,
   "/transaktioner": TransactionsView,
   "/budget": BudgetView,
+  "/budget/planera": PlannerView,
   "/budget/riktlinjer": GuidelinesView,
   "/sparmal": GoalsView,
   "/sparmal/nytt": NewGoal,

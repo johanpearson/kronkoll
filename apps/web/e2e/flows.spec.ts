@@ -62,23 +62,30 @@ test("sätt budget från snittet, justera Mat och se att den är över (V-e2e-bu
   await expect(page.getByRole("list", { name: "Kategorier" }).getByRole("listitem").filter({ hasText: "Mat" })).toContainText("104 % – över");
 });
 
-test("slå på sparläge med ett sparmål och se kvar att spendera fritt (V-e2e-guidelines, KK-42)", async ({ page }) => {
+test("planera en budget från förväntad inkomst, se vad som blir över och spara den (V-e2e-planner, KK-42)", async ({ page }) => {
   const api = await useFakeApi(page);
   await page.goto("/budget");
-  await page.getByRole("link", { name: "Riktlinjer och sparläge" }).click();
-  await expect(page.getByRole("heading", { name: "Riktlinjer" })).toBeVisible();
-  await expect(page.getByRole("region", { name: "Kvar att spendera fritt" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Planera budget" }).click();
+  await expect(page.getByRole("heading", { name: "Planera budget" })).toBeVisible();
+  // Inkomsten är förifylld med förväntad inkomst, och en rad till går att lägga till.
+  await expect(page.getByLabel("Belopp för Lön (kr)")).toHaveValue("40000");
+  await page.getByRole("button", { name: "Lägg till inkomst" }).click();
+  await page.getByLabel("Namn på inkomsten").nth(1).fill("Barnbidrag");
+  await page.getByLabel("Belopp för Barnbidrag (kr)").fill("1250");
 
-  await page.getByRole("radio", { name: "Sparläge" }).check();
-  await page.getByLabel("Sparmål per period (kr)").fill("8000");
-  await page.getByRole("button", { name: "Spara" }).click();
-  await expect.poll(() => api.guidelinePuts).toEqual([{ mode: "saving", saving_goal_minor: 800000, overrides: [], one_off_periods: [] }]);
+  // För höga utgifter ger ett underskott som står i text, inte bara i färg.
+  await page.getByLabel("Utgift för Mat (kr)").fill("45000");
+  const summary = page.getByRole("region", { name: "Summering" });
+  await expect(summary).toContainText("Underskott");
+  await expect(page.getByRole("note")).toContainText("mer än inkomsten");
 
-  const card = page.getByRole("region", { name: "Kvar att spendera fritt" });
-  await expect(card).toContainText("16 448,00 kr");
-  await expect(card).toContainText("= 23 000,00 kr att spendera fritt");
-  // Överskridet syns med text, inte bara färg (KK-42-D).
-  await expect(page.getByRole("list", { name: "Kategorier" }).getByRole("listitem").filter({ hasText: "Mat" })).toContainText("Över takt");
+  await page.getByLabel("Utgift för Mat (kr)").fill("6300");
+  await expect(summary).toContainText("Blir över");
+  await expect(summary).toContainText("25 150,00 kr");
+
+  await page.getByRole("button", { name: "Spara som budget för perioden" }).click();
+  await expect.poll(() => api.budgetPuts).toEqual([{ lines: [{ category_id: "boende", amount_minor: 980000 }, { category_id: "mat", amount_minor: 630000 }], source: "manual" }]);
+  await expect(page.getByRole("status")).toHaveText("Budgeten för perioden är sparad.");
 });
 
 test("exportera budget och riktlinjer som Excel och som PDF (V-e2e-export, KK-43)", async ({ page }) => {

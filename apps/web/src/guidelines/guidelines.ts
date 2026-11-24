@@ -14,6 +14,8 @@ export interface GuidelineCategory {
   /** Manuell nivå, eller null när nivån är beräknad. */
   readonly overrideMinor: number | null;
   readonly actualMinor: number;
+  /** Förra periodens utfall. */
+  readonly lastMinor: number;
   readonly overPace: boolean;
 }
 
@@ -48,6 +50,7 @@ function toCategory(raw: unknown): GuidelineCategory | null {
     savingMinor: minor(field(raw, "saving_minor")),
     overrideMinor: maybe(field(raw, "override_minor")),
     actualMinor: minor(field(raw, "actual_minor")),
+    lastMinor: minor(field(raw, "last_minor")),
     overPace: field(raw, "over_pace") === true,
   };
 }
