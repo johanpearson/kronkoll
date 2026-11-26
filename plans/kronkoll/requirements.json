@@ -983,12 +983,16 @@
       "id": "KK-50",
       "title": "Konfigurera egna konton",
       "normative_strength": "should",
-      "statement": "Privata konton (till exempel makarnas egna konton) kan ställas in så att de hålls utanför hushållets ekonomi. Det bygger på Räknas med (KK-41) och kompletteras så att inställningen går att göra snabbt för flera konton. (Ägarens önskemål 2026-11-26.)",
+      "statement": "Privata konton (till exempel makarnas egna konton) kan ställas in så att de hålls utanför hushållets ekonomi. Det bygger på Räknas med (KK-41) och kompletteras så att inställningen går att göra snabbt för flera konton. (Ägarens önskemål 2026-11-26.) Konton som inte är kopplade till appen (till exempel makens eller makans) syns bara som motpart i överföringar. De räknas som en utgift från det gemensamma kontot och hanteras med en regel (Innehåller, KK-47) som ger dem en kategori som Överföringar; ingen ny inställning behövs (ägarens beslut 2026-11-26).",
       "verification_note": "Komponenttest av kontolistan i Inställningar; E2E av att byta Räknas med för flera konton.",
       "acceptance_criteria": [
         {
           "id": "KK-50-A",
           "text": "Under Inställningar visas alla konton med namn och en brytare Räknas med. Ett privat konto kan märkas som Privat och hålls då utanför alla summor, men dess överföringar från gemensamma konton räknas som utgift (KK-41-B)."
+        },
+        {
+          "id": "KK-50-B",
+          "text": "En överföring till ett konto som inte är kopplat räknas som en utgift och går att kategorisera med en regel på kontots namn eller nummer (KK-47)."
         }
       ]
     }
