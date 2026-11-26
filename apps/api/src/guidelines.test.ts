@@ -56,7 +56,7 @@ afterAll(async () => {
   await dispose();
 });
 beforeEach(async () => {
-  await db.batch([db.prepare(`DELETE FROM guideline_overrides`), db.prepare(`DELETE FROM guideline_one_off_periods`), db.prepare(`DELETE FROM guideline_settings`)]);
+  await db.prepare(`DELETE FROM guideline_one_off_periods`).run();
   await settingsRepository(db).setBudgetPeriodStartDay(1);
 });
 
@@ -77,28 +77,19 @@ async function call(method: string, path: string, body?: unknown, env: Partial<E
 
 
 const kr = (amount: number) => amount * 100;
-const SAVING = { mode: "saving", saving_goal_minor: kr(8000), overrides: [], one_off_periods: [] };
+const NONE = { one_off_periods: [] };
 
 interface Line {
   category_id: string;
   average_minor: number;
   normal_minor: number;
   fixed_minor: number;
-  saving_minor: number;
-  override_minor: number | null;
   actual_minor: number;
   last_minor: number;
-  over_pace: boolean;
 }
 interface Guidelines {
-  mode: string;
-  feasible: boolean;
-  shortfall_minor: number;
   expected_income_minor: number;
   fixed_minor: number;
-  free_to_spend_minor: number;
-  remaining_free_minor: number;
-  per_day_minor: number;
   one_off_periods: string[];
   categories: Line[];
 }
@@ -109,56 +100,32 @@ const get = async (path = "/api/guidelines?period=2026-11"): Promise<Guidelines>
 const line = (body: Guidelines, id: string): Line => body.categories.find((c) => c.category_id === id) as Line;
 
 describe("GET /api/guidelines (KK-42)", () => {
-  it("utan sparade val är läget ingen budget, och riktlinjerna visar historiskt snitt och normalt utan sparande", async () => {
+  it("visar historiskt snitt och normalnivå, fasta kostnader och förväntad inkomst", async () => {
     const body = await get();
-    expect(body).toMatchObject({ mode: "none", feasible: true, shortfall_minor: 0, expected_income_minor: kr(40000), fixed_minor: kr(9000), free_to_spend_minor: kr(31000) });
+    expect(body).toMatchObject({ expected_income_minor: kr(40000), fixed_minor: kr(9000), one_off_periods: [] });
     // Median respektive snitt av de sex senaste månaderna: shopping-månaden styr inte normalnivån.
-    expect(line(body, "fritid")).toMatchObject({ normal_minor: kr(1700), average_minor: kr(3850), override_minor: null, over_pace: false });
+    expect(line(body, "fritid")).toMatchObject({ normal_minor: kr(1700), average_minor: kr(3850), fixed_minor: 0 });
     expect(line(body, "mat")).toMatchObject({ normal_minor: kr(6150) });
     // Förra periodens utfall (oktober) per huvudkategori, med underkategorierna summerade uppåt.
     expect(body.categories.map((c) => [c.category_id, c.last_minor])).toEqual([["boende", kr(9000)], ["fritid", kr(1600)], ["mat", kr(6400)]]);
+    expect(line(body, "boende")).toMatchObject({ normal_minor: kr(9000), fixed_minor: kr(9000) });
   });
 
-  it("i sparläge räknas utrymmet efter fasta kostnader och sparmål och fördelas på det rörliga", async () => {
-    expect((await call("PUT", "/api/guidelines", SAVING)).status).toBe(200);
+  it("visar utfallet hittills i perioden", async () => {
     const body = await get();
-    expect(body).toMatchObject({ mode: "saving", feasible: true, free_to_spend_minor: kr(23000) });
-    // 23 000 kr delas 6 150 : 1 700. Hyran är fast och får sin hela nivå.
-    expect(line(body, "mat").saving_minor).toBe(1_801_911);
-    expect(line(body, "fritid").saving_minor).toBe(498_089);
-    expect(line(body, "boende")).toMatchObject({ normal_minor: kr(9000), fixed_minor: kr(9000), saving_minor: kr(9000) });
-  });
-
-  it("visar vad som är kvar att spendera fritt, per dag, och vilka kategorier som ligger över takt", async () => {
-    await call("PUT", "/api/guidelines", SAVING);
-    const body = await get();
-    // 3 000 kr mat och 3 000 kr hobby i november: 23 000 − 6 000 kvar, 16 dagar kvar inklusive den 15:e.
-    expect(body).toMatchObject({ remaining_free_minor: kr(17000), per_day_minor: 106_250 });
-    // Halva perioden har gått: hobbyns nivå 4 981 kr motsvarar 2 490 kr i takt, maten 9 010 kr i takt.
-    expect(line(body, "fritid")).toMatchObject({ actual_minor: kr(3000), over_pace: true });
-    expect(line(body, "mat")).toMatchObject({ actual_minor: kr(3000), over_pace: false });
+    expect(line(body, "fritid")).toMatchObject({ actual_minor: kr(3000) });
+    expect(line(body, "mat")).toMatchObject({ actual_minor: kr(3000) });
   });
 
   it("en månad markerad som engångsperiod lämnas utanför normalnivån men inte snittet", async () => {
-    await call("PUT", "/api/guidelines", { ...SAVING, one_off_periods: ["2026-09"] });
+    await call("PUT", "/api/guidelines", { one_off_periods: ["2026-09"] });
     const body = await get();
     expect(body.one_off_periods).toEqual(["2026-09"]);
     expect(line(body, "fritid")).toMatchObject({ normal_minor: kr(1600), average_minor: kr(3850) });
   });
 
-  it("en manuell nivå ersätter kategorins sparlägesnivå", async () => {
-    await call("PUT", "/api/guidelines", { ...SAVING, overrides: [{ category_id: "mat", amount_minor: kr(5000) }] });
-    expect(line(await get(), "mat")).toMatchObject({ saving_minor: kr(5000), override_minor: kr(5000) });
-  });
-
-  it("ett sparmål som inte går ihop ger underskott och inget fritt utrymme", async () => {
-    await call("PUT", "/api/guidelines", { ...SAVING, saving_goal_minor: kr(40000) });
-    expect(await get()).toMatchObject({ feasible: false, shortfall_minor: kr(9000), free_to_spend_minor: 0 });
-  });
-
-  it("utan historik och inkomst är utrymmet noll och inget kraschar", async () => {
-    await call("PUT", "/api/guidelines", SAVING);
-    expect(await get("/api/guidelines?period=2024-01")).toMatchObject({ expected_income_minor: 0, free_to_spend_minor: 0, categories: [] });
+  it("utan historik och inkomst är allt noll och inget kraschar", async () => {
+    expect(await get("/api/guidelines?period=2024-01")).toMatchObject({ expected_income_minor: 0, categories: [] });
   });
 
   it("period current och ingen period ger den pågående perioden, som appen frågar efter", async () => {
@@ -176,54 +143,33 @@ describe("GET /api/guidelines (KK-42)", () => {
   });
 });
 
-describe("PUT /api/guidelines (KK-42)", () => {
+describe("PUT /api/guidelines (KK-42-E)", () => {
   const put = (body: unknown, csrf = true) => call("PUT", "/api/guidelines", body, {}, csrf);
 
-  it("ersätter allt och svarar med läget", async () => {
-    const res = await put({ ...SAVING, overrides: [{ category_id: "mat", amount_minor: 1 }], one_off_periods: ["2026-08"] });
+  it("ersätter listan och svarar med den sorterad", async () => {
+    const res = await put({ one_off_periods: ["2026-09", "2026-08"] });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ mode: "saving" });
-    await put({ mode: "none", saving_goal_minor: 0, overrides: [], one_off_periods: [] });
-    expect(await get()).toMatchObject({ mode: "none", one_off_periods: [] });
-    expect(line(await get(), "mat").override_minor).toBeNull();
+    expect(await res.json()).toEqual({ one_off_periods: ["2026-08", "2026-09"] });
+    await put(NONE);
+    expect(await get()).toMatchObject({ one_off_periods: [] });
   });
 
   it.each([
-    ["okänt läge", { ...SAVING, mode: "spara" }],
-    ["saknat sparmål", { mode: "saving", overrides: [], one_off_periods: [] }],
-    ["negativt sparmål", { ...SAVING, saving_goal_minor: -1 }],
-    ["sparmål som inte är heltal", { ...SAVING, saving_goal_minor: 1.5 }],
-    ["saknade manuella nivåer", { mode: "saving", saving_goal_minor: 0, one_off_periods: [] }],
-    ["saknade engångsperioder", { mode: "saving", saving_goal_minor: 0, overrides: [] }],
-    ["nivå utan belopp", { ...SAVING, overrides: [{ category_id: "mat" }] }],
-    ["negativ nivå", { ...SAVING, overrides: [{ category_id: "mat", amount_minor: -1 }] }],
-    ["nivå som inte är ett objekt", { ...SAVING, overrides: ["mat"] }],
-    ["samma kategori två gånger", { ...SAVING, overrides: [{ category_id: "mat", amount_minor: 1 }, { category_id: "mat", amount_minor: 2 }] }],
-    ["för många nivåer", { ...SAVING, overrides: Array.from({ length: 201 }, (_, i) => ({ category_id: `k${String(i)}`, amount_minor: 1 })) }],
-    ["felaktig period", { ...SAVING, one_off_periods: ["2026-9"] }],
-    ["period som inte är text", { ...SAVING, one_off_periods: [202609] }],
-    ["samma period två gånger", { ...SAVING, one_off_periods: ["2026-09", "2026-09"] }],
-    ["för många perioder", { ...SAVING, one_off_periods: Array.from({ length: 25 }, (_, i) => `20${String(10 + i)}-01`) }],
+    ["saknade engångsperioder", {}],
+    ["felaktig period", { one_off_periods: ["2026-9"] }],
+    ["period som inte är text", { one_off_periods: [202609] }],
+    ["samma period två gånger", { one_off_periods: ["2026-09", "2026-09"] }],
+    ["för många perioder", { one_off_periods: Array.from({ length: 25 }, (_, i) => `20${String(10 + i)}-01`) }],
     ["kroppen är inte ett objekt", "[]"],
     ["kroppen är inte JSON", "{"],
   ])("avvisar %s och ändrar ingenting", async (_name, body) => {
-    await put(SAVING);
+    await put({ one_off_periods: ["2026-08"] });
     expect((await put(body)).status).toBe(400);
-    expect(await get()).toMatchObject({ mode: "saving", saving_goal_minor: kr(8000) });
-  });
-
-  it("avvisar en okänd, arkiverad eller underkategori och en inkomstkategori", async () => {
-    await db.prepare(`UPDATE categories SET archived = 1 WHERE id = 'fritid'`).run();
-    for (const category_id of ["finns-inte", "fritid", "mat-livsmedel", "inkomst-lon"]) {
-      const res = await put({ ...SAVING, overrides: [{ category_id, amount_minor: 1 }] });
-      expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: "unknown_category" });
-    }
-    await db.prepare(`UPDATE categories SET archived = 0 WHERE id = 'fritid'`).run();
+    expect(await get()).toMatchObject({ one_off_periods: ["2026-08"] });
   });
 
   it("kräver CSRF-skydd", async () => {
-    expect((await put(SAVING, false)).status).toBe(403);
+    expect((await put(NONE, false)).status).toBe(403);
   });
 });
 
@@ -231,7 +177,7 @@ describe("/api/guidelines: fel i databasen", () => {
   const broken = { prepare: () => { throw new Error("D1 nere"); } } as unknown as D1Database;
 
   it("svarar 503 utan detaljer när databasen inte går att läsa eller skriva", async () => {
-    for (const res of [await call("GET", "/api/guidelines", undefined, { DB: broken }), await call("PUT", "/api/guidelines", SAVING, { DB: broken })]) {
+    for (const res of [await call("GET", "/api/guidelines", undefined, { DB: broken }), await call("PUT", "/api/guidelines", NONE, { DB: broken })]) {
       expect(res.status).toBe(503);
       expect(await res.json()).toEqual({ error: "unavailable" });
     }

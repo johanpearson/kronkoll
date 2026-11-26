@@ -25,20 +25,13 @@ const CATEGORIES = {
 function guidelines(extra: Record<string, unknown> = {}) {
   return {
     period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
-    mode: "saving",
-    saving_goal_minor: 800000,
     one_off_periods: ["2026-09"],
     expected_income_minor: 4000000,
     fixed_minor: 900000,
-    feasible: true,
-    shortfall_minor: 0,
-    free_to_spend_minor: 2300000,
-    remaining_free_minor: 1700000,
-    per_day_minor: 106250,
     categories: [
-      { category_id: "mat", average_minor: 613333, normal_minor: 615000, fixed_minor: 0, saving_minor: 600000, override_minor: null, actual_minor: 300000, last_minor: 640000, over_pace: false },
-      { category_id: "boende", average_minor: 900000, normal_minor: 900000, fixed_minor: 900000, saving_minor: 900000, override_minor: 850000, actual_minor: 0, last_minor: 900000, over_pace: false },
-      { category_id: "fritid", average_minor: 385000, normal_minor: 170000, fixed_minor: 0, saving_minor: 150000, override_minor: null, actual_minor: 0, last_minor: 160000, over_pace: false },
+      { category_id: "mat", average_minor: 613333, normal_minor: 615000, fixed_minor: 0, actual_minor: 300000, last_minor: 640000 },
+      { category_id: "boende", average_minor: 900000, normal_minor: 900000, fixed_minor: 900000, actual_minor: 0, last_minor: 900000 },
+      { category_id: "fritid", average_minor: 385000, normal_minor: 170000, fixed_minor: 0, actual_minor: 0, last_minor: 160000 },
     ],
     ...extra,
   };
@@ -65,7 +58,7 @@ function api(options: { guidelines?: [number, unknown]; budgetLines?: number; bu
       if (url.pathname === "/api/guidelines") {
         if (init?.method === "PUT") {
           calls.guidelinePuts.push(body());
-          return json(options.guidelinePutStatus ?? 200, { mode: "saving" });
+          return json(options.guidelinePutStatus ?? 200, { one_off_periods: [] });
         }
         const [status, payload] = options.guidelines ?? [200, guidelines()];
         return json(status, payload);
@@ -255,14 +248,12 @@ describe("Planera budget (KK-42)", () => {
     expect(screen.getByRole("alert").textContent).toContain("Det gick inte att spara budgeten");
   });
 
-  it("en engångsperiod sparas direkt och förslagen hämtas om, med läge, sparmål och egna nivåer oförändrade (KK-42-E)", async () => {
+  it("en engångsperiod sparas direkt och förslagen hämtas om (KK-42-E)", async () => {
     const calls = api();
     await open();
     fireEvent.click(screen.getByRole("checkbox", { name: /augusti 2026/u }));
     await settle();
-    expect(calls.guidelinePuts).toEqual([
-      { mode: "saving", saving_goal_minor: 800000, overrides: [{ category_id: "boende", amount_minor: 850000 }], one_off_periods: ["2026-08", "2026-09"] },
-    ]);
+    expect(calls.guidelinePuts).toEqual([{ one_off_periods: ["2026-08", "2026-09"] }]);
     expect(calls.paths.filter((p) => p === "GET /api/guidelines?period=current")).toHaveLength(2);
     expect(screen.getByRole<HTMLInputElement>("checkbox", { name: /september 2026/u }).checked).toBe(true);
   });

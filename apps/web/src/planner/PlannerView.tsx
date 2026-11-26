@@ -2,7 +2,7 @@
 // flera rader (första raden är förifylld med förväntad inkomst). Per huvudkategori finns ett förslag, normalnivån
 // ur historiken, som går att ändra. Summan av utgifterna och sparandet och vad som blir över räknas om medan man
 // skriver, och ett underskott står i text. Planen sparas som periodens budget först när man väljer det, och
-// utkastet ligger under tiden i webbläsaren (planner-draft.ts). Ersätter skärmen Riktlinjer och sparläge.
+// utkastet ligger under tiden i webbläsaren (planner-draft.ts). Ersätter Riktlinjer, sparläge och den gamla Budgetvyn.
 import { budgetPlan, formatSek } from "@kronkoll/domain";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { AccountFilter, useAccountChoices } from "../accounts/account-filter.tsx";
@@ -77,13 +77,7 @@ function PlannerForm(props: { guidelines: Guidelines; categories: Categories; ac
     const next = new Set(g.oneOffPeriods);
     if (!next.delete(key)) next.add(key);
     setBusy(true);
-    // Skärmen Riktlinjer och sparläge lagrar läge, sparmål och egna nivåer i samma anrop. De skickas tillbaka som de var.
-    const { status } = await putJson("/api/guidelines", {
-      mode: g.mode,
-      saving_goal_minor: g.savingGoalMinor,
-      overrides: g.categories.flatMap((c) => (c.overrideMinor === null ? [] : [{ category_id: c.categoryId, amount_minor: c.overrideMinor }])),
-      one_off_periods: [...next].sort(),
-    });
+    const { status } = await putJson("/api/guidelines", { one_off_periods: [...next].sort() });
     setBusy(false);
     if (status === 200) props.onChanged();
     else setMessage("Det gick inte att spara engångsperioden. Försök igen.");

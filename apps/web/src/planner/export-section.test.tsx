@@ -20,17 +20,10 @@ afterEach(() => {
 const CATEGORIES = { items: [{ id: "mat", parent_id: null, name: "Mat", kind: "expense", archived: false }] };
 const GUIDELINES = {
   period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
-  mode: "saving",
-  saving_goal_minor: 800000,
   one_off_periods: [],
   expected_income_minor: 4000000,
   fixed_minor: 900000,
-  feasible: true,
-  shortfall_minor: 0,
-  free_to_spend_minor: 2300000,
-  remaining_free_minor: 1700000,
-  per_day_minor: 106250,
-  categories: [{ category_id: "mat", average_minor: 613333, normal_minor: 615000, fixed_minor: 0, saving_minor: 600000, override_minor: null, actual_minor: 650000, over_pace: true }],
+  categories: [{ category_id: "mat", average_minor: 613333, normal_minor: 615000, fixed_minor: 0, actual_minor: 650000 }],
 };
 const BUDGET = {
   period: GUIDELINES.period,

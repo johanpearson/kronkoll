@@ -26,13 +26,11 @@ export function buildExportDoc(
 ): ExportDoc {
   const budgets = new Map(budgetLines.map((l) => [l.categoryId, l.budgetMinor]));
   const { rows, totals } = budgetExport(
-    "budget",
     g.categories.map((c) => ({
       name: nameOf(c.categoryId),
       budgetMinor: budgets.get(c.categoryId) ?? null,
       averageMinor: c.averageMinor,
       normalMinor: c.normalMinor,
-      savingMinor: c.savingMinor,
       actualMinor: c.actualMinor,
     })),
   );

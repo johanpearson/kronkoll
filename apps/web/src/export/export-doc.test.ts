@@ -5,19 +5,12 @@ import { buildExportDoc } from "./export-doc.ts";
 /** Påhittade riktlinjer (KK-13). */
 const guidelines = (extra: Partial<Guidelines> = {}): Guidelines => ({
   period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
-  mode: "saving",
-  savingGoalMinor: 800000,
   oneOffPeriods: [],
   expectedIncomeMinor: 4000000,
   fixedMinor: 900000,
-  feasible: true,
-  shortfallMinor: 0,
-  freeMinor: 2300000,
-  remainingMinor: 1700000,
-  perDayMinor: 106250,
   categories: [
-    { categoryId: "mat", averageMinor: 613333, normalMinor: 615000, fixedMinor: 0, savingMinor: 600000, overrideMinor: null, actualMinor: 650000, lastMinor: 0, overPace: true },
-    { categoryId: "boende", averageMinor: 900000, normalMinor: 900000, fixedMinor: 900000, savingMinor: 900000, overrideMinor: null, actualMinor: 0, lastMinor: 0, overPace: false },
+    { categoryId: "mat", averageMinor: 613333, normalMinor: 615000, fixedMinor: 0, actualMinor: 650000, lastMinor: 0 },
+    { categoryId: "boende", averageMinor: 900000, normalMinor: 900000, fixedMinor: 900000, actualMinor: 0, lastMinor: 0 },
   ],
   ...extra,
 });

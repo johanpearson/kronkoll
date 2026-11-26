@@ -156,30 +156,17 @@ export async function useFakeApi(
     monthly_interest_minor: 350000, monthly_amortization_minor: 200000, monthly_cost_minor: 550000, rate_fixed: true, rate_fixed_days_left: 41, rate_fixed_ending: true,
   }];
   const state: FakeApi = { rules: [], budgetPuts: [], guidelinePuts: [], accountPatches: [] };
-  /** Påhittade riktlinjer (KK-42): läget och sparmålet är det som sparats, resten är fasta siffror. */
-  let guidelineMode = "none";
-  let guidelineGoal = 0;
-  const guidelines = () => {
-    const saving = guidelineMode === "saving";
-    const free = saving ? 2300000 : 3100000;
-    return {
-      period: NOVEMBER,
-      mode: guidelineMode,
-      saving_goal_minor: guidelineGoal,
-      one_off_periods: [],
-      expected_income_minor: 4000000,
-      fixed_minor: 900000,
-      feasible: true,
-      shortfall_minor: 0,
-      free_to_spend_minor: free,
-      remaining_free_minor: free - 655200,
-      per_day_minor: Math.floor((free - 655200) / 16),
-      categories: [
-        { category_id: "boende", average_minor: 980000, normal_minor: 980000, fixed_minor: 900000, saving_minor: 980000, override_minor: null, actual_minor: 980000, last_minor: 980000, over_pace: false },
-        { category_id: "mat", average_minor: 606667, normal_minor: 610000, fixed_minor: 0, saving_minor: 1800000, override_minor: null, actual_minor: 655200, last_minor: 620000, over_pace: saving },
-      ],
-    };
-  };
+  /** Påhittat underlag till budgetplaneraren (KK-42): fasta siffror. */
+  const guidelines = () => ({
+    period: NOVEMBER,
+    one_off_periods: [],
+    expected_income_minor: 4000000,
+    fixed_minor: 900000,
+    categories: [
+      { category_id: "boende", average_minor: 980000, normal_minor: 980000, fixed_minor: 900000, actual_minor: 980000, last_minor: 980000 },
+      { category_id: "mat", average_minor: 606667, normal_minor: 610000, fixed_minor: 0, actual_minor: 655200, last_minor: 620000 },
+    ],
+  });
   const accounts = ACCOUNTS.map((a) => ({ ...a }));
   // Utan bank visar översikten välkomstsidan. Kopplingen görs klar med koden som banken skickar tillbaka.
   let connected = options.connected ?? true;
@@ -337,9 +324,7 @@ export async function useFakeApi(
     if (path === "/api/guidelines" && method === "GET") return [200, guidelines()];
     if (path === "/api/guidelines" && method === "PUT") {
       state.guidelinePuts.push(body);
-      guidelineMode = String(body["mode"]);
-      guidelineGoal = Number(body["saving_goal_minor"]);
-      return [200, { mode: guidelineMode }];
+      return [200, { one_off_periods: body["one_off_periods"] }];
     }
     const key = /^\/api\/budgets\/(.+)$/u.exec(path)?.[1]?.replace("current", NOVEMBER.key);
     if (key !== undefined && method === "PUT") {

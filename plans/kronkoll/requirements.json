@@ -880,7 +880,7 @@
         },
         {
           "id": "KK-44-B",
-          "text": "En migrering släpper tabellerna för sparmål, avsättningar och riktlinjer. Inget hos banken ändras."
+          "text": "En migrering släpper tabellerna för sparläge och egna nivåer (guideline_settings, guideline_overrides) samt för sparmål och avsättningar. Engångsperioderna (KK-42-E) finns kvar. Inget hos banken ändras."
         },
         {
           "id": "KK-44-C",
