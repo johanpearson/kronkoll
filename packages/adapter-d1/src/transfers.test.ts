@@ -54,6 +54,7 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
       description: "",
       status: "booked",
       manualTransfer: null,
+      hidden: false,
       internal: false,
       pairId: null,
     });

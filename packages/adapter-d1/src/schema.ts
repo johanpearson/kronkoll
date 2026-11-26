@@ -179,6 +179,8 @@ export const transactions = sqliteTable(
     transferPairId: text("transfer_pair_id").references((): AnySQLiteColumn => transactions.id, { onDelete: "set null" }),
     /** Användarens eget val (KK-20-C): 1 = räkna inte som utgift, 0 = räkna som utgift, null = automatiskt. */
     manualTransfer: integer("manual_transfer", { mode: "boolean" }),
+    /** Dold av användaren (KK-49): syns inte i listan och räknas inte någonstans. Påverkar inte `manualTransfer`. */
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [
     check("transactions_status", oneOf("status", ["pending", "booked", "removed"])),

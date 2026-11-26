@@ -27,7 +27,7 @@ import { getSplits, putSplits } from "./splits.ts";
 import { putTransfer } from "./transfers.ts";
 import { completeConnection, renewConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
-import { getTransaction, listTransactions } from "./transactions.ts";
+import { getTransaction, hideTransactions, listTransactions } from "./transactions.ts";
 
 export interface Env extends AccessEnv, SyncEnv, ConnectEnv, PushEnv {
   /** Secret: Enable Bankings application id. */
@@ -118,6 +118,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/connections" || pathname === "/api/connections/callback") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: pathname === "/api/connections" ? "GET, POST" : "POST" });
     return pathname === "/api/connections" ? startConnection(request, env, context, email) : completeConnection(request, env, context, email);
+  }
+
+  if (pathname === "/api/transactions/hide") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return hideTransactions(request, env);
   }
 
   const transferMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})\/transfer$/u.exec(pathname);

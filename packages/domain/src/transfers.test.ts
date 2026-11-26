@@ -332,3 +332,39 @@ describe("konton som inte räknas med (KK-41)", () => {
     expect(result.borta).toEqual({ id: "borta", internal: false, pairId: null, reason: "none" });
   });
 });
+
+describe("dolda transaktioner (KK-49)", () => {
+  it("en dold transaktion räknas inte, med orsaken dold", () => {
+    const result = classify([tx({ id: "dold", hidden: true }), tx({ id: "synlig" })]);
+    expect(result.dold).toMatchObject(internal(null, "hidden"));
+    expect(result.synlig).toMatchObject(external);
+  });
+
+  it("en dold transaktion ingår aldrig i ett par, så motposten räknas som en vanlig transaktion", () => {
+    const result = classify([tx({ id: "ut", hidden: true }), tx({ id: "in", accountId: "spar", amountMinor: 500000 })]);
+    expect(result.ut).toMatchObject(internal(null, "hidden"));
+    expect(result.in).toMatchObject(external);
+  });
+
+  it("dolt vinner över ett eget val, och egna valet gäller igen när den visas", () => {
+    const counted = tx({ id: "a", manualTransfer: false });
+    expect(classify([{ ...counted, hidden: true }]).a).toMatchObject(internal(null, "hidden"));
+    expect(classify([{ ...counted, hidden: false }]).a).toMatchObject({ internal: false, reason: "manual" });
+    expect(classify([counted]).a).toMatchObject({ internal: false, reason: "manual" });
+  });
+
+  it("dolt vinner över en Räkna inte-regel och ett konto som inte räknas med", () => {
+    const rules: ExcludeRule[] = [{ id: "r", match: "counterparty_prefix", pattern: "IKEA" }];
+    const result = classifyTransfers({
+      transactions: [tx({ id: "ikea", counterpartyNorm: "IKEA", hidden: true }), tx({ id: "privat-spar", accountId: "spar", hidden: true })],
+      accounts: [...ACCOUNTS.filter((a) => a.id !== "spar"), { id: "spar", type: "savings", counted: false }],
+      cardPaymentCounterparties: [],
+      excludeRules: rules,
+    });
+    expect(result.map((c) => [c.id, c.reason])).toEqual([["ikea", "hidden"], ["privat-spar", "hidden"]]);
+  });
+
+  it("en borttagen dold transaktion behandlas som annan borttagen", () => {
+    expect(classify([tx({ id: "a", hidden: true, status: "removed" })]).a).toMatchObject(internal(null, "hidden"));
+  });
+});

@@ -48,6 +48,29 @@ test("kategorisera med Gör alltid så skapar en regel som även tar tidigare k�
   await expect(page.getByRole("main")).toContainText("HÖRNBUTIKEN EXEMPELVÄGEN");
 });
 
+test("välj flera transaktioner, dölj dem och visa dem igen (V-e2e-hide, KK-49)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/transaktioner");
+  // Listan är grupperad per dag. En rad är ett listelement utan dagens rubrik.
+  const row = (name: string) => page.getByRole("main").getByRole("listitem").filter({ hasText: name, hasNot: page.getByRole("heading") });
+  await expect(row("Påhittade Möbler AB")).toHaveCount(1);
+  await page.getByRole("button", { name: "Välj flera" }).click();
+  await page.getByRole("checkbox", { name: "Välj Påhittade Möbler AB" }).check();
+  await expect(page.getByText("1 valda")).toBeVisible();
+  await page.getByRole("button", { name: "Dölj" }).click();
+  await expect(page.getByRole("status")).toHaveText("1 transaktion är dold. De finns under Visa dolda.");
+  await expect(row("Påhittade Möbler AB")).toHaveCount(0);
+
+  await page.getByRole("checkbox", { name: "Visa dolda" }).check();
+  await expect(row("Påhittade Möbler AB")).toContainText("Dold");
+  await page.getByRole("button", { name: "Välj flera" }).click();
+  await page.getByRole("checkbox", { name: "Välj Påhittade Möbler AB" }).check();
+  await page.getByRole("button", { name: "Visa igen" }).click();
+  await expect(page.getByRole("status")).toHaveText("1 transaktion visas igen.");
+  await page.getByRole("checkbox", { name: "Visa dolda" }).uncheck();
+  await expect(row("Påhittade Möbler AB")).toHaveCount(1);
+});
+
 test("lägg till en regel som innehåller en text, oavsett versaler (V-e2e-rule-contains, KK-47)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/installningar/regler");

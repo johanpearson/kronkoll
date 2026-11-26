@@ -1,12 +1,13 @@
 // Transaktionslistan (#32, KK-4, KK-9, KK-30): en budgetperiod i taget, grupperad per dag, nyast
 // först. Bankens text renderas alltid som text, aldrig som HTML. Kategorin visas med namn, t.ex.
 // "Mat › Livsmedel". Kategorin kan bytas och transaktionen delas upp direkt i listan. Från budgeten kan
-// listan öppnas filtrerad på en kategori med underkategorier (?period=…&kategori=…, KK-20).
+// listan öppnas filtrerad på en kategori med underkategorier (?period=…&kategori=…, KK-20). Flera rader går att
+// välja och dölja på en gång; dolda syns inte och räknas inte, men finns under Visa dolda (KK-49).
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { Pencil, Search, Split } from "lucide-react";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { AccountFilter, accountParams, useAccountChoices } from "../accounts/account-filter.tsx";
-import { field, getJson } from "../api.ts";
+import { field, getJson, postJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { CategoryDot } from "../category-color.tsx";
 import { IconButton, PeriodNav } from "../icon-button.tsx";
@@ -26,6 +27,8 @@ interface Transaction {
   /** Användarens eget val: true = räknas inte (KK-39), false = räknas, null = automatiskt. */
   readonly manualTransfer: boolean | null;
   readonly split: boolean;
+  /** Dold av användaren (KK-49). */
+  readonly hidden: boolean;
 }
 
 export interface Period {
@@ -62,6 +65,7 @@ function toTransaction(raw: unknown): Transaction | null {
     isInternalTransfer: field(raw, "is_internal_transfer") === true,
     manualTransfer: typeof manual === "boolean" ? manual : null,
     split: field(raw, "split") === true,
+    hidden: field(raw, "hidden") === true,
   };
 }
 
@@ -80,7 +84,12 @@ type Filters = {
   readonly categoryId: string | null;
   /** Bara dessa konton (KK-41-C). Tomt betyder alla. */
   readonly accountIds: readonly string[];
+  /** Bara de dolda (KK-49-B). */
+  readonly hidden: boolean;
 };
+
+/** Så många rader går att dölja eller visa på en gång (samma gräns som API:t). */
+const MAX_SELECTED = 100;
 
 /** Filtret ur adressen, t.ex. /transaktioner?period=2026-11&kategori=mat från en budgetrad. */
 function filtersFromAddress(): Filters {
@@ -94,6 +103,7 @@ function filtersFromAddress(): Filters {
     uncategorized: params.get("okategoriserade") === "1",
     categoryId: categoryId === "" ? null : categoryId,
     accountIds: [],
+    hidden: false,
   };
 }
 
@@ -108,6 +118,7 @@ function url(filters: Filters, cursor: string | null): string {
   if (filters.q.trim() !== "") params.set("q", filters.q.trim());
   if (filters.uncategorized) params.set("uncategorized", "true");
   if (filters.categoryId) params.set("category_id", filters.categoryId);
+  if (filters.hidden) params.set("hidden", "true");
   if (cursor) params.set("cursor", cursor);
   const query = [params.toString(), accountParams(filters.accountIds)].filter((p) => p !== "").join("&");
   return query === "" ? "/api/transactions" : `/api/transactions?${query}`;
@@ -175,6 +186,8 @@ function Row(props: {
   categories: Categories;
   /** Vad som är öppet på raden just nu, om något. */
   mode: "category" | "split" | null;
+  /** Visas när flera rader väljs: en kryssruta i stället för åtgärderna (KK-49). */
+  selection: { selected: boolean; onToggle: () => void } | null;
   onOpen: (mode: "category" | "split") => void;
   onSaved: (categoryId: string) => void;
   onSplitSaved: (split: boolean) => void;
@@ -187,7 +200,8 @@ function Row(props: {
   const notes = [
     t.categoryId === null ? null : (categoryNames.get(t.categoryId) ?? null),
     t.status === "pending" ? "Preliminär" : null,
-    t.manualTransfer === true ? "Räknas inte" : t.isInternalTransfer ? "Intern överföring – räknas inte" : null,
+    t.hidden ? "Dold" : null,
+    t.manualTransfer === true && !t.hidden ? "Räknas inte" : t.isInternalTransfer && !t.hidden ? "Intern överföring – räknas inte" : null,
     t.split ? "Uppdelad" : null,
     t.categoryId === null && !t.split ? "Okategoriserad" : null,
   ].filter((n): n is string => n !== null);
@@ -195,6 +209,9 @@ function Row(props: {
     <li className={t.isInternalTransfer ? "tx internal" : "tx"}>
       <div className="tx-main">
         <span className="tx-name">
+          {props.selection && (
+            <input type="checkbox" aria-label={`Välj ${name}`} checked={props.selection.selected} onChange={props.selection.onToggle} />
+          )}
           <Link to={`/transaktioner/${encodeURIComponent(t.id)}`}>{name}</Link>
         </span>
         <span className={t.amountMinor > 0 ? "amount income" : "amount"}>{formatSek(t.amountMinor)}</span>
@@ -205,7 +222,7 @@ function Row(props: {
           {notes.join(" · ")}
         </small>
       )}
-      {props.mode === null && (
+      {props.mode === null && props.selection === null && (
         <div className="tx-actions">
           <IconButton label={`Ändra kategori för ${name}`} icon={Pencil} onClick={() => { props.onOpen("category"); }} />
           <IconButton label={`Dela upp ${name}`} icon={Split} onClick={() => { props.onOpen("split"); }} />
@@ -240,6 +257,9 @@ export function TransactionsView() {
   const [state, setState] = useState<ListState>({ kind: "loading" });
   const [categories, setCategories] = useState<Categories>(NO_CATEGORIES);
   const [editing, setEditing] = useState<{ id: string; mode: "category" | "split" } | null>(null);
+  /** Valda rader när flerval är på (KK-49), annars null. */
+  const [selected, setSelected] = useState<ReadonlySet<string> | null>(null);
+  const [busy, setBusy] = useState(false);
   const accounts = useAccountChoices();
   const toast = useToast();
 
@@ -282,6 +302,33 @@ export function TransactionsView() {
     setEditing(null);
     setFilters({ ...filters, period: period?.key ?? filters.period });
   };
+  const toggle = (id: string) => {
+    if (selected === null) return;
+    const next = new Set(selected);
+    if (!next.delete(id)) {
+      if (next.size >= MAX_SELECTED) {
+        toast.problem(`Du kan välja högst ${String(MAX_SELECTED)} transaktioner åt gången.`);
+        return;
+      }
+      next.add(id);
+    }
+    setSelected(next);
+  };
+  /** Döljer eller visar de valda och hämtar om listan, så att de byter plats (KK-49). */
+  const setHidden = async (hidden: boolean) => {
+    if (selected === null || selected.size === 0) return;
+    setBusy(true);
+    const { status, body } = await postJson("/api/transactions/hide", { ids: [...selected], hidden });
+    setBusy(false);
+    const updated = field(body, "updated");
+    if (status !== 200 || typeof updated !== "number") {
+      toast.problem("Det gick inte att ändra. Ingenting är ändrat. Försök igen.");
+      return;
+    }
+    toast.done(hidden ? `${String(updated)} ${updated === 1 ? "transaktion är dold" : "transaktioner är dolda"}. De finns under Visa dolda.` : `${String(updated)} ${updated === 1 ? "transaktion visas" : "transaktioner visas"} igen.`);
+    setSelected(null);
+    setFilters({ ...filters, period: period?.key ?? filters.period });
+  };
   const go = (months: number) => {
     if (period) setFilters({ ...filters, period: shiftPeriodKey(period.key, months) });
   };
@@ -317,15 +364,46 @@ export function TransactionsView() {
       <label>
         <input
           type="checkbox"
+          checked={filters.hidden}
+          onChange={(e) => {
+            setSelected(null);
+            setFilters({ ...filters, period: period?.key ?? filters.period, hidden: e.target.checked });
+          }}
+        />{" "}
+        Visa dolda
+      </label>
+      <label>
+        <input
+          type="checkbox"
           checked={filters.uncategorized}
           onChange={(e) => { setFilters({ ...filters, period: period?.key ?? filters.period, uncategorized: e.target.checked }); }}
         />{" "}
         Bara okategoriserade
       </label>
+      {selected === null ? (
+        <p>
+          <button type="button" className="small" onClick={() => { setSelected(new Set()); setEditing(null); }}>
+            Välj flera
+          </button>
+        </p>
+      ) : (
+        <section className="card" aria-label="Valda transaktioner">
+          <p>{selected.size === 0 ? "Välj transaktioner i listan." : `${String(selected.size)} valda`}</p>
+          <p className="actions">
+            <button type="button" className="primary" disabled={busy || selected.size === 0} onClick={() => void setHidden(!filters.hidden)}>
+              {filters.hidden ? "Visa igen" : "Dölj"}
+            </button>
+            <button type="button" disabled={busy} onClick={() => { setSelected(null); }}>
+              Avbryt
+            </button>
+          </p>
+          {!filters.hidden && <small>Dolda syns inte i listan och räknas inte i budget, översikt, insikter eller inkomst.</small>}
+        </section>
+      )}
 
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta transaktionerna. Försök igen om en stund.</p>}
-      {state.kind === "ready" && state.items.length === 0 && <p>Inga transaktioner i perioden.</p>}
+      {state.kind === "ready" && state.items.length === 0 && <p>{filters.hidden ? "Inga dolda transaktioner i perioden." : "Inga transaktioner i perioden."}</p>}
       {state.kind === "ready" && state.items.length > 0 && (
         <ul>
           {groupByDay(state.items).map(([day, items]) => (
@@ -338,6 +416,7 @@ export function TransactionsView() {
                     transaction={t}
                     categories={categories}
                     mode={editing?.id === t.id ? editing.mode : null}
+                    selection={selected === null ? null : { selected: selected.has(t.id), onToggle: () => { toggle(t.id); } }}
                     onOpen={(mode) => { setEditing({ id: t.id, mode }); }}
                     onSaved={(categoryId) => { update(t.id, { categoryId }); }}
                     onSplitSaved={(split) => { update(t.id, { split }); }}

@@ -124,6 +124,8 @@ export async function useFakeApi(
     transaction("t3", "2026-11-03", -129900, "Påhittade Möbler AB"),
   ];
   const budgets = new Map<string, { category_id: string; budget_minor: number }[]>();
+  /** Dolda transaktioner (KK-49). */
+  const hiddenIds = new Set<string>();
   const salary = {
     id: "lon1", account: { id: "acc_1", name: "Vardag", type: "checking" }, status: "booked", transaction_date: "2026-11-25", booking_date: "2026-11-25",
     amount_minor: 3361000, counterparty: "", counterparty_norm: "EXEMPELFÖRETAGET AB", description: "EXEMPELFÖRETAGET AB LÖN", category_id: null, category_source: "none",
@@ -182,7 +184,7 @@ export async function useFakeApi(
     };
   };
 
-  const handle = (method: string, path: string, body: Record<string, unknown>): [number, unknown] => {
+  const handle = (method: string, path: string, body: Record<string, unknown>, query = new URLSearchParams()): [number, unknown] => {
     if (path === "/api/overview") return [200, overview()];
     if (path === "/api/loans") {
       return [200, {
@@ -276,7 +278,15 @@ export async function useFakeApi(
     if (path === "/api/settings") return [200, { budget_period_start_day: 1, current_period: NOVEMBER }];
     // Web Push är påslaget på servern (KK-27). I E2E är service workers avstängda, så vyn säger att enheten saknar stöd.
     if (path === "/api/push") return [200, { configured: true, public_key: "BPublicKeyForE2E", topics: ["consent", "budget_over", "sync_failed"] }];
-    if (path === "/api/transactions") return [200, { period: NOVEMBER, items: transactions, next_cursor: null }];
+    if (path === "/api/transactions/hide" && method === "POST") {
+      const ids = Array.isArray(body["ids"]) ? (body["ids"] as string[]) : [];
+      for (const id of ids) hiddenIds[body["hidden"] === true ? "add" : "delete"](id);
+      return [200, { updated: ids.length, hidden: body["hidden"] === true }];
+    }
+    if (path === "/api/transactions") {
+      const wantHidden = query.get("hidden") === "true";
+      return [200, { period: NOVEMBER, items: transactions.filter((t) => hiddenIds.has(t.id) === wantHidden).map((t) => ({ ...t, hidden: hiddenIds.has(t.id) })), next_cursor: null }];
+    }
     const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
     // En påhittad löneinbetalning som bara nås via sin adress, för inkomsttypen på detaljsidan (KK-22-A).
     if (tx?.[1] === "lon1" && method === "PATCH") {
@@ -326,7 +336,7 @@ export async function useFakeApi(
   await page.route("**/api/**", async (route: Route) => {
     const request = route.request();
     const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
-    const [status, json] = handle(request.method(), new URL(request.url()).pathname, body);
+    const [status, json] = handle(request.method(), new URL(request.url()).pathname, body, new URL(request.url()).searchParams);
     await route.fulfill(status === 204 ? { status } : { status, json: scaleAmounts(json, options.scale ?? 1) });
   });
   return state;

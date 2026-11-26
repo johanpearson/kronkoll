@@ -1,9 +1,11 @@
-// GET /api/transactions (#32, KK-9, KK-18, KK-34): transaktionerna i en budgetperiod för listvyn.
+// GET /api/transactions (#32, KK-9, KK-18, KK-34): transaktionerna i en budgetperiod för listvyn. Dolda (KK-49)
+// visas bara med ?hidden=true. POST /api/transactions/hide döljer eller visar flera på en gång.
 // Perioden följer startdagen i inställningarna (t.ex. lönedagen) och svensk tid. Bankens text
 // skickas som den kom och renderas alltid som text i appen (KK-30).
 import { settingsRepository, splitRepository, transactionRepository, type TransactionListItem } from "@kronkoll/adapter-d1";
 import { budgetPeriodForKey, currentBudgetPeriod, ruleKey, type BudgetPeriod } from "@kronkoll/domain";
 import { readAccountFilter } from "./account-filter.ts";
+import { recomputeTransfers } from "./transfers.ts";
 import type { SyncDeps } from "./sync.ts";
 
 const DEFAULT_LIMIT = 50;
@@ -33,6 +35,7 @@ function toJson(item: TransactionListItem) {
     is_internal_transfer: item.isInternalTransfer,
     manual_transfer: item.manualTransfer,
     split: item.split,
+    hidden: item.hidden,
   };
 }
 
@@ -42,6 +45,7 @@ function readQuery(url: URL) {
   const limitText = params.get("limit");
   const limit = limitText === null ? DEFAULT_LIMIT : Number(limitText);
   const uncategorized = params.get("uncategorized");
+  const hidden = params.get("hidden");
   const q = params.get("q") ?? undefined;
   const categoryId = params.get("category_id") ?? undefined;
   const cursor = params.get("cursor");
@@ -52,10 +56,11 @@ function readQuery(url: URL) {
     limit >= 1 &&
     limit <= MAX_LIMIT &&
     (uncategorized === null || uncategorized === "true" || uncategorized === "false") &&
+    (hidden === null || hidden === "true" || hidden === "false") &&
     (q === undefined || q.length <= MAX_QUERY_LENGTH) &&
     (categoryId === undefined || (categoryId !== "" && categoryId.length <= MAX_ID_LENGTH)) &&
     (cursor === null || cursor.length <= MAX_CURSOR_LENGTH);
-  return valid ? { period: params.get("period"), limit, uncategorized: uncategorized === "true", q, categoryId, cursor, accountIds } : null;
+  return valid ? { period: params.get("period"), limit, uncategorized: uncategorized === "true", hidden: hidden === "true", q, categoryId, cursor, accountIds } : null;
 }
 
 export async function listTransactions(request: Request, env: { DB: D1Database }, sync: SyncDeps): Promise<Response> {
@@ -82,6 +87,7 @@ export async function listTransactions(request: Request, env: { DB: D1Database }
       to: period.end,
       limit: query.limit,
       uncategorized: query.uncategorized,
+      hidden: query.hidden,
       q: query.q,
       categoryId: query.categoryId,
       accountIds: query.accountIds,
@@ -127,6 +133,36 @@ export async function getTransaction(env: { DB: D1Database }, id: string): Promi
       },
       200,
     );
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
+}
+
+/** Så många transaktioner går att dölja eller visa i ett anrop. */
+export const MAX_HIDE = 100;
+
+/**
+ * POST /api/transactions/hide (KK-49): `{ ids, hidden }` döljer eller visar flera transaktioner. Dolda syns inte i
+ * listan och räknas inte i budget, översikt, insikter eller inkomst, och att visa dem igen ångrar det. Ett eget
+ * val (Räknas inte) rörs inte. Svarar med hur många som ändrades. Okända och borttagna id hoppas över.
+ */
+export async function hideTransactions(request: Request, env: { DB: D1Database }): Promise<Response> {
+  const input: unknown = await request.json().catch(() => null);
+  if (typeof input !== "object" || input === null) return invalid();
+  const { ids, hidden } = input as Record<string, unknown>;
+  const valid =
+    typeof hidden === "boolean" &&
+    Array.isArray(ids) &&
+    ids.length >= 1 &&
+    ids.length <= MAX_HIDE &&
+    ids.every((id): id is string => typeof id === "string" && id !== "" && id.length <= MAX_ID_LENGTH) &&
+    new Set(ids).size === ids.length;
+  if (!valid) return invalid();
+  try {
+    const updated = await transactionRepository(env.DB).setHidden(ids, hidden);
+    // Dolda räknas inte, så överföringar och Räkna inte-regler räknas om direkt.
+    await recomputeTransfers(env.DB);
+    return json({ updated, hidden }, 200);
   } catch {
     return json({ error: "unavailable" }, 503);
   }
