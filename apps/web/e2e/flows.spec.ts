@@ -48,25 +48,57 @@ test("kategorisera med Gör alltid så skapar en regel som även tar tidigare k�
   await expect(page.getByRole("main")).toContainText("HÖRNBUTIKEN EXEMPELVÄGEN");
 });
 
-test("sätt budget från snittet, justera Mat och se att den är över (V-e2e-budget)", async ({ page }) => {
-  const api = await useFakeApi(page);
-  await page.goto("/budget");
-  await page.getByRole("button", { name: "Sätt budget" }).click();
-  const form = page.getByRole("form", { name: "Sätt budget" });
-  await form.getByRole("button", { name: "Föreslå från snitt" }).click();
-  await expect(form.getByLabel("Mat", { exact: true })).toHaveValue("6070");
-  await form.getByLabel("Mat", { exact: true }).fill("6300");
-  await form.getByRole("button", { name: "Spara" }).click();
+test("välj flera transaktioner, dölj dem och visa dem igen (V-e2e-hide, KK-49)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/transaktioner");
+  // Listan är grupperad per dag. En rad är ett listelement utan dagens rubrik.
+  const row = (name: string) => page.getByRole("main").getByRole("listitem").filter({ hasText: name, hasNot: page.getByRole("heading") });
+  await expect(row("Påhittade Möbler AB")).toHaveCount(1);
+  await page.getByRole("button", { name: "Välj flera" }).click();
+  await page.getByRole("checkbox", { name: "Välj Påhittade Möbler AB" }).check();
+  await expect(page.getByText("1 valda")).toBeVisible();
+  await page.getByRole("button", { name: "Dölj" }).click();
+  await expect(page.getByRole("status")).toHaveText("1 transaktion är dold. De finns under Visa dolda.");
+  await expect(row("Påhittade Möbler AB")).toHaveCount(0);
 
-  await expect.poll(() => api.budgetPuts).toEqual([{ lines: [{ category_id: "boende", amount_minor: 980000 }, { category_id: "mat", amount_minor: 630000 }], source: "manual" }]);
-  await expect(page.getByRole("list", { name: "Kategorier" }).getByRole("listitem").filter({ hasText: "Mat" })).toContainText("104 % – över");
+  await page.getByRole("checkbox", { name: "Visa dolda" }).check();
+  await expect(row("Påhittade Möbler AB")).toContainText("Dold");
+  await page.getByRole("button", { name: "Välj flera" }).click();
+  await page.getByRole("checkbox", { name: "Välj Påhittade Möbler AB" }).check();
+  await page.getByRole("button", { name: "Visa igen" }).click();
+  await expect(page.getByRole("status")).toHaveText("1 transaktion visas igen.");
+  await page.getByRole("checkbox", { name: "Visa dolda" }).uncheck();
+  await expect(row("Påhittade Möbler AB")).toHaveCount(1);
+});
+
+test("lägg till en regel som innehåller en text, oavsett versaler (V-e2e-rule-contains, KK-47)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/installningar/regler");
+  await page.getByRole("button", { name: "Ny regel" }).click();
+  await page.getByLabel("Träffar").selectOption("contains");
+  await page.getByLabel("Text").fill("Amazon");
+  await page.getByLabel("Får kategorin").selectOption({ label: "Hushåll › Förbrukning" });
+  await page.getByRole("button", { name: "Spara" }).click();
+  await expect(page.getByRole("status")).toHaveText("Regeln är sparad och gäller nya transaktioner.");
+  await expect(page.getByRole("list", { name: "Regler" }).getByRole("listitem").filter({ hasText: "AMAZON" })).toContainText("Innehåller → Hushåll › Förbrukning");
+});
+
+test("rensa alla kategorier efter en fråga och börja om (V-e2e-categories-reset, KK-48)", async ({ page }) => {
+  const api = await useFakeApi(page);
+  await page.goto("/installningar/kategorier");
+  await page.getByRole("button", { name: "Rensa alla kategorier" }).click();
+  const dialog = page.getByRole("region", { name: "Rensa alla kategorier" });
+  await expect(dialog).toContainText("37 kategorier och 14 regler tas bort");
+  await dialog.getByRole("button", { name: "Rensa alla kategorier" }).click();
+  await expect(page.getByRole("status")).toHaveText("Alla kategorier är rensade. Lägg till nya från början.");
+  await expect(page.getByText("Det finns inga kategorier.")).toBeVisible();
+  expect(api.categoryResets).toEqual([{ confirm: true, restore_template: false }]);
 });
 
 test("planera en budget från förväntad inkomst, se vad som blir över och spara den (V-e2e-planner, KK-42)", async ({ page }) => {
   const api = await useFakeApi(page);
   await page.goto("/budget");
-  await page.getByRole("link", { name: "Planera budget" }).click();
-  await expect(page.getByRole("heading", { name: "Planera budget" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Budget" })).toBeVisible();
   // Inkomsten är förifylld med förväntad inkomst, och en rad till går att lägga till.
   await expect(page.getByLabel("Belopp för Lön (kr)")).toHaveValue("40000");
   await page.getByRole("button", { name: "Lägg till inkomst" }).click();
@@ -86,11 +118,13 @@ test("planera en budget från förväntad inkomst, se vad som blir över och spa
   await page.getByRole("button", { name: "Spara som budget för perioden" }).click();
   await expect.poll(() => api.budgetPuts).toEqual([{ lines: [{ category_id: "boende", amount_minor: 980000 }, { category_id: "mat", amount_minor: 630000 }], source: "manual" }]);
   await expect(page.getByRole("status")).toHaveText("Budgeten för perioden är sparad.");
+  // Utfallet står i text mot det som är planerat (KK-45-A): Mat är över med 6 300 kr mot ett utfall på 6 552 kr.
+  await expect(page.getByRole("list", { name: "Utgifter" }).getByRole("listitem").filter({ hasText: "Mat" })).toContainText("104 % – över");
 });
 
-test("exportera budget och riktlinjer som Excel och som PDF (V-e2e-export, KK-43)", async ({ page }) => {
+test("exportera budgeten som Excel och som PDF (V-e2e-export, KK-43)", async ({ page }) => {
   await useFakeApi(page);
-  await page.goto("/budget/riktlinjer");
+  await page.goto("/budget");
   // Skrivbordswebbläsaren har ingen delningsmeny, så filerna laddas ned. Excel-biblioteket hämtas först här
   // och måste få köra under samma CSP som i drift.
   const excel = page.waitForEvent("download");
@@ -109,50 +143,26 @@ test("exportera budget och riktlinjer som Excel och som PDF (V-e2e-export, KK-43
 test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/budget");
-  await page.getByRole("button", { name: "Sätt budget" }).click();
-  await page.getByRole("form", { name: "Sätt budget" }).getByLabel("Mat", { exact: true }).fill("6300");
-  await page.getByRole("form", { name: "Sätt budget" }).getByRole("button", { name: "Spara" }).click();
+  await expect(page.getByRole("button", { name: "Ta bort budget" })).toHaveCount(0);
+  await page.getByLabel("Utgift för Mat (kr)").fill("6300");
+  await page.getByRole("button", { name: "Spara som budget för perioden" }).click();
+  await expect(page.getByRole("status")).toHaveText("Budgeten för perioden är sparad.");
 
   await page.getByRole("button", { name: "Ta bort budget" }).click();
   const dialog = page.getByRole("region", { name: "Ta bort budgeten" });
   await dialog.getByRole("button", { name: "Avbryt" }).click();
-  await expect(page.getByRole("button", { name: "Ändra budget" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ta bort budget" })).toBeVisible();
 
   await page.getByRole("button", { name: "Ta bort budget" }).click();
   await dialog.getByRole("button", { name: "Ta bort budget" }).click();
   await expect(page.getByRole("status")).toHaveText("Budgeten för perioden är borttagen.");
-  await expect(page.getByRole("button", { name: "Sätt budget" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ta bort budget" })).toHaveCount(0);
   // Bekräftelsen är en notis som försvinner av sig själv (KK-26-C).
   await expect(page.getByRole("status")).toBeHidden({ timeout: 6000 });
   await page.reload();
-  await expect(page.getByText("Ingen budget är satt för perioden än.")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Ta bort budget" })).toHaveCount(0);
 });
 
-test("skapa ett sparmål, se det i listan och lägg till en avsättning (V-e2e-goal, KK-21)", async ({ page }) => {
-  await useFakeApi(page);
-  await page.goto("/");
-  await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Sparmål" }).click();
-  await page.getByRole("button", { name: "Nytt sparmål" }).click();
-  const form = page.getByRole("form", { name: "Nytt sparmål" });
-  await form.getByLabel("Namn").fill("Ny cykel");
-  await form.getByLabel("Målbelopp (kr)").fill("12 000");
-  await form.getByLabel("Måldatum (valfritt)").fill("2027-06-30");
-  await form.getByRole("button", { name: "Skapa sparmål" }).click();
-
-  await expect(page.getByRole("status")).toHaveText("Sparmålet är skapat.");
-  const row = page.getByRole("list", { name: "Dina sparmål" }).getByRole("listitem").filter({ hasText: "Ny cykel" });
-  await expect(row).toContainText("0,00 kr av 12 000,00 kr");
-  await expect(row).toContainText("Nås inte i nuvarande takt");
-
-  await row.getByRole("link", { name: "Ny cykel" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Ny cykel" })).toBeVisible();
-  const deposit = page.getByRole("form", { name: "Ny avsättning" });
-  await deposit.getByLabel("Belopp (kr)").fill("3 000");
-  await deposit.getByRole("button", { name: "Lägg till" }).click();
-  await expect(page.getByRole("status")).toHaveText("Avsättningen är sparad.");
-  await expect(page.getByRole("main")).toContainText("3 000,00 kr av 12 000,00 kr (25 %)");
-  await expect(page.getByRole("list", { name: "Avsättningar" }).getByRole("listitem")).toHaveCount(1);
-});
 test("planera föräldraledighet och se den under Inkomst (V-e2e-leave, KK-23)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/");
@@ -171,10 +181,17 @@ test("planera föräldraledighet och se den under Inkomst (V-e2e-leave, KK-23)",
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(1)).toContainText("3 dagar/vecka");
 });
-test("sparmålets sida visar hur planerad ledighet försenar målet (KK-23-C)", async ({ page }) => {
+test("se vilka inbetalningar som räknas som inkomst en månad och gå till dem (KK-46)", async ({ page }) => {
   await useFakeApi(page);
-  await page.goto("/sparmal/g1");
-  await expect(page.getByRole("note").filter({ hasText: "Med ledighet" })).toContainText("nås målet mars 2028, 3 mån senare.");
+  await page.goto("/inkomst");
+  await page.getByRole("button", { name: "Visa det som räknas i oktober 2026" }).click();
+  const items = page.getByRole("list", { name: "Inbetalningar Oktober 2026" }).getByRole("listitem");
+  await expect(items).toHaveCount(2);
+  await expect(items.first()).toContainText("Påhittade Bygg AB");
+  await expect(items.nth(1)).toContainText("Swish från Anna");
+  await expect(items.nth(1)).toContainText("Inte klassad");
+  await items.first().getByRole("link").click();
+  await expect(page).toHaveURL(/\/transaktioner\/lon1$/u);
 });
 test("ändra en inbetalnings inkomsttyp på transaktionens sida (KK-22-A)", async ({ page }) => {
   await useFakeApi(page);
@@ -186,8 +203,8 @@ test("ändra en inbetalnings inkomsttyp på transaktionens sida (KK-22-A)", asyn
 });
 test("lägg till ett lån och se det i lånöversikten (V-e2e-loans, KK-36)", async ({ page }) => {
   await useFakeApi(page);
-  await page.goto("/sparmal");
-  await page.getByRole("button", { name: "Lån" }).click();
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Lån" }).click();
   const loans = page.getByRole("list", { name: "Dina lån" }).getByRole("listitem");
   await expect(loans.first()).toContainText("Bindningstiden slutar om 41 dagar");
 

@@ -88,7 +88,7 @@ function PlanRow({ plan, onRemoved }: { plan: LeavePlan; onRemoved: (id: string)
       {plan.fallbackYears && <small className="tx-notes">Försäkringskassans belopp för ett senare år finns inte än, så det senaste kända året används.</small>}
       {confirming ? (
         <div className="tx-editor">
-          <p>Ta bort ledigheten? Budget och sparmål räknas då utan den.</p>
+          <p>Ta bort ledigheten? Budgeten räknas då utan den.</p>
           {error && <p role="alert">Det gick inte att ta bort ledigheten. Försök igen.</p>}
           <p className="actions">
             <button type="button" className="danger small" onClick={() => void remove()}>

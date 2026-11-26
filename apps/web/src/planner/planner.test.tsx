@@ -25,20 +25,13 @@ const CATEGORIES = {
 function guidelines(extra: Record<string, unknown> = {}) {
   return {
     period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
-    mode: "saving",
-    saving_goal_minor: 800000,
     one_off_periods: ["2026-09"],
     expected_income_minor: 4000000,
     fixed_minor: 900000,
-    feasible: true,
-    shortfall_minor: 0,
-    free_to_spend_minor: 2300000,
-    remaining_free_minor: 1700000,
-    per_day_minor: 106250,
     categories: [
-      { category_id: "mat", average_minor: 613333, normal_minor: 615000, fixed_minor: 0, saving_minor: 600000, override_minor: null, actual_minor: 300000, last_minor: 640000, over_pace: false },
-      { category_id: "boende", average_minor: 900000, normal_minor: 900000, fixed_minor: 900000, saving_minor: 900000, override_minor: 850000, actual_minor: 0, last_minor: 900000, over_pace: false },
-      { category_id: "fritid", average_minor: 385000, normal_minor: 170000, fixed_minor: 0, saving_minor: 150000, override_minor: null, actual_minor: 0, last_minor: 160000, over_pace: false },
+      { category_id: "mat", average_minor: 613333, normal_minor: 615000, fixed_minor: 0, actual_minor: 300000, last_minor: 640000 },
+      { category_id: "boende", average_minor: 900000, normal_minor: 900000, fixed_minor: 900000, actual_minor: 0, last_minor: 900000 },
+      { category_id: "fritid", average_minor: 385000, normal_minor: 170000, fixed_minor: 0, actual_minor: 0, last_minor: 160000 },
     ],
     ...extra,
   };
@@ -50,9 +43,10 @@ interface Calls {
   readonly budgetPuts: { path: string; body: unknown }[];
 }
 
-function api(options: { guidelines?: [number, unknown]; budgetLines?: number; budgetStatus?: number; budgetPutStatus?: number; guidelinePutStatus?: number } = {}): Calls {
+function api(options: { guidelines?: [number, unknown]; budgetLines?: number; budgetStatus?: number; budgetPutStatus?: number; guidelinePutStatus?: number; saved?: { category_id: string; budget_minor: number | null; actual_minor: number }[]; uncategorized?: number; internal?: number } = {}): Calls {
   const calls: Calls = { paths: [], guidelinePuts: [], budgetPuts: [] };
-  const lines = Array.from({ length: options.budgetLines ?? 0 }, (_, i) => ({ category_id: `k${String(i)}`, budget_minor: 100 }));
+  const saved = options.saved ?? [];
+  const lines = [...Array.from({ length: options.budgetLines ?? 0 }, (_, i) => ({ category_id: `k${String(i)}`, budget_minor: 100 })), ...saved.flatMap((g) => (g.budget_minor === null ? [] : [{ category_id: g.category_id, budget_minor: g.budget_minor }]))];
   vi.stubGlobal(
     "fetch",
     vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
@@ -65,7 +59,7 @@ function api(options: { guidelines?: [number, unknown]; budgetLines?: number; bu
       if (url.pathname === "/api/guidelines") {
         if (init?.method === "PUT") {
           calls.guidelinePuts.push(body());
-          return json(options.guidelinePutStatus ?? 200, { mode: "saving" });
+          return json(options.guidelinePutStatus ?? 200, { one_off_periods: [] });
         }
         const [status, payload] = options.guidelines ?? [200, guidelines()];
         return json(status, payload);
@@ -78,11 +72,11 @@ function api(options: { guidelines?: [number, unknown]; budgetLines?: number; bu
         return json(options.budgetStatus ?? 200, {
           period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
           lines,
-          groups: [],
-          uncategorized_minor: 0,
+          groups: saved.map((g) => ({ ...g, remaining_minor: null, percent: null, over: false, subcategories: [] })),
+          uncategorized_minor: options.uncategorized ?? 0,
           total_budget_minor: 0,
           total_actual_minor: 0,
-          excluded_internal_minor: 0,
+          excluded_internal_minor: options.internal ?? 0,
         });
       }
       return json(404, { error: "not_found" });
@@ -97,7 +91,7 @@ const settle = () =>
   });
 
 async function open() {
-  window.history.replaceState(null, "", "/budget/planera");
+  window.history.replaceState(null, "", "/budget");
   await act(async () => {
     render(<App />);
     await Promise.resolve();
@@ -255,14 +249,12 @@ describe("Planera budget (KK-42)", () => {
     expect(screen.getByRole("alert").textContent).toContain("Det gick inte att spara budgeten");
   });
 
-  it("en engångsperiod sparas direkt och förslagen hämtas om, med läge, sparmål och egna nivåer oförändrade (KK-42-E)", async () => {
+  it("en engångsperiod sparas direkt och förslagen hämtas om (KK-42-E)", async () => {
     const calls = api();
     await open();
     fireEvent.click(screen.getByRole("checkbox", { name: /augusti 2026/u }));
     await settle();
-    expect(calls.guidelinePuts).toEqual([
-      { mode: "saving", saving_goal_minor: 800000, overrides: [{ category_id: "boende", amount_minor: 850000 }], one_off_periods: ["2026-08", "2026-09"] },
-    ]);
+    expect(calls.guidelinePuts).toEqual([{ one_off_periods: ["2026-08", "2026-09"] }]);
     expect(calls.paths.filter((p) => p === "GET /api/guidelines?period=current")).toHaveLength(2);
     expect(screen.getByRole<HTMLInputElement>("checkbox", { name: /september 2026/u }).checked).toBe(true);
   });
@@ -294,6 +286,55 @@ describe("Planera budget (KK-42)", () => {
     expect(screen.getByRole("link", { name: "Budget" }).getAttribute("aria-current")).toBe("page");
     fireEvent.click(screen.getByRole("button", { name: "Föregående period" }));
     await settle();
-    expect(calls.paths.at(-1)).toContain("period=2026-10");
+    expect(calls.paths).toContain("GET /api/guidelines?period=2026-10");
+    expect(calls.paths).toContain("GET /api/budgets/2026-10");
+  });
+
+  it("visar utfall, kvar och andel per kategori mot det som står i fältet, och över står i text (KK-45-A)", async () => {
+    api();
+    await open();
+    // Mat: planerat 6 150 kr, utfall 3 000 kr.
+    expect(rows()[2]?.textContent).toContain(`Utfall ${formatSek(300000)} · kvar ${formatSek(315000)} · 49 %`);
+    type("Utgift för Mat (kr)", "2000");
+    expect(rows()[2]?.textContent).toContain(`Utfall ${formatSek(300000)} · över med ${formatSek(100000)} · 150 % – över`);
+    expect(rows()[2]?.className).toContain("over");
+    // Fritid har inget utfall, och en plan på noll har ingen andel.
+    type("Utgift för Fritid (kr)", "");
+    expect(rows()[1]?.querySelector(".budget-actual")?.textContent).toBe(`Utfall ${formatSek(0)}`);
+    expect(rows()[1]?.className).not.toContain("over");
+  });
+
+  it("utan plan men med utgifter står det att ingen budget är satt (KK-45-A)", async () => {
+    api({ guidelines: [200, guidelines({ categories: [{ category_id: "mat", average_minor: 0, normal_minor: 0, fixed_minor: 0, actual_minor: 250000, last_minor: 0 }] })] });
+    await open();
+    expect(rows()[0]?.textContent).toContain(`Utfall ${formatSek(250000)} · ingen budget`);
+  });
+
+  it("en kategori nära taket markeras innan den är över (KK-45-A)", async () => {
+    api();
+    await open();
+    type("Utgift för Mat (kr)", "3200");
+    expect(rows()[2]?.className).toContain("near");
+  });
+
+  it("en sparad budget är utgångsläget i stället för normalnivån, och en kategori med budget men utan historik följer med (KK-45-B)", async () => {
+    const { budgetPuts } = api({ saved: [{ category_id: "mat", budget_minor: 620000, actual_minor: 300000 }, { category_id: "hushall", budget_minor: 150000, actual_minor: 40000 }] });
+    await open();
+    expect(screen.getByLabelText<HTMLInputElement>("Utgift för Mat (kr)").value).toBe("6200");
+    expect(screen.getByLabelText<HTMLInputElement>("Utgift för Boende (kr)").value).toBe("9000");
+    expect(screen.getByLabelText<HTMLInputElement>("Utgift för hushall (kr)").value).toBe("1500");
+    expect(rows()[2]?.textContent).toContain(`Utfall ${formatSek(40000)} · kvar ${formatSek(110000)}`);
+    await submit();
+    fireEvent.click(screen.getByRole("button", { name: "Ersätt budgeten" }));
+    await settle();
+    expect(budgetPuts[0]?.body).toMatchObject({ lines: expect.arrayContaining([{ category_id: "hushall", amount_minor: 150000 }, { category_id: "mat", amount_minor: 620000 }]) as unknown[] });
+  });
+
+  it("varje kategori länkar till sina transaktioner i perioden, och okategoriserade och interna överföringar står i text (KK-20-C)", async () => {
+    api({ uncategorized: 3000, internal: 120000 });
+    await open();
+    expect(screen.getByRole("link", { name: "Mat" }).getAttribute("href")).toBe("/transaktioner?period=2026-11&kategori=mat");
+    expect(screen.getByRole("link", { name: "Okategoriserade utgifter" }).getAttribute("href")).toBe("/transaktioner?period=2026-11&okategoriserade=1");
+    expect(screen.getByRole("note").textContent).toContain(`(${formatSek(120000)}) räknas inte som utgifter`);
   });
 });

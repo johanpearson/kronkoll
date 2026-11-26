@@ -7,14 +7,6 @@ export { easterSunday, isBankDay, previousBankDayOnOrBefore, swedishBankHolidays
 export { budgetPeriodForKey, budgetPeriodOf, currentBudgetPeriod, weekStart, type BudgetPeriod } from "./period.ts";
 export { loanMonthly, loanTotals, RATE_ENDING_DAYS, rateFixedStatus, type Loan, type LoanMonthly } from "./loans.ts";
 export {
-  averageMonthlySaving,
-  forecastGoal,
-  RATE_MONTHS,
-  type GoalForecast,
-  type GoalForecastInput,
-  type GoalMovement,
-} from "./goals.ts";
-export {
   reconcile,
   MATCH_WINDOW_DAYS,
   PENDING_GRACE_DAYS,
@@ -82,7 +74,7 @@ export {
   type LeavePeriod,
   type MonthComparison,
 } from "./income-forecast.ts";
-export { leaveImpact, type GoalImpact, type ImpactGoal, type LeaveImpact, type LeaveImpactInput, type MonthImpact } from "./leave-impact.ts";
+export { leaveImpact, type LeaveImpact, type LeaveImpactInput, type MonthImpact } from "./leave-impact.ts";
 export {
   CATEGORY_TEMPLATE,
   TEMPLATE_RULES,
@@ -198,25 +190,6 @@ export {
 } from "./bank.ts";
 export { AMOUNT_TOLERANCE_PCT, recurringCharges, type RecurringCharge, type RecurringInterval, type RecurringTransaction } from "./recurring.ts";
 export { ANOMALY_MIN_MINOR, ANOMALY_MIN_PCT, spendingAnomalies, spendingByMainCategory, topExpenses, type CategoryAnomaly, type MainCategorySpending, type TopExpense } from "./insights.ts";
-export {
-  NORMAL_MONTHS,
-  allocateFreeSpending,
-  categoryLevels,
-  freeSpending,
-  guidelineLines,
-  isOverPace,
-  medianMinor,
-  perDayMinor,
-  remainingFree,
-  rollUpToMain,
-  type CategoryLevels,
-  type FreeSpending,
-  type FreeSpendingInput,
-  type GuidelineLine,
-  type GuidelineLineInput,
-  type PaceInput,
-  type PeriodSpending,
-  type VariableCategory,
-} from "./guidelines.ts";
-export { budgetExport, type BudgetExport, type ExportCategory, type ExportMode, type ExportRow } from "./budget-export.ts";
-export { budgetPlan, type BudgetPlan, type BudgetPlanInput, type PlanRow, type PlanRowInput } from "./budget-plan.ts";
+export { NORMAL_MONTHS, categoryLevels, medianMinor, rollUpToMain, type CategoryLevels, type PeriodSpending } from "./guidelines.ts";
+export { budgetExport, type BudgetExport, type ExportCategory, type ExportRow } from "./budget-export.ts";
+export { budgetPlan, planProgress, type BudgetPlan, type BudgetPlanInput, type PlanProgress, type PlanRow, type PlanRowInput } from "./budget-plan.ts";

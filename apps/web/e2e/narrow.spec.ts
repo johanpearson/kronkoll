@@ -28,7 +28,7 @@ for (const path of ["/", "/budget"]) {
 
 test("alla fem flikarna i menyn får plats på 350 px", async ({ page }) => {
   await useFakeApi(page);
-  await page.goto("/sparmal");
+  await page.goto("/lan");
   const tabs = page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link");
   await expect(tabs).toHaveCount(5);
   const overflowing = await tabs.evaluateAll((links) =>

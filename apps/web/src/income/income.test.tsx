@@ -23,7 +23,6 @@ const LEAVE = {
   impacts: [
     { type: "budget", period: "2027-03", budget_minor: 3200000, income_minor: 2014000, shortfall_minor: 1186000 },
     { type: "budget", period: "2027-04", budget_minor: 3200000, income_minor: 2014000, shortfall_minor: 1186000 },
-    { type: "goal", goal_id: "g1", name: "Resa till Japan", shortfall_minor: 9999999, delay_months: 3 },
   ],
 };
 
@@ -114,7 +113,7 @@ describe("ta bort en planerad ledighet (KK-23-A)", () => {
     const deletes = withDelete(204);
     await open();
     fireEvent.click(screen.getByRole("button", { name: label }));
-    expect(rows()[0]?.textContent).toContain("Ta bort ledigheten? Budget och sparmål räknas då utan den.");
+    expect(rows()[0]?.textContent).toContain("Ta bort ledigheten? Budgeten räknas då utan den.");
     fireEvent.click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Behåll" }));
     fireEvent.click(screen.getByRole("button", { name: label }));
     fireEvent.click(within(rows()[0] as HTMLElement).getByRole("button", { name: "Ta bort" }));

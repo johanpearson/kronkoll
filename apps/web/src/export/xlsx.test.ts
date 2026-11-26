@@ -5,7 +5,7 @@ import { buildXlsx, safeText, sheetFor } from "./xlsx.ts";
 
 /** Ett påhittat dokument (KK-13). */
 const doc: ExportDoc = {
-  title: "Budget och riktlinjer 1 nov. 2026 – 30 nov. 2026",
+  title: "Budget 1 nov. 2026 – 30 nov. 2026",
   fileStem: "kronkoll-budget-2026-11",
   summary: [["Period", "1 nov. 2026 – 30 nov. 2026"], ["Sparmål per period", { minor: 800000 }]],
   header: ["Kategori", "Budget", "Utfall", "Andel", "Status"],

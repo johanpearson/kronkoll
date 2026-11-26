@@ -3,6 +3,7 @@
  * namn, nivåer och sammanslagning finns i domänen (`domain/categories`); här sparas bara resultatet.
  */
 import type { D1Database } from "@cloudflare/workers-types";
+import type { CategoryRule } from "@kronkoll/domain";
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { categories } from "./schema.ts";
@@ -13,6 +14,22 @@ export interface CategoryRow {
   readonly name: string;
   readonly kind: "expense" | "income" | "transfer";
   readonly archived: boolean;
+}
+
+/** Vad en rensning av alla kategorier berör (KK-48-A). */
+export interface ResetSummary {
+  readonly categories: number;
+  /** Regler som sätter en kategori. Regler som bara sätter inkomsttyp eller Räkna inte rörs inte. */
+  readonly rules: number;
+  readonly transactions: number;
+  readonly splits: number;
+  readonly budgetLines: number;
+}
+
+/** Mallen som kan sättas tillbaka efter en rensning. */
+export interface CategoryTemplate {
+  readonly categories: readonly CategoryRow[];
+  readonly rules: readonly CategoryRule[];
 }
 
 export function categoryRepository(d1: D1Database) {
@@ -36,6 +53,45 @@ export function categoryRepository(d1: D1Database) {
     async save(changed: readonly CategoryRow[]): Promise<void> {
       const [first, ...rest] = changed.map(update);
       if (first) await db.batch([first, ...rest]);
+    },
+
+    /** Hur mycket en rensning av alla kategorier berör, utan att ändra något (KK-48-A). */
+    async resetSummary(): Promise<ResetSummary> {
+      const count = async (sql: string) => (await d1.prepare(sql).first<{ n: number }>())?.n ?? 0;
+      const [categories, rules, transactions, splits, budgetLines] = await Promise.all([
+        count(`SELECT count(*) AS n FROM categories`),
+        count(`SELECT count(*) AS n FROM category_rules WHERE action = 'categorize' AND category_id IS NOT NULL`),
+        count(`SELECT count(*) AS n FROM transactions WHERE category_id IS NOT NULL`),
+        count(`SELECT count(*) AS n FROM transaction_splits`),
+        count(`SELECT count(*) AS n FROM budget_lines`),
+      ]);
+      return { categories, rules, transactions, splits, budgetLines };
+    },
+
+    /**
+     * Rensar alla kategorier i en batch, så att ett fel ändrar ingenting (KK-48-B): transaktionerna blir
+     * okategoriserade och uppdelningarna, kategoriserande regler och budgetrader tas bort. Inga transaktioner
+     * raderas. Med `template` sätts mallens kategorier och regler tillbaka, annars blir listan tom.
+     */
+    async reset(template?: CategoryTemplate): Promise<void> {
+      const insertCategory = (c: CategoryRow) =>
+        d1.prepare(`INSERT INTO categories (id, parent_id, name, kind, archived) VALUES (?, ?, ?, ?, ?)`).bind(c.id, c.parentId, c.name, c.kind, c.archived ? 1 : 0);
+      const insertRule = (r: CategoryRule) =>
+        d1.prepare(`INSERT INTO category_rules (id, match, pattern, category_id, source) VALUES (?, ?, ?, ?, ?)`).bind(r.id, r.match, r.pattern, r.categoryId, r.source);
+      // Huvudkategorierna först, så att underkategorierna har något att peka på.
+      const mains = (template?.categories ?? []).filter((c) => c.parentId === null);
+      const subs = (template?.categories ?? []).filter((c) => c.parentId !== null);
+      await d1.batch([
+        d1.prepare(`DELETE FROM transaction_splits`),
+        d1.prepare(`UPDATE transactions SET category_id = NULL, category_source = 'none' WHERE category_id IS NOT NULL`),
+        d1.prepare(`DELETE FROM category_rules WHERE action = 'categorize' AND category_id IS NOT NULL`),
+        d1.prepare(`DELETE FROM budget_lines`),
+        d1.prepare(`DELETE FROM categories WHERE parent_id IS NOT NULL`),
+        d1.prepare(`DELETE FROM categories`),
+        ...mains.map(insertCategory),
+        ...subs.map(insertCategory),
+        ...(template?.rules ?? []).map(insertRule),
+      ]);
     },
 
     /**

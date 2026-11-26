@@ -117,3 +117,25 @@ describe("inkomst per månad (KK-22-B)", () => {
     ]);
   });
 });
+
+describe("posterna bakom en månads inkomst (KK-46-A)", () => {
+  it("följer bokföringsdagen som månadens summa, nyast först, utan interna överföringar och borttagna", async () => {
+    const repo = incomeRepository(db);
+    await insert(
+      { id: "lon-okt", amount: 3_000_000, date: "2026-10-24", booking: "2026-10-25" },
+      { id: "gammal", amount: 500_000, date: "2026-10-10" },
+      { id: "nov-bokford", amount: 3_100_000, date: "2026-10-31", booking: "2026-11-02" },
+      { id: "intern", amount: 900_000, date: "2026-10-15", internal: true },
+      { id: "bort", amount: 900_000, date: "2026-10-15", status: "removed" },
+      { id: "utgift", amount: -900_000, date: "2026-10-15" },
+    );
+    await repo.setIncome([{ id: "lon-okt", incomeType: "salary", incomeSource: "template" }]);
+    const october = await repo.items("2026-10");
+    expect(october.map((i) => [i.id, i.date, i.incomeType])).toEqual([
+      ["lon-okt", "2026-10-25", "salary"],
+      ["gammal", "2026-10-10", null],
+    ]);
+    expect((await repo.items("2026-11")).map((i) => i.id)).toEqual(["nov-bokford"]);
+    expect(await repo.items("2026-09")).toEqual([]);
+  });
+});

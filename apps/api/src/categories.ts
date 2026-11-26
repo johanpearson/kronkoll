@@ -3,10 +3,12 @@
 //   POST  /api/categories              { parent_id, name } ny huvud- eller underkategori
 //   PATCH /api/categories/{id}         { name } eller { archived: true }
 //   POST  /api/categories/{id}/merge   { into_id } flyttar allt och arkiverar den gamla
+//   POST  /api/categories/reset        { preview: true } hur mycket en rensning berör (KK-48-A)
+//                                      { confirm: true, restore_template? } rensar alla kategorier (KK-48-B)
 // Reglerna (två nivåer, unika namn, samma typ vid sammanslagning) finns i domänen. Ett brott mot dem ger
 // 400 med domänens förklaring på svenska, som appen kan visa. Den innehåller aldrig bankdata.
 import { categoryRepository, type CategoryRow } from "@kronkoll/adapter-d1";
-import { addCategory, archiveCategory, mergeCategories, renameCategory } from "@kronkoll/domain";
+import { CATEGORY_TEMPLATE, TEMPLATE_RULES, addCategory, archiveCategory, mergeCategories, renameCategory } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
 
 const MAX_NAME_LENGTH = 40;
@@ -94,5 +96,28 @@ export async function mergeCategory(request: Request, env: { DB: D1Database }, f
     const { categories } = mergeCategories({ categories: before, fromId, intoId, transactions: [], rules: [] });
     const moved = await repo.merge(fromId, intoId, changedRows(before, categories));
     return json({ from_id: fromId, into_id: intoId, moved_transactions: moved }, 200);
+  });
+}
+
+/**
+ * POST /api/categories/reset (KK-48): börja om med kategorierna. `{ preview: true }` säger hur mycket som berörs och
+ * ändrar inget. `{ confirm: true }` rensar alla kategorier, kategoriserande regler, uppdelningar och budgetrader, och
+ * transaktionerna blir okategoriserade men raderas aldrig. Med `restore_template: true` sätts den svenska mallen
+ * tillbaka, annars blir listan tom.
+ */
+export async function resetCategories(request: Request, env: { DB: D1Database }): Promise<Response> {
+  const input = await body(request);
+  if (input === null) return invalid();
+  const { preview, confirm, restore_template: restore } = input;
+  const valid = (v: unknown) => v === undefined || typeof v === "boolean";
+  if (!valid(preview) || !valid(confirm) || !valid(restore) || (preview === true) === (confirm === true)) return invalid();
+  return attempt(async () => {
+    const repo = categoryRepository(env.DB);
+    if (preview === true) {
+      const s = await repo.resetSummary();
+      return json({ categories: s.categories, rules: s.rules, transactions: s.transactions, splits: s.splits, budget_lines: s.budgetLines }, 200);
+    }
+    await repo.reset(restore === true ? { categories: CATEGORY_TEMPLATE, rules: TEMPLATE_RULES } : undefined);
+    return json({ reset: true, restored_template: restore === true }, 200);
   });
 }

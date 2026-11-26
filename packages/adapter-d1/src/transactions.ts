@@ -36,6 +36,8 @@ export interface TransactionListQuery {
   /** En kategori med dess underkategorier, och uppdelningar med en del i dem. */
   readonly categoryId?: string | undefined;
   readonly uncategorized?: boolean | undefined;
+  /** Bara de dolda (KK-49-B). Utelämnat betyder bara de som inte är dolda. */
+  readonly hidden?: boolean | undefined;
   /** Bara dessa konton (KK-41-C). Utelämnat betyder alla konton. */
   readonly accountIds?: readonly string[] | undefined;
   /** Fritext i motpart och beskrivning. */
@@ -61,6 +63,8 @@ export interface TransactionListItem {
   readonly manualTransfer: boolean | null;
   /** Transaktionen är uppdelad på flera kategorier (KK-19). */
   readonly split: boolean;
+  /** Dold av användaren (KK-49). */
+  readonly hidden: boolean;
 }
 
 export interface TransactionDetail {
@@ -194,6 +198,7 @@ export function transactionRepository(d1: D1Database) {
       const q = query.q?.trim() ?? "";
       const conditions = [
         ne(transactions.status, "removed"),
+        eq(transactions.hidden, query.hidden === true),
         // Perioden räknas som i budgeten: bokföringsdagen, annars köpdagen (KK-20, KK-34).
         sql`coalesce(${transactions.bookingDate}, ${transactions.transactionDate}) BETWEEN ${query.from} AND ${query.to}`,
         query.uncategorized ? isNull(transactions.categoryId) : undefined,
@@ -224,6 +229,7 @@ export function transactionRepository(d1: D1Database) {
           categorySource: transactions.categorySource,
           isInternalTransfer: transactions.isInternalTransfer,
           manualTransfer: transactions.manualTransfer,
+          hidden: transactions.hidden,
           // Tabellnamnet behövs: utan det betyder "id" uppdelningens id inne i underfrågan.
           split: sql<number>`EXISTS (SELECT 1 FROM transaction_splits s WHERE s.transaction_id = "transactions"."id")`,
         })
@@ -334,11 +340,30 @@ export function transactionRepository(d1: D1Database) {
           internal: transactions.isInternalTransfer,
           pairId: transactions.transferPairId,
           manualTransfer: transactions.manualTransfer,
+          hidden: transactions.hidden,
         })
         .from(transactions)
         .where(ne(transactions.status, "removed"))
         .all();
       return rows;
+    },
+
+    /**
+     * Döljer eller visar transaktionerna (KK-49) i en batch. Ger antalet som fanns och inte var borttagna.
+     * Ett eget val (`manualTransfer`) rörs inte, så det gäller igen när en transaktion visas.
+     */
+    async setHidden(ids: readonly string[], hidden: boolean): Promise<number> {
+      const statements = ids.map((id) =>
+        db
+          .update(transactions)
+          .set({ hidden })
+          .where(and(eq(transactions.id, id), ne(transactions.status, "removed")))
+          .returning({ id: transactions.id }),
+      );
+      const [first, ...rest] = statements;
+      if (!first) return 0;
+      const results = await db.batch([first, ...rest]);
+      return results.reduce((sum, rows) => sum + rows.length, 0);
     },
 
     /**

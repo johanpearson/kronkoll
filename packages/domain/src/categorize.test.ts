@@ -67,6 +67,17 @@ describe("kategorisering med regler (KK-18)", () => {
     expect(categorize(tx({ id: "t1", counterpartyNorm: "", description: "Hyra november" }), [rule])?.categoryId).toBe("boende");
   });
 
+  it("en regel som innehåller en text träffar var som helst i beskrivningen eller motparten, oavsett versaler (KK-47-A)", () => {
+    const amazon: CategoryRule = { id: "r-amazon", match: "description_contains", pattern: "AMAZON", categoryId: "hushall", source: "learned" };
+    const beskrivning = tx({ id: "t1", counterpartyNorm: "", description: "AmazonMktplc*BT4W355R4, www.amazon.se" });
+    expect(categorize(beskrivning, [amazon])?.categoryId).toBe("hushall");
+    // Texten står mitt i beskrivningen, inte först.
+    expect(categorize(tx({ id: "t2", counterpartyNorm: "", description: "Betalning via www.amazon.se" }), [amazon])?.categoryId).toBe("hushall");
+    // Banken skickar en motpart: texten finns bara där, inte i beskrivningen.
+    expect(categorize(tx({ id: "t3", counterpartyNorm: "MY AMAZON STORE", description: "Kortköp" }), [amazon])?.categoryId).toBe("hushall");
+    expect(categorize(tx({ id: "t4", counterpartyNorm: "ICA NARA SOFO", description: "Kortköp" }), [amazon])).toBeNull();
+  });
+
   it("tomma mönster matchar aldrig", () => {
     const empty: CategoryRule[] = [
       { id: "e1", match: "counterparty_exact", pattern: "", categoryId: "x", source: "template" },

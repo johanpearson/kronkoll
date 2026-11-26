@@ -416,7 +416,7 @@
       "id": "KK-21",
       "title": "Sparmål med prognos",
       "normative_strength": "must",
-      "statement": "Sparmål har belopp, måldatum och antingen ett kopplat konto (saldo räknas) eller manuella avsättningar. Appen visar prognos för när målet nås i nuvarande takt.",
+      "statement": "Sparmål har belopp, måldatum och antingen ett kopplat konto (saldo räknas) eller manuella avsättningar. Appen visar prognos för när målet nås i nuvarande takt. Struken (ägarens önskemål 2026-11-26): sparmål tas bort ur appen (inklusive tabellerna). Lånöversikten (KK-36) stannar.",
       "verification_note": "Unit-tester (TDD) för prognosberäkningen inklusive kantfall; E2E av att skapa sparmål.",
       "acceptance_criteria": [
         {
@@ -471,7 +471,7 @@
         },
         {
           "id": "KK-23-C",
-          "text": "Sparmålsprognoser och \"kvar att spendera\" för berörda månader räknas om med den lägre inkomsten och visar påverkan (t.ex. \"Resa: nås 3 mån senare\")."
+          "text": "Sparmålsprognoser och \"kvar att spendera\" för berörda månader räknas om med den lägre inkomsten och visar påverkan (t.ex. \"Resa: nås 3 mån senare\"). Sparmålsdelen utgår när sparmål tas bort (KK-44)."
         }
       ]
     },
@@ -819,7 +819,7 @@
       "id": "KK-42",
       "title": "Budgetplanerare",
       "normative_strength": "should",
-      "statement": "Användaren kan planera en budget utifrån förväntad inkomst: skriva in en eller flera inkomstrader, få ett förslag på utgifter per huvudkategori ur historiken, ändra beloppen och se summan av utgifterna och vad som blir över. Planen kan sparas som periodens budget. Skärmen ersätter Riktlinjer och sparläge. (Motiv: efter en period med mycket shopping och renovering vill ägarna få översikt över vad utgifterna blir och hur mycket som blir över, som när man sätter upp en budget själv. Ägarens önskemål 2026-11-23, preciserat 2026-11-24.)",
+      "statement": "Användaren kan planera en budget utifrån förväntad inkomst: skriva in en eller flera inkomstrader, få ett förslag på utgifter per huvudkategori ur historiken, ändra beloppen och se summan av utgifterna och vad som blir över. Planen kan sparas som periodens budget. Skärmen ersätter Riktlinjer, sparläge och den gamla Budgetvyn (KK-45). (Motiv: efter en period med mycket shopping och renovering vill ägarna få översikt över vad utgifterna blir och hur mycket som blir över, som när man sätter upp en budget själv. Ägarens önskemål 2026-11-23, preciserat 2026-11-24.)",
       "verification_note": "Unit-tester (TDD) för summering och normalnivå (median) med syntetiska serier inklusive extrema månader; API-test mot lokal D1 för förväntad inkomst och engångsperioder; komponenttester av planeraren; E2E att skriva in inkomst, ändra ett belopp och se summan.",
       "acceptance_criteria": [
         {
@@ -864,6 +864,135 @@
         {
           "id": "KK-43-C",
           "text": "Den lättlästa versionen är en sida som går att dela via telefonens delningsmeny (Web Share) och som annars laddas ned som PDF."
+        }
+      ]
+    },
+    {
+      "id": "KK-44",
+      "title": "Ta bort sparmål och riktlinjer",
+      "normative_strength": "should",
+      "statement": "Sparmål (KK-21), Riktlinjer och sparläge (KK-42 tidigare version) tas bort ur appen, API:t och databasen. Lånöversikten (KK-36) behålls och får en egen plats i menyn. Budgetexporten (KK-43) behålls. (Ägarens önskemål 2026-11-26.)",
+      "verification_note": "Arkitekturtest och sökning att inga rester finns kvar; migreringstest att tabellerna släpps; E2E att menyn inte längre har Sparmål och att Lån nås.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-44-A",
+          "text": "Menyn har inte längre Sparmål och sidan /budget/riktlinjer finns inte. Lånöversikten nås från menyn."
+        },
+        {
+          "id": "KK-44-B",
+          "text": "En migrering släpper tabellerna för sparläge och egna nivåer (guideline_settings, guideline_overrides) samt för sparmål och avsättningar. Engångsperioderna (KK-42-E) finns kvar. Inget hos banken ändras."
+        },
+        {
+          "id": "KK-44-C",
+          "text": "Exporten som Excel och PDF (KK-43) fungerar som förut från budgetplaneraren, utan riktlinjer."
+        }
+      ]
+    },
+    {
+      "id": "KK-45",
+      "title": "Budgetplaneraren ersätter Budget",
+      "normative_strength": "should",
+      "statement": "Fliken Budget är budgetplaneraren (KK-42). Den visar per huvudkategori planerat belopp, utfall hittills, kvar och andel för vald period, så att uppföljningen från den gamla budgetvyn (KK-20) finns kvar. Gamla budgetvyn och redigeraren tas bort. (Ägarens önskemål 2026-11-26.)",
+      "verification_note": "Komponenttest av utfallskolumnerna; E2E att planera och se utfall.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-45-A",
+          "text": "Per huvudkategori visas planerat, utfall, kvar och andel. Över 100 % markeras med färg och text (som KK-20-B)."
+        },
+        {
+          "id": "KK-45-B",
+          "text": "En sparad plan blir periodens budget och driver Översikt och notiser som tidigare. Gamla budgetvyn och dess redigerare finns inte kvar."
+        }
+      ]
+    },
+    {
+      "id": "KK-46",
+      "title": "Se vad som räknas som inkomst",
+      "normative_strength": "should",
+      "statement": "I Inkomst går det att klicka på en inkomstpost eller en månad och se de transaktioner som räknas som inkomst, med belopp, datum och typ, och nå transaktionen där typen kan ändras. (Ägarens önskemål 2026-11-26.)",
+      "verification_note": "Komponenttest av listan; API-test av underlaget; E2E av klicket.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-46-A",
+          "text": "Ett klick på en inkomstrad visar transaktionerna bakom summan (datum, motpart som text, belopp och typ). Banktexter renderas som text (KK-30)."
+        },
+        {
+          "id": "KK-46-B",
+          "text": "Varje post leder till transaktionen, där inkomsttypen går att ändra (KK-22-A). Posterna summerar till månadens belopp."
+        }
+      ]
+    },
+    {
+      "id": "KK-47",
+      "title": "Regler som innehåller text",
+      "normative_strength": "should",
+      "statement": "En kategoriseringsregel kan matcha på att motparten eller beskrivningen börjar med eller innehåller en text, utan hänsyn till versaler och gemener. ”Innehåller Amazon”, ”AMAZON” och ”amazon” träffar samma transaktioner. (Ägarens önskemål 2026-11-26.)",
+      "verification_note": "Unit-tester (TDD) för matchningen med blandade skiftlägen; API-test av matchningsvalet; komponenttest av formuläret.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-47-A",
+          "given": "en regel Innehåller ”amazon”",
+          "when": "en transaktion med beskrivningen ”AmazonMktplc*BT4W355R4, www.amazon.se” kategoriseras",
+          "then": "träffar regeln, oavsett hur regeln eller texten är skriven"
+        },
+        {
+          "id": "KK-47-B",
+          "text": "Regelformuläret har ett val Börjar med eller Innehåller. Före sparande visas hur många transaktioner regeln träffar. Befintliga regler fortsätter som Börjar med."
+        }
+      ]
+    },
+    {
+      "id": "KK-48",
+      "title": "Börja om med egna kategorier",
+      "normative_strength": "should",
+      "statement": "Användaren kan rensa alla egna kategorier och regler och sätta upp nya från början, med en tydlig bekräftelse. Transaktionerna blir okategoriserade men ändras inte i övrigt. (Ägarens önskemål 2026-11-26.)",
+      "verification_note": "API-test mot lokal D1 att kategorier, regler och kategorival rensas men inga transaktioner tas bort; komponenttest av bekräftelsen.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-48-A",
+          "text": "Under Kategorier finns Rensa alla kategorier. Appen visar hur många kategorier, regler och transaktioner som berörs och kräver en bekräftelse."
+        },
+        {
+          "id": "KK-48-B",
+          "text": "Efter rensning är kategorilistan tom (eller bara mallen om användaren väljer det), alla regler och kategoriserade transaktioner är okategoriserade och inga transaktioner raderas."
+        }
+      ]
+    },
+    {
+      "id": "KK-49",
+      "title": "Dölj transaktioner helt",
+      "normative_strength": "should",
+      "statement": "Användaren kan markera flera transaktioner i Transaktioner och dölja dem. Dolda transaktioner syns inte i listan och räknas inte i Transaktioner, Insikter, Budget, Översikt eller Inkomst. De finns under Visa dolda och kan visas igen. Skiljer sig från Räknas inte (KK-39), som visar raden nedtonad. (Ägarens önskemål 2026-11-26.)",
+      "verification_note": "Unit-tester att dolda inte räknas; API-test av flerval och ångra; komponenttest av flervalet; E2E att dölja och visa igen.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-49-A",
+          "text": "I Transaktioner går det att välja flera rader och dölja dem. Dolda rader försvinner ur listan och ur alla summor."
+        },
+        {
+          "id": "KK-49-B",
+          "text": "Visa dolda listar dem med texten Dold. De kan visas igen en och en eller flera samtidigt."
+        },
+        {
+          "id": "KK-49-C",
+          "text": "Att dölja ändrar inga saldon eller transaktioner hos banken."
+        }
+      ]
+    },
+    {
+      "id": "KK-50",
+      "title": "Konfigurera egna konton",
+      "normative_strength": "should",
+      "statement": "Privata konton (till exempel makarnas egna konton) kan ställas in så att de hålls utanför hushållets ekonomi. Det bygger på Räknas med (KK-41) och kompletteras så att inställningen går att göra snabbt för flera konton. (Ägarens önskemål 2026-11-26.) Konton som inte är kopplade till appen (till exempel makens eller makans) syns bara som motpart i överföringar. De räknas som en utgift från det gemensamma kontot och hanteras med en regel (Innehåller, KK-47) som ger dem en kategori som Överföringar; ingen ny inställning behövs (ägarens beslut 2026-11-26).",
+      "verification_note": "Komponenttest av kontolistan i Inställningar; E2E av att byta Räknas med för flera konton.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-50-A",
+          "text": "Under Inställningar visas alla konton med namn och en brytare Räknas med. Ett privat konto kan märkas som Privat och hålls då utanför alla summor, men dess överföringar från gemensamma konton räknas som utgift (KK-41-B)."
+        },
+        {
+          "id": "KK-50-B",
+          "text": "En överföring till ett konto som inte är kopplat räknas som en utgift och går att kategorisera med en regel på kontots namn eller nummer (KK-47)."
         }
       ]
     }

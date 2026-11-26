@@ -1,11 +1,9 @@
 /**
- * Rader för export av budget och riktlinjer (KK-43-A) till Excel och en delbar sida. Ren logik: belopp
+ * Rader för export av budgeten (KK-43-A) till Excel och en delbar sida. Ren logik: belopp
  * är heltal öre och formateras av den som visar dem. Banktexter (motparter) ingår aldrig, bara
  * kategorinamn och summor.
  */
 import { sumMinor } from "./money.ts";
-
-export type ExportMode = "none" | "budget" | "saving";
 
 export interface ExportCategory {
   readonly name: string;
@@ -13,7 +11,6 @@ export interface ExportCategory {
   readonly budgetMinor: number | null;
   readonly averageMinor: number;
   readonly normalMinor: number;
-  readonly savingMinor: number;
   readonly actualMinor: number;
 }
 
@@ -22,13 +19,11 @@ export interface ExportRow {
   readonly budgetMinor: number | null;
   readonly averageMinor: number;
   readonly normalMinor: number;
-  /** Sparlägesnivån, bara i sparläge. */
-  readonly savingMinor: number | null;
-  /** Riktlinjen som utfallet mäts mot. */
+  /** Nivån som utfallet mäts mot: budgeten där den är satt, annars normalnivån. */
   readonly levelMinor: number;
   readonly actualMinor: number;
   readonly remainingMinor: number;
-  /** Utfallet i procent av riktlinjen, avrundat, eller null när riktlinjen är noll. */
+  /** Utfallet i procent av nivån, avrundat, eller null när nivån är noll. */
   readonly percent: number | null;
   readonly over: boolean;
 }
@@ -36,15 +31,6 @@ export interface ExportRow {
 export interface BudgetExport {
   readonly rows: readonly ExportRow[];
   readonly totals: ExportRow;
-}
-
-/**
- * Riktlinjen: sparlägesnivån i sparläge, budgeten där den är satt i läget budget, annars normalnivån.
- * Utan budget (läget ingen budget) är det bara riktlinjer, så en satt budget räknas inte.
- */
-function levelOf(mode: ExportMode, c: ExportCategory): number {
-  if (mode === "saving") return c.savingMinor;
-  return mode === "budget" ? (c.budgetMinor ?? c.normalMinor) : c.normalMinor;
 }
 
 function figures(name: string, parts: Omit<ExportRow, "name" | "remainingMinor" | "percent" | "over">): ExportRow {
@@ -65,7 +51,7 @@ const sumOrNull = (values: readonly (number | null)[]): number | null => {
 };
 
 /** Raderna per kategori, sorterade på namn, och summan (KK-43-A). Summeringen avvisar belopp som inte är heltal öre. */
-export function budgetExport(mode: ExportMode, categories: readonly ExportCategory[]): BudgetExport {
+export function budgetExport(categories: readonly ExportCategory[]): BudgetExport {
   const rows = [...categories]
     .sort((a, b) => a.name.localeCompare(b.name, "sv"))
     .map((c) =>
@@ -73,8 +59,7 @@ export function budgetExport(mode: ExportMode, categories: readonly ExportCatego
         budgetMinor: c.budgetMinor,
         averageMinor: c.averageMinor,
         normalMinor: c.normalMinor,
-        savingMinor: mode === "saving" ? c.savingMinor : null,
-        levelMinor: levelOf(mode, c),
+        levelMinor: c.budgetMinor ?? c.normalMinor,
         actualMinor: c.actualMinor,
       }),
     );
@@ -82,7 +67,6 @@ export function budgetExport(mode: ExportMode, categories: readonly ExportCatego
     budgetMinor: sumOrNull(rows.map((r) => r.budgetMinor)),
     averageMinor: sumMinor(rows.map((r) => r.averageMinor)),
     normalMinor: sumMinor(rows.map((r) => r.normalMinor)),
-    savingMinor: sumOrNull(rows.map((r) => r.savingMinor)),
     levelMinor: sumMinor(rows.map((r) => r.levelMinor)),
     actualMinor: sumMinor(rows.map((r) => r.actualMinor)),
   });

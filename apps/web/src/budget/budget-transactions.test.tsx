@@ -28,6 +28,15 @@ const BUDGET = {
   excluded_internal_minor: 0,
 };
 
+/** Underlag till planeraren (KK-13): Mat har ett utfall. */
+const GUIDELINES = {
+  period: BUDGET.period,
+  one_off_periods: [],
+  expected_income_minor: 0,
+  fixed_minor: 0,
+  categories: [{ category_id: "mat", average_minor: 600000, normal_minor: 600000, fixed_minor: 0, actual_minor: 52000, last_minor: 590000 }],
+};
+
 /** Påhittad transaktion (KK-13) i API:ts form. */
 const ICA = {
   id: "t1",
@@ -50,6 +59,8 @@ function api() {
       const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200 }));
       if (url.pathname === "/api/categories") return json(CATEGORIES);
       if (url.pathname.startsWith("/api/budgets/")) return json(BUDGET);
+      if (url.pathname === "/api/guidelines") return json(GUIDELINES);
+      if (url.pathname === "/api/accounts") return json({ items: [] });
       lists.push(url.search);
       return json({ period: BUDGET.period, items: [ICA], next_cursor: null });
     }),
@@ -73,12 +84,10 @@ async function open(path: string) {
 }
 
 describe("transaktionerna bakom en budgetrad (#33, KK-20)", () => {
-  it("huvud- och underkategorier i budgeten länkar till sina transaktioner i perioden", async () => {
+  it("en kategori i budgeten länkar till sina transaktioner i perioden", async () => {
     api();
     await open("/budget");
     expect(screen.getByRole("link", { name: "Mat" }).getAttribute("href")).toBe("/transaktioner?period=2026-11&kategori=mat");
-    fireEvent.click(screen.getByRole("button", { name: "Visa underkategorier (1)" }));
-    expect(screen.getByRole("link", { name: "Livsmedel" }).getAttribute("href")).toBe("/transaktioner?period=2026-11&kategori=mat-livsmedel");
   });
 
   it("ett tryck öppnar transaktionerna för kategorin med underkategorier, och Visa alla tar bort filtret", async () => {

@@ -27,6 +27,22 @@ describe("regler i D1 (KK-18)", () => {
     expect(await repo.update({ id: "finns-inte", pattern: "X", categoryId: "mat" })).toBe(false);
   });
 
+  it("byter slag av träff på en kategoriregel och på en Räkna inte-regel, och låter det vara när det inte anges (KK-47)", async () => {
+    const repo = ruleRepository(db);
+    await repo.save({ id: "r-amazon", match: "counterparty_prefix", pattern: "AMAZON", categoryId: "hushall-forbrukning", source: "learned" });
+    expect(await repo.update({ id: "r-amazon", pattern: "AMAZON", categoryId: "hushall-forbrukning", match: "description_contains" })).toBe(true);
+    expect((await repo.list()).find((r) => r.id === "r-amazon")?.match).toBe("description_contains");
+    expect(await repo.update({ id: "r-amazon", pattern: "AMAZON SE", categoryId: "hushall-forbrukning" })).toBe(true);
+    expect((await repo.list()).find((r) => r.id === "r-amazon")).toMatchObject({ match: "description_contains", pattern: "AMAZON SE" });
+    await repo.saveExclude({ id: "r-panten", match: "counterparty_prefix", pattern: "PANTEN" });
+    expect(await repo.updateExclude({ id: "r-panten", pattern: "PANTEN", match: "description_contains" })).toBe(true);
+    expect((await repo.excludeRules()).find((r) => r.id === "r-panten")?.match).toBe("description_contains");
+    expect(await repo.updateExclude({ id: "r-panten", pattern: "PANTEN 2" })).toBe(true);
+    expect((await repo.excludeRules()).find((r) => r.id === "r-panten")).toMatchObject({ match: "description_contains", pattern: "PANTEN 2" });
+    await repo.remove("r-amazon");
+    await repo.remove("r-panten");
+  });
+
   it("tar bort en regel, och säger till när den redan är borta", async () => {
     const repo = ruleRepository(db);
     await repo.save({ id: "r-ikea", match: "counterparty_prefix", pattern: "IKEA", categoryId: "hushall-forbrukning", source: "learned" });

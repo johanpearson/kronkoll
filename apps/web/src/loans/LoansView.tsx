@@ -6,7 +6,6 @@ import { Pencil } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
 import { IconButton } from "../icon-button.tsx";
-import { Link } from "../router.tsx";
 import { LoanForm } from "./LoanForm.tsx";
 import { formatRate, toLoan, type Loan } from "./loan.ts";
 
@@ -81,9 +80,6 @@ export function LoansView() {
 
   return (
     <main>
-      <p>
-        <Link to="/sparmal">‹ Sparmål</Link>
-      </p>
       <h1>Lån</h1>
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta lånen. Försök igen om en stund.</p>}

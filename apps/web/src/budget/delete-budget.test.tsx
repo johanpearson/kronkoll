@@ -25,6 +25,15 @@ function november(withBudget: boolean) {
   };
 }
 
+/** Underlag till planeraren (KK-13). */
+const GUIDELINES = {
+  period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
+  one_off_periods: [],
+  expected_income_minor: 0,
+  fixed_minor: 0,
+  categories: [{ category_id: "mat", average_minor: 600000, normal_minor: 600000, fixed_minor: 0, actual_minor: 655200, last_minor: 590000 }],
+};
+
 /** Ett API där budgeten finns tills DELETE lyckas. */
 function api(deleteStatus = 204, withBudget = true) {
   let hasBudget = withBudget;
@@ -35,6 +44,8 @@ function api(deleteStatus = 204, withBudget = true) {
       const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "https://app.test");
       const json = (status: number, body: unknown) => Promise.resolve(new Response(status === 204 ? null : JSON.stringify(body), { status }));
       if (url.pathname === "/api/categories") return json(200, CATEGORIES);
+      if (url.pathname === "/api/accounts") return json(200, { items: [] });
+      if (url.pathname === "/api/guidelines") return json(200, GUIDELINES);
       if (init?.method === "DELETE") {
         deletes.push({ path: url.pathname, csrf: new Headers(init.headers).get("x-kronkoll") });
         if (deleteStatus === 204) hasBudget = false;
@@ -77,7 +88,7 @@ describe("ta bort en periods budget (KK-40)", () => {
     await click("Avbryt", dialog());
     expect(screen.queryByRole("region", { name: "Ta bort budgeten" })).toBeNull();
     expect(deletes).toEqual([]);
-    expect(screen.getByRole("button", { name: "Ändra budget" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Ta bort budget" })).toBeDefined();
   });
 
   it("tar bort periodens budget med CSRF-header och visar perioden utan budget (KK-40-A)", async () => {
@@ -87,8 +98,8 @@ describe("ta bort en periods budget (KK-40)", () => {
     await click("Ta bort budget", dialog());
     expect(deletes).toEqual([{ path: "/api/budgets/2026-11", csrf: "1" }]);
     expect(screen.getByRole("status").textContent).toBe("Budgeten för perioden är borttagen.");
-    expect(screen.getByText("Ingen budget är satt för perioden än.")).toBeDefined();
-    expect(screen.getByRole("button", { name: "Sätt budget" })).toBeDefined();
+    // Utan sparad budget är utgångsläget normalnivån igen.
+    expect(screen.getByLabelText<HTMLInputElement>("Utgift för Mat (kr)").value).toBe("6000");
     expect(screen.queryByRole("button", { name: "Ta bort budget" })).toBeNull();
   });
 
@@ -98,13 +109,13 @@ describe("ta bort en periods budget (KK-40)", () => {
     await click("Ta bort budget");
     await click("Ta bort budget", dialog());
     expect(within(dialog()).getByRole("alert").textContent).toBe("Det gick inte att ta bort budgeten. Ingenting är ändrat. Försök igen.");
-    expect(screen.getByRole("button", { name: "Ändra budget" })).toBeDefined();
+    expect(screen.getByRole("button", { name: "Ta bort budget" })).toBeDefined();
   });
 
   it("en period utan budget har ingen knapp för att ta bort", async () => {
     api(204, false);
     await open();
-    expect(screen.getByRole("button", { name: "Sätt budget" })).toBeDefined();
+    expect(screen.getByLabelText<HTMLInputElement>("Utgift för Mat (kr)").value).toBe("6000");
     expect(screen.queryByRole("button", { name: "Ta bort budget" })).toBeNull();
   });
 });

@@ -2,7 +2,7 @@
 // /api/loans/{id}. Ett lån som ändras kan också tas bort.
 import { useState, type SyntheticEvent } from "react";
 import { deleteJson, putJson } from "../api.ts";
-import { parseKronor } from "../goals/NewGoal.tsx";
+import { parseKronor } from "../kronor.ts";
 import { parsePercent } from "../income/NewLeave.tsx";
 import { useToast } from "../toast.tsx";
 import type { Loan } from "./loan.ts";
@@ -69,7 +69,7 @@ export function LoanForm(props: { loan: Loan | null; onSaved: () => void; onClos
   };
 
   return (
-    <form className="goal-form" aria-label={l ? `Ändra ${l.name}` : "Nytt lån"} onSubmit={(e) => void save(e)}>
+    <form className="stack-form" aria-label={l ? `Ändra ${l.name}` : "Nytt lån"} onSubmit={(e) => void save(e)}>
       <label>
         Namn
         <input value={name} maxLength={60} onChange={(e) => { setName(e.target.value); }} />
