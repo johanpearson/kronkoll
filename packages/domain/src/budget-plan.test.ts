@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { budgetPlan } from "./budget-plan.ts";
+import { budgetPlan, planProgress } from "./budget-plan.ts";
 
 const kr = (amount: number) => amount * 100;
 const rows = (...amounts: number[]) => amounts.map((a, i) => ({ categoryId: `k${String(i)}`, plannedMinor: kr(a) }));
@@ -53,5 +53,35 @@ describe("budgetPlan: summering av en planerad budget (KK-42-C)", () => {
     ["sparande", { incomesMinor: [], rows: [], savingMinor: 1.5 }],
   ])("avvisar ett belopp som inte är heltal öre i %s", (_name, input) => {
     expect(() => budgetPlan(input)).toThrow("Belopp måste vara ett heltal i öre");
+  });
+});
+
+describe("planProgress: utfall mot plan (KK-45-A)", () => {
+  it("visar kvar och andel när utfallet är under planen", () => {
+    expect(planProgress(kr(6000), kr(1500))).toEqual({ remainingMinor: kr(4500), percent: 25, over: false });
+  });
+
+  it("precis på planen är inte över, och 100 % är kvar noll", () => {
+    expect(planProgress(kr(6000), kr(6000))).toEqual({ remainingMinor: 0, percent: 100, over: false });
+  });
+
+  it("över planen är kvar negativt och andelen över 100", () => {
+    expect(planProgress(kr(6000), kr(6600))).toEqual({ remainingMinor: -kr(600), percent: 110, over: true });
+  });
+
+  it("avrundar andelen", () => {
+    expect(planProgress(300, 100)).toMatchObject({ percent: 33 });
+    expect(planProgress(300, 200)).toMatchObject({ percent: 67 });
+  });
+
+  it("en plan på noll ger ingen andel, och över bara om något är spenderat", () => {
+    expect(planProgress(0, 1)).toEqual({ remainingMinor: -1, percent: null, over: true });
+    expect(planProgress(0, 0)).toEqual({ remainingMinor: 0, percent: null, over: false });
+  });
+
+  it("avvisar negativ plan och belopp som inte är heltal öre", () => {
+    expect(() => planProgress(-1, 0)).toThrow("Belopp får inte vara negativa");
+    expect(() => planProgress(1.5, 0)).toThrow("Belopp måste vara ett heltal i öre");
+    expect(() => planProgress(100, 1.5)).toThrow("Belopp måste vara ett heltal i öre");
   });
 });

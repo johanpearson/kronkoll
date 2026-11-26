@@ -1,7 +1,7 @@
 // Dela eller exportera perioden (KK-43): Excel och en lättläst PDF. Filen byggs i webbläsaren av det som är
 // sparat för perioden, och på en telefon öppnas delningsmenyn. Inget lämnar enheten (KK-43-B).
 import { useState } from "react";
-import { fetchBudget } from "../budget/BudgetView.tsx";
+import { fetchBudget } from "../budget/budget-data.ts";
 import { deliverFile } from "../export/deliver.ts";
 import { buildExportDoc } from "../export/export-doc.ts";
 import { buildPdf } from "../export/pdf.ts";

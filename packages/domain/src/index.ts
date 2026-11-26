@@ -192,4 +192,4 @@ export { AMOUNT_TOLERANCE_PCT, recurringCharges, type RecurringCharge, type Recu
 export { ANOMALY_MIN_MINOR, ANOMALY_MIN_PCT, spendingAnomalies, spendingByMainCategory, topExpenses, type CategoryAnomaly, type MainCategorySpending, type TopExpense } from "./insights.ts";
 export { NORMAL_MONTHS, categoryLevels, medianMinor, rollUpToMain, type CategoryLevels, type PeriodSpending } from "./guidelines.ts";
 export { budgetExport, type BudgetExport, type ExportCategory, type ExportRow } from "./budget-export.ts";
-export { budgetPlan, type BudgetPlan, type BudgetPlanInput, type PlanRow, type PlanRowInput } from "./budget-plan.ts";
+export { budgetPlan, planProgress, type BudgetPlan, type BudgetPlanInput, type PlanProgress, type PlanRow, type PlanRowInput } from "./budget-plan.ts";

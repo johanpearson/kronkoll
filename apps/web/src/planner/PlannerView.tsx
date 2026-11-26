@@ -1,17 +1,19 @@
-// Planera budget (KK-42): ett arbetsblad som när man sätter upp en budget själv. Inkomsten skrivs som en eller
+// Budget (KK-42, KK-45): ett arbetsblad som när man sätter upp en budget själv. Inkomsten skrivs som en eller
 // flera rader (första raden är förifylld med förväntad inkomst). Per huvudkategori finns ett förslag, normalnivån
 // ur historiken, som går att ändra. Summan av utgifterna och sparandet och vad som blir över räknas om medan man
 // skriver, och ett underskott står i text. Planen sparas som periodens budget först när man väljer det, och
 // utkastet ligger under tiden i webbläsaren (planner-draft.ts). Ersätter Riktlinjer, sparläge och den gamla Budgetvyn.
-import { budgetPlan, formatSek } from "@kronkoll/domain";
+import { budgetPlan, formatSek, planProgress } from "@kronkoll/domain";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { AccountFilter, useAccountChoices } from "../accounts/account-filter.tsx";
 import { putJson } from "../api.ts";
-import { parseField, toText } from "../budget/BudgetEditor.tsx";
-import { fetchBudget } from "../budget/BudgetView.tsx";
-import { fetchGuidelines, type Guidelines } from "../guidelines/guidelines.ts";
+import { parseField, toText } from "../kronor.ts";
+import { fetchBudget, type Budget } from "../budget/budget-data.ts";
+import { DeleteBudget } from "../budget/DeleteBudget.tsx";
+import { fetchGuidelines, type GuidelineCategory, type Guidelines } from "../guidelines/guidelines.ts";
 import { PeriodNav } from "../icon-button.tsx";
 import { Link } from "../router.tsx";
+import { CategoryDot } from "../category-color.tsx";
 import { useToast } from "../toast.tsx";
 import { fetchCategories, NO_CATEGORIES, shiftPeriodKey, type Categories } from "../transactions/TransactionsView.tsx";
 import { ExportSection } from "./ExportSection.tsx";
@@ -29,7 +31,10 @@ function amountOf(text: string): { readonly minor: number; readonly invalid: boo
   return { minor: parsed ?? 0, invalid: parsed === undefined };
 }
 
-function PlannerForm(props: { guidelines: Guidelines; categories: Categories; accountIds: readonly string[]; onChanged: () => void }) {
+/** Huvudkategorier har ingen förälder att slå upp. */
+const MAIN: ReadonlyMap<string, string | null> = new Map();
+
+function PlannerForm(props: { guidelines: Guidelines; budget: Budget | null; categories: Categories; accountIds: readonly string[]; onChanged: () => void }) {
   const g = props.guidelines;
   const toast = useToast();
   const [draft, setDraft] = useState<Draft>(() => loadDraft(g.period.key));
@@ -41,8 +46,15 @@ function PlannerForm(props: { guidelines: Guidelines; categories: Categories; ac
 
   const defaultIncomes: readonly IncomeRow[] = [{ id: "forvantad", name: "Lön", text: g.expectedIncomeMinor > 0 ? toText(g.expectedIncomeMinor) : "" }];
   const incomes = draft.incomes ?? defaultIncomes;
-  const rows = [...g.categories].sort((a, b) => nameOf(a.categoryId).localeCompare(nameOf(b.categoryId), "sv"));
-  const textFor = (categoryId: string, normalMinor: number) => draft.edited[categoryId] ?? toText(normalMinor);
+  // Ett belopp som redan är sparat som periodens budget är utgångsläget, annars normalnivån. En kategori som har
+  // budget men ingen historik tas med, så att den inte försvinner när planen sparas.
+  const saved = new Map((props.budget?.groups ?? []).flatMap((b) => (b.budgetMinor === null ? [] : [[b.categoryId, b] as const])));
+  const known = new Set(g.categories.map((c) => c.categoryId));
+  const extra: GuidelineCategory[] = [...saved.values()]
+    .filter((b) => !known.has(b.categoryId))
+    .map((b) => ({ categoryId: b.categoryId, averageMinor: 0, normalMinor: 0, fixedMinor: 0, actualMinor: b.actualMinor, lastMinor: 0 }));
+  const rows = [...g.categories, ...extra].sort((a, b) => nameOf(a.categoryId).localeCompare(nameOf(b.categoryId), "sv"));
+  const textFor = (categoryId: string, normalMinor: number) => draft.edited[categoryId] ?? toText(saved.get(categoryId)?.budgetMinor ?? normalMinor);
 
   const update = (next: Draft) => {
     setDraft(next);
@@ -143,12 +155,27 @@ function PlannerForm(props: { guidelines: Guidelines; categories: Categories; ac
         <p>Det finns ingen historik att ta förslag ur än. Lägg till beloppen när du har några transaktioner.</p>
       ) : (
         <ul aria-label="Utgifter" className="guideline-list">
-          {rows.map((c, i) => (
-            <li key={c.categoryId} className="budget-line">
+          {rows.map((c, i) => {
+            const progress = planProgress(rowAmounts[i]?.minor ?? 0, c.actualMinor);
+            const planned = rowAmounts[i]?.minor ?? 0;
+            const near = !progress.over && progress.percent !== null && progress.percent >= 90;
+            return (
+            <li key={c.categoryId} className={`budget-line${progress.over ? " over" : near ? " near" : ""}`}>
               <div className="tx-main">
-                <span className="tx-name">{nameOf(c.categoryId)}</span>
+                <span className="tx-name">
+                  <CategoryDot categoryId={c.categoryId} parentOf={MAIN} />
+                  {/* Raden leder till transaktionerna bakom utfallet, med underkategorier och uppdelningar. */}
+                  <Link to={`/transaktioner?period=${encodeURIComponent(g.period.key)}&kategori=${encodeURIComponent(c.categoryId)}`}>{nameOf(c.categoryId)}</Link>
+                </span>
                 {c.fixedMinor > 0 && <span className="budget-share">Fast</span>}
               </div>
+              {planned > 0 && <progress className="budget-bar" aria-hidden="true" max={planned} value={Math.min(c.actualMinor, planned)} />}
+              <small className="budget-actual">
+                {`Utfall ${formatSek(c.actualMinor)}`}
+                {planned > 0 && ` · ${progress.over ? `över med ${formatSek(-progress.remainingMinor)}` : `kvar ${formatSek(progress.remainingMinor)}`}`}
+                {progress.percent !== null && ` · ${String(progress.percent)} %${progress.over ? " – över" : ""}`}
+                {planned === 0 && c.actualMinor > 0 && " · ingen budget"}
+              </small>
               <small>
                 Förra perioden {formatSek(c.lastMinor)}
                 {c.fixedMinor > 0 && ` · varav fast ${formatSek(c.fixedMinor)}`}
@@ -163,7 +190,8 @@ function PlannerForm(props: { guidelines: Guidelines; categories: Categories; ac
                 onChange={(e) => { update({ ...draft, edited: { ...draft.edited, [c.categoryId]: e.target.value } }); }}
               />
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
 
@@ -236,7 +264,7 @@ function PlannerForm(props: { guidelines: Guidelines; categories: Categories; ac
   );
 }
 
-type State = { readonly kind: "loading" } | { readonly kind: "error" } | { readonly kind: "ready"; readonly guidelines: Guidelines };
+type State = { readonly kind: "loading" } | { readonly kind: "error" } | { readonly kind: "ready"; readonly guidelines: Guidelines; readonly budget: Budget | null };
 
 export function PlannerView() {
   const [key, setKey] = useState("current");
@@ -259,8 +287,9 @@ export function PlannerView() {
   useEffect(() => {
     let current = true;
     setState({ kind: "loading" });
-    void fetchGuidelines(key, accountIds).then((guidelines) => {
-      if (current) setState(guidelines ? { kind: "ready", guidelines } : { kind: "error" });
+    // Periodens sparade budget är utgångsläget för beloppen. Går den inte att hämta fungerar planeringen ändå.
+    void Promise.all([fetchGuidelines(key, accountIds), fetchBudget(key, accountIds)]).then(([guidelines, budget]) => {
+      if (current) setState(guidelines ? { kind: "ready", guidelines, budget } : { kind: "error" });
     });
     return () => {
       current = false;
@@ -268,18 +297,38 @@ export function PlannerView() {
   }, [key, reload, accountIds]);
 
   const guidelines = state.kind === "ready" ? state.guidelines : null;
+  const budget = state.kind === "ready" ? state.budget : null;
+  const toast = useToast();
   return (
     <main>
-      <h1>Planera budget</h1>
-      <p>
-        <Link to="/budget">Till budget</Link>
-      </p>
+      <h1>Budget</h1>
       <PeriodNav period={guidelines?.period ?? null} onGo={(months) => { if (guidelines) setKey(shiftPeriodKey(guidelines.period.key, months)); }} />
       <AccountFilter choices={accounts} selected={accountIds} onChange={setAccountIds} />
       {state.kind === "loading" && <p>Hämtar…</p>}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta underlaget till planen. Försök igen om en stund.</p>}
       {guidelines && (
-        <PlannerForm key={`${guidelines.period.key}-${String(reload)}-${accountIds.join(",")}`} guidelines={guidelines} categories={categories} accountIds={accountIds} onChanged={() => { setReload((n) => n + 1); }} />
+        <PlannerForm key={`${guidelines.period.key}-${String(reload)}-${accountIds.join(",")}`} guidelines={guidelines} budget={budget} categories={categories} accountIds={accountIds} onChanged={() => { setReload((n) => n + 1); }} />
+      )}
+      {guidelines && budget && budget.lines.length > 0 && (
+        <DeleteBudget
+          key={budget.period.key}
+          periodKey={budget.period.key}
+          lineCount={budget.lines.length}
+          onDeleted={() => {
+            toast.done("Budgeten för perioden är borttagen.");
+            setReload((n) => n + 1);
+          }}
+        />
+      )}
+      {guidelines && budget && budget.uncategorizedMinor > 0 && (
+        <p>
+          <Link to={`/transaktioner?period=${encodeURIComponent(budget.period.key)}&okategoriserade=1`}>Okategoriserade utgifter</Link>: {formatSek(budget.uncategorizedMinor)}
+        </p>
+      )}
+      {guidelines && budget && budget.excludedInternalMinor > 0 && (
+        <p className="note" role="note">
+          Överföringar mellan dina egna konton och kortfakturor ({formatSek(budget.excludedInternalMinor)}) räknas inte som utgifter.
+        </p>
       )}
       {guidelines && <ExportSection guidelines={guidelines} categories={categories} accountIds={accountIds} />}
     </main>

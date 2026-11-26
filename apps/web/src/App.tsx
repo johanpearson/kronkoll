@@ -1,7 +1,6 @@
 // Appens skal (#30): sidorna och huvudmenyn. Service workern (sw/) ger offline-skal och senaste
 // översikten i högst 24 h.
 import { House, Landmark, PiggyBank, ReceiptText, Wallet } from "lucide-react";
-import { BudgetView } from "./budget/BudgetView.tsx";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { PlannerView } from "./planner/PlannerView.tsx";
 import { IncomeView } from "./income/IncomeView.tsx";
@@ -32,8 +31,7 @@ function NotFound() {
 const ROUTES: Record<string, () => React.JSX.Element> = {
   "/": OverviewView,
   "/transaktioner": TransactionsView,
-  "/budget": BudgetView,
-  "/budget/planera": PlannerView,
+  "/budget": PlannerView,
   "/lan": LoansView,
   "/inkomst": IncomeView,
   "/inkomst/ledighet": NewLeave,

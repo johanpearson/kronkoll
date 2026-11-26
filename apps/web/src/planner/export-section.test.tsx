@@ -59,7 +59,7 @@ const settle = () =>
   });
 
 async function open() {
-  window.history.replaceState(null, "", "/budget/planera");
+  window.history.replaceState(null, "", "/budget");
   await act(async () => {
     render(<App />);
     await Promise.resolve();

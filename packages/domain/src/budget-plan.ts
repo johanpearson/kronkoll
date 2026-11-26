@@ -59,3 +59,23 @@ export function budgetPlan(input: BudgetPlanInput): BudgetPlan {
     rows: input.rows.map((r) => ({ ...r, shareOfIncomePercent: incomeMinor === 0 ? null : Math.round((r.plannedMinor * 100) / incomeMinor) })),
   };
 }
+
+export interface PlanProgress {
+  /** Planerat minus utfall. Negativt när utfallet är större än planen. */
+  readonly remainingMinor: number;
+  /** Utfallet i procent av planen, avrundat, eller null när planen är noll. */
+  readonly percent: number | null;
+  /** Utfallet är större än planen. Med en plan på noll räknas allt som spenderats som över. */
+  readonly over: boolean;
+}
+
+/** Utfall mot plan för en kategori (KK-45-A). */
+export function planProgress(plannedMinor: number, actualMinor: number): PlanProgress {
+  const planned = nonNegative(plannedMinor);
+  const actual = assertMinor(actualMinor);
+  return {
+    remainingMinor: planned - actual,
+    percent: planned === 0 ? null : Math.round((actual * 100) / planned),
+    over: actual > planned,
+  };
+}
