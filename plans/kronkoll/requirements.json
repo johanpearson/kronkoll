@@ -909,7 +909,7 @@
       "id": "KK-46",
       "title": "Se vad som räknas som inkomst",
       "normative_strength": "should",
-      "statement": "I Inkomst går det att klicka på en inkomstpost eller en månad och se de transaktioner som räknas som inkomst, med belopp, datum och typ, och ändra typen där. (Ägarens önskemål 2026-11-26.)",
+      "statement": "I Inkomst går det att klicka på en inkomstpost eller en månad och se de transaktioner som räknas som inkomst, med belopp, datum och typ, och nå transaktionen där typen kan ändras. (Ägarens önskemål 2026-11-26.)",
       "verification_note": "Komponenttest av listan; API-test av underlaget; E2E av klicket.",
       "acceptance_criteria": [
         {
@@ -918,7 +918,7 @@
         },
         {
           "id": "KK-46-B",
-          "text": "Typen går att ändra från listan och summan uppdateras."
+          "text": "Varje post leder till transaktionen, där inkomsttypen går att ändra (KK-22-A). Posterna summerar till månadens belopp."
         }
       ]
     },

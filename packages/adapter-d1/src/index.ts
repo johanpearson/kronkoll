@@ -24,7 +24,7 @@ export { budgetRepository, type BudgetSource } from "./budget.ts";
 export { guidelineRepository, type GuidelineState } from "./guidelines.ts";
 export { overviewRepository, type ConnectionAccount, type OverviewAccountRow, type OverviewConnection, type SyncRunRow } from "./overview.ts";
 export { leaveRepository, type LeavePeriodRecord } from "./leave.ts";
-export { incomeRepository, type IncomeMonth } from "./income.ts";
+export { incomeRepository, type IncomeItem, type IncomeMonth } from "./income.ts";
 export { loanRepository, type LoanRecord } from "./loans.ts";
 export { pushRepository, type PushSubscriptionRecord } from "./push.ts";
 export { insightsRepository, type ChargeRow } from "./insights.ts";

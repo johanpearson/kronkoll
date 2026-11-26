@@ -12,7 +12,7 @@ import { createCategory, listCategories, mergeCategory, patchCategory } from "./
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
 import { deleteLoan, listLoans, putLoan } from "./loans.ts";
-import { getIncome } from "./income.ts";
+import { getIncome, getIncomeMonth } from "./income.ts";
 import { getGuidelines, putGuidelines } from "./guidelines.ts";
 import { getInsights } from "./insights.ts";
 import { createLeavePeriod, deleteLeavePeriod, listLeavePeriods } from "./leave.ts";
@@ -222,6 +222,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, PATCH" });
   }
 
+  const incomeMonth = /^\/api\/income\/([^/]+)$/u.exec(pathname)?.[1];
+  if (incomeMonth !== undefined) {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return getIncomeMonth(incomeMonth, env);
+  }
   if (pathname === "/api/income") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
     return getIncome(request, env, context.sync);

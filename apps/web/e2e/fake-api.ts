@@ -222,7 +222,14 @@ export async function useFakeApi(
         top_expenses: [{ id: "t1", date: "2026-11-01", name: "Möbelhuset Påhittat", amount_minor: 890000, category_id: "hushall-forbrukning", split: false }],
         top_categories: [{ category_id: "hushall", amount_minor: 890000 }, { category_id: "mat", amount_minor: 523000 }],
       }];
-    }    if (path === "/api/income") {
+    }
+    if (path === "/api/income/2026-10") {
+      return [200, { period: "2026-10", items: [
+        { id: "lon1", date: "2026-10-26", amount_minor: 3361000, counterparty: "Påhittade Bygg AB", description: "", income_type: "salary", income_source: "learned" },
+        { id: "swish1", date: "2026-10-12", amount_minor: 42000, counterparty: "", description: "Swish från Anna", income_type: null, income_source: "none" },
+      ] }];
+    }
+    if (path === "/api/income") {
       return [200, { months: [
         { period: "2026-09", salary_minor: 1120000, parental_benefit_minor: 995000, other_minor: 78000 },
         { period: "2026-10", salary_minor: 3361000, parental_benefit_minor: 0, other_minor: 42000 },

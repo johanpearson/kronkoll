@@ -97,3 +97,42 @@ describe("inkomst per månad (KK-22-B)", () => {
     expect((await get("/api/income", "GET", broken)).status).toBe(503);
   });
 });
+
+describe("posterna bakom en månads inkomst (KK-46-A)", () => {
+  it("listar inbetalningarna som räknas, nyast först, med typ och källa", async () => {
+    await db
+      .prepare(`INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor, counterparty, description, income_type, income_source) VALUES ('fk-okt-2', 'a1', 'fp', 'booked', '2026-10-30', '2026-10-30', 40000, 'Försäkringskassan', 'Föräldrapenning <b>okt</b>', NULL, 'none')`)
+      .run();
+    const body = await (await get("/api/income/2026-10")).json<{ period: string; items: Record<string, unknown>[] }>();
+    expect(body.period).toBe("2026-10");
+    expect(body.items).toEqual([
+      { id: "fk-okt-2", date: "2026-10-30", amount_minor: 40_000, counterparty: "Försäkringskassan", description: "Föräldrapenning <b>okt</b>", income_type: null, income_source: "none" },
+      { id: "lon-okt", date: "2026-10-24", amount_minor: 3_300_000, counterparty: "", description: "", income_type: "salary", income_source: "template" },
+      { id: "fk-okt", date: "2026-10-10", amount_minor: 500_000, counterparty: "", description: "", income_type: "parental_benefit", income_source: "template" },
+    ]);
+  });
+
+  it("posterna summerar till månadens belopp, och interna överföringar, utgifter och borttagna räknas inte", async () => {
+    await db.batch([
+      db.prepare(`INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor, is_internal_transfer) VALUES ('intern', 'a1', 'fp', 'booked', '2026-10-12', '2026-10-12', 100000, 1)`),
+      db.prepare(`INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor) VALUES ('utgift', 'a1', 'fp', 'booked', '2026-10-12', '2026-10-12', -50000)`),
+      db.prepare(`INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor) VALUES ('borta', 'a1', 'fp', 'removed', '2026-10-12', '2026-10-12', 70000)`),
+    ]);
+    const { items } = await (await get("/api/income/2026-10")).json<{ items: { id: string; amount_minor: number }[] }>();
+    expect(items.map((i) => i.id)).toEqual(["lon-okt", "fk-okt"]);
+    const { months } = await (await get("/api/income?from=2026-10&to=2026-10")).json<{ months: { salary_minor: number; parental_benefit_minor: number; other_minor: number }[] }>();
+    const month = months[0];
+    expect(items.reduce((sum, i) => sum + i.amount_minor, 0)).toBe((month?.salary_minor ?? 0) + (month?.parental_benefit_minor ?? 0) + (month?.other_minor ?? 0));
+  });
+
+  it("en månad utan inkomst ger en tom lista", async () => {
+    expect(await (await get("/api/income/2026-01")).json()).toEqual({ period: "2026-01", items: [] });
+  });
+
+  it("vägrar en ogiltig månad, fel metod och svarar 503 när databasen inte svarar", async () => {
+    for (const period of ["2026-13", "2026-1", "november"]) expect((await get(`/api/income/${period}`)).status).toBe(400);
+    expect((await get("/api/income/2026-10", "POST")).status).toBe(405);
+    const broken = { DB: { prepare: () => { throw new Error("nere"); } } as unknown as D1Database };
+    expect((await get("/api/income/2026-10", "GET", broken)).status).toBe(503);
+  });
+});

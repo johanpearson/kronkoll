@@ -134,6 +134,18 @@ test("planera föräldraledighet och se den under Inkomst (V-e2e-leave, KK-23)",
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(1)).toContainText("3 dagar/vecka");
 });
+test("se vilka inbetalningar som räknas som inkomst en månad och gå till dem (KK-46)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/inkomst");
+  await page.getByRole("button", { name: "Visa det som räknas i oktober 2026" }).click();
+  const items = page.getByRole("list", { name: "Inbetalningar Oktober 2026" }).getByRole("listitem");
+  await expect(items).toHaveCount(2);
+  await expect(items.first()).toContainText("Påhittade Bygg AB");
+  await expect(items.nth(1)).toContainText("Swish från Anna");
+  await expect(items.nth(1)).toContainText("Inte klassad");
+  await items.first().getByRole("link").click();
+  await expect(page).toHaveURL(/\/transaktioner\/lon1$/u);
+});
 test("ändra en inbetalnings inkomsttyp på transaktionens sida (KK-22-A)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/transaktioner/lon1");
