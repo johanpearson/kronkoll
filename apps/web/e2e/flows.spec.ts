@@ -128,31 +128,6 @@ test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {
   await expect(page.getByText("Ingen budget är satt för perioden än.")).toBeVisible();
 });
 
-test("skapa ett sparmål, se det i listan och lägg till en avsättning (V-e2e-goal, KK-21)", async ({ page }) => {
-  await useFakeApi(page);
-  await page.goto("/");
-  await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Sparmål" }).click();
-  await page.getByRole("button", { name: "Nytt sparmål" }).click();
-  const form = page.getByRole("form", { name: "Nytt sparmål" });
-  await form.getByLabel("Namn").fill("Ny cykel");
-  await form.getByLabel("Målbelopp (kr)").fill("12 000");
-  await form.getByLabel("Måldatum (valfritt)").fill("2027-06-30");
-  await form.getByRole("button", { name: "Skapa sparmål" }).click();
-
-  await expect(page.getByRole("status")).toHaveText("Sparmålet är skapat.");
-  const row = page.getByRole("list", { name: "Dina sparmål" }).getByRole("listitem").filter({ hasText: "Ny cykel" });
-  await expect(row).toContainText("0,00 kr av 12 000,00 kr");
-  await expect(row).toContainText("Nås inte i nuvarande takt");
-
-  await row.getByRole("link", { name: "Ny cykel" }).click();
-  await expect(page.getByRole("heading", { level: 1, name: "Ny cykel" })).toBeVisible();
-  const deposit = page.getByRole("form", { name: "Ny avsättning" });
-  await deposit.getByLabel("Belopp (kr)").fill("3 000");
-  await deposit.getByRole("button", { name: "Lägg till" }).click();
-  await expect(page.getByRole("status")).toHaveText("Avsättningen är sparad.");
-  await expect(page.getByRole("main")).toContainText("3 000,00 kr av 12 000,00 kr (25 %)");
-  await expect(page.getByRole("list", { name: "Avsättningar" }).getByRole("listitem")).toHaveCount(1);
-});
 test("planera föräldraledighet och se den under Inkomst (V-e2e-leave, KK-23)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/");
@@ -171,11 +146,6 @@ test("planera föräldraledighet och se den under Inkomst (V-e2e-leave, KK-23)",
   await expect(rows).toHaveCount(2);
   await expect(rows.nth(1)).toContainText("3 dagar/vecka");
 });
-test("sparmålets sida visar hur planerad ledighet försenar målet (KK-23-C)", async ({ page }) => {
-  await useFakeApi(page);
-  await page.goto("/sparmal/g1");
-  await expect(page.getByRole("note").filter({ hasText: "Med ledighet" })).toContainText("nås målet mars 2028, 3 mån senare.");
-});
 test("ändra en inbetalnings inkomsttyp på transaktionens sida (KK-22-A)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/transaktioner/lon1");
@@ -186,8 +156,8 @@ test("ändra en inbetalnings inkomsttyp på transaktionens sida (KK-22-A)", asyn
 });
 test("lägg till ett lån och se det i lånöversikten (V-e2e-loans, KK-36)", async ({ page }) => {
   await useFakeApi(page);
-  await page.goto("/sparmal");
-  await page.getByRole("button", { name: "Lån" }).click();
+  await page.goto("/");
+  await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Lån" }).click();
   const loans = page.getByRole("list", { name: "Dina lån" }).getByRole("listitem");
   await expect(loans.first()).toContainText("Bindningstiden slutar om 41 dagar");
 

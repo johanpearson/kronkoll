@@ -7,14 +7,6 @@ export { easterSunday, isBankDay, previousBankDayOnOrBefore, swedishBankHolidays
 export { budgetPeriodForKey, budgetPeriodOf, currentBudgetPeriod, weekStart, type BudgetPeriod } from "./period.ts";
 export { loanMonthly, loanTotals, RATE_ENDING_DAYS, rateFixedStatus, type Loan, type LoanMonthly } from "./loans.ts";
 export {
-  averageMonthlySaving,
-  forecastGoal,
-  RATE_MONTHS,
-  type GoalForecast,
-  type GoalForecastInput,
-  type GoalMovement,
-} from "./goals.ts";
-export {
   reconcile,
   MATCH_WINDOW_DAYS,
   PENDING_GRACE_DAYS,
@@ -82,7 +74,7 @@ export {
   type LeavePeriod,
   type MonthComparison,
 } from "./income-forecast.ts";
-export { leaveImpact, type GoalImpact, type ImpactGoal, type LeaveImpact, type LeaveImpactInput, type MonthImpact } from "./leave-impact.ts";
+export { leaveImpact, type LeaveImpact, type LeaveImpactInput, type MonthImpact } from "./leave-impact.ts";
 export {
   CATEGORY_TEMPLATE,
   TEMPLATE_RULES,

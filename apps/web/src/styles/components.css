@@ -696,38 +696,38 @@ main ul > li.budget-line.sub {
 .cat-slate { --cat: var(--cat-slate); }
 .cat-grey { --cat: var(--cat-grey); }
 .cat-lime { --cat: var(--cat-lime); }
-/* Nytt sparmål: fält under varandra med etiketten ovanför. */
-.goal-form {
+/* Formulär: fält under varandra med etiketten ovanför. */
+.stack-form {
   display: grid;
   gap: var(--space-4);
 }
 
-.goal-form > label {
+.stack-form > label {
   display: grid;
   gap: var(--space-1);
   font-size: 0.875rem;
   color: var(--muted);
 }
 
-.goal-form > label > input,
-.goal-form > label > select {
+.stack-form > label > input,
+.stack-form > label > select {
   width: 100%;
   font-size: 1rem;
   color: var(--text);
 }
 
-.goal-form fieldset {
+.stack-form fieldset {
   margin: 0;
   padding: 0;
   border: 0;
 }
 
-.goal-form legend {
+.stack-form legend {
   margin-bottom: var(--space-2);
   font-size: 0.875rem;
   color: var(--muted);
 }
-.goal-form > label.check {
+.stack-form > label.check {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -735,15 +735,6 @@ main ul > li.budget-line.sub {
   font-size: 1rem;
 }
 
-/* Sparat av målet med status bredvid, på sparmålets sida. */
-.goal-progress {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  font-weight: 600;
-}
 /* Sidans rubrik med en ikonknapp till höger, t.ex. kugghjulet på Översikt. */
 .page-header {
   display: flex;

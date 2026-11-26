@@ -42,28 +42,8 @@ const LEAVE = {
   },
   impacts: [
     { type: "budget", period: "2027-03", budget_minor: 3200000, income_minor: 2014000, shortfall_minor: 1186000 },
-    { type: "goal", goal_id: "g1", name: "Resa till Japan", lost_saving_minor: 840000, delay_months: 3, reach_period_before: "2027-12", reach_period_after: "2028-03", on_track_before: false, on_track_after: false },
   ],
 };
-
-/** Påhittade sparmål i samma form som GET /api/goals: i fas, sent och utan sparttakt. */
-const GOALS = [
-  {
-    id: "g1", name: "Resa till Japan", target_minor: 6000000, target_date: "2027-08-31", source: "manual", account_id: null, account_missing: false,
-    saved_minor: 2150000, monthly_rate_minor: 320000, contributions: [],
-    forecast: { kind: "eta", remaining_minor: 3850000, months_left: 13, reach_period: "2027-12", on_track: false, months_late: 4, required_monthly_minor: 427778 },
-  },
-  {
-    id: "g2", name: "Buffert", target_minor: 10000000, target_date: "2027-12-31", source: "account", account_id: "acc_2", account_missing: false,
-    saved_minor: 7400000, monthly_rate_minor: 300000, contributions: [],
-    forecast: { kind: "eta", remaining_minor: 2600000, months_left: 9, reach_period: "2027-08", on_track: true, months_late: 0, required_monthly_minor: 200000 },
-  },
-  {
-    id: "g3", name: "Ny barnvagn", target_minor: 800000, target_date: "2027-03-31", source: "manual", account_id: null, account_missing: false,
-    saved_minor: 120000, monthly_rate_minor: 0, contributions: [],
-    forecast: { kind: "never", remaining_minor: 680000, required_monthly_minor: 170000 },
-  },
-];
 
 const OVERVIEW = {
   period: NOVEMBER,
@@ -143,7 +123,6 @@ export async function useFakeApi(
     transaction("t3", "2026-11-03", -129900, "Påhittade Möbler AB"),
   ];
   const budgets = new Map<string, { category_id: string; budget_minor: number }[]>();
-  const goals: Record<string, unknown>[] = GOALS.map((g) => ({ ...g }));
   const salary = {
     id: "lon1", account: { id: "acc_1", name: "Vardag", type: "checking" }, status: "booked", transaction_date: "2026-11-25", booking_date: "2026-11-25",
     amount_minor: 3361000, counterparty: "", counterparty_norm: "EXEMPELFÖRETAGET AB", description: "EXEMPELFÖRETAGET AB LÖN", category_id: null, category_source: "none",
@@ -203,15 +182,6 @@ export async function useFakeApi(
 
   const handle = (method: string, path: string, body: Record<string, unknown>): [number, unknown] => {
     if (path === "/api/overview") return [200, overview()];
-    if (path === "/api/goals" && method === "POST") {
-      const goal = {
-        ...GOALS[2], id: `g${String(goals.length + 1)}`, name: body["name"], target_minor: body["target_minor"], target_date: body["target_date"] ?? null,
-        saved_minor: 0, monthly_rate_minor: 0, forecast: { kind: "never", remaining_minor: body["target_minor"], required_monthly_minor: null },
-      };
-      goals.push(goal);
-      return [201, goal];
-    }
-    if (path === "/api/goals") return [200, { items: goals }];
     if (path === "/api/loans") {
       return [200, {
         loans,
@@ -265,15 +235,6 @@ export async function useFakeApi(
       return [201, period];
     }
     if (path === "/api/leave-periods") return [200, { items: leave }];
-    const goalPath = /^\/api\/goals\/([^/]+)(\/contributions)?$/u.exec(path);
-    const goal = goals.find((g) => g["id"] === goalPath?.[1]);
-    if (goal && goalPath?.[2] && method === "POST") {
-      const amount = Number(body["amount_minor"]);
-      goal["saved_minor"] = Number(goal["saved_minor"]) + amount;
-      goal["contributions"] = [{ date: "2026-11-15", amount_minor: amount }, ...(goal["contributions"] as unknown[])];
-      return [201, goal];
-    }
-    if (goal && !goalPath?.[2]) return [200, goal];
     if (path === "/api/categories") return [200, { items: CATEGORIES }];
     if (path === "/api/rules") return [200, { items: state.rules }];
     if (path === "/api/connections" && method === "POST") return [200, { redirect_url: `${FAKE_BANK}/auth?state=s-1` }];

@@ -3,7 +3,7 @@
 // i API:t och visas på Inkomst när perioden är sparad.
 import { useState, type SyntheticEvent } from "react";
 import { field, postJson } from "../api.ts";
-import { parseKronor } from "../goals/NewGoal.tsx";
+import { parseKronor } from "../kronor.ts";
 import { navigate } from "../router.tsx";
 import { useToast } from "../toast.tsx";
 
@@ -83,7 +83,7 @@ export function NewLeave() {
   return (
     <main>
       <h1>Planera föräldraledighet</h1>
-      <form className="card goal-form" aria-label="Planera föräldraledighet" onSubmit={(e) => void save(e)}>
+      <form className="card stack-form" aria-label="Planera föräldraledighet" onSubmit={(e) => void save(e)}>
         <label>
           Från
           <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); }} />
