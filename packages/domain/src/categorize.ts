@@ -60,7 +60,8 @@ function matches(rule: Pick<CategoryRule, "match" | "pattern">, text: MatchText)
     case "counterparty_prefix":
       return matchesWordPrefix(rule.pattern, text.key);
     case "description_contains":
-      return rule.pattern !== "" && text.description.includes(rule.pattern);
+      // Texten kan stå i motparten eller i beskrivningen, och versaler och gemener spelar ingen roll (KK-47-A).
+      return rule.pattern !== "" && (text.description.includes(rule.pattern) || text.key.includes(rule.pattern));
   }
 }
 

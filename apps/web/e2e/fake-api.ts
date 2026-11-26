@@ -95,7 +95,8 @@ const ACTUALS: Record<string, Record<string, number>> = {
 };
 
 export interface FakeApi {
-  readonly rules: { id: string; pattern: string; category_id: string; source: string; hits: number }[];
+  readonly rules: { id: string; pattern: string; category_id: string; source: string; hits: number; match?: string }[];
+  readonly categoryResets: unknown[];
   readonly budgetPuts: unknown[];
   /** Sparade riktlinjer (KK-42), i den ordning de sparades. */
   readonly guidelinePuts: unknown[];
@@ -134,7 +135,8 @@ export async function useFakeApi(
     id: "lan1", name: "Bolån del 1", lender: "Exempelbanken", balance_minor: 120000000, interest_rate_bp: 350, rate_fixed_until: "2026-12-15", amortization_minor: 200000,
     monthly_interest_minor: 350000, monthly_amortization_minor: 200000, monthly_cost_minor: 550000, rate_fixed: true, rate_fixed_days_left: 41, rate_fixed_ending: true,
   }];
-  const state: FakeApi = { rules: [], budgetPuts: [], guidelinePuts: [], accountPatches: [] };
+  const state: FakeApi = { rules: [], budgetPuts: [], guidelinePuts: [], accountPatches: [], categoryResets: [] };
+  let categoriesCleared = false;
   /** Påhittat underlag till budgetplaneraren (KK-42): fasta siffror. */
   const guidelines = () => ({
     period: NOVEMBER,
@@ -242,8 +244,20 @@ export async function useFakeApi(
       return [201, period];
     }
     if (path === "/api/leave-periods") return [200, { items: leave }];
-    if (path === "/api/categories") return [200, { items: CATEGORIES }];
+    if (path === "/api/categories") return [200, { items: categoriesCleared ? [] : CATEGORIES }];
+    if (path === "/api/rules" && method === "POST") {
+      const text = String(body["pattern"]).trim().toUpperCase();
+      const rule = { id: `r-${String(state.rules.length + 1)}`, match: body["match"] === "contains" ? "description_contains" : "counterparty_prefix", pattern: text, category_id: String(body["category_id"]), source: "learned", hits: 0 };
+      state.rules.push(rule);
+      return [201, { rule, retroactive_candidates: 0, protected_manual: 0 }];
+    }
     if (path === "/api/rules") return [200, { items: state.rules }];
+    if (path === "/api/categories/reset" && method === "POST") {
+      if (body["preview"] === true) return [200, { categories: 37, rules: 14, transactions: 812, splits: 3, budget_lines: 9 }];
+      state.categoryResets.push(body);
+      categoriesCleared = true;
+      return [200, { reset: true }];
+    }
     if (path === "/api/connections" && method === "POST") return [200, { redirect_url: `${FAKE_BANK}/auth?state=s-1` }];
     if (path === "/api/connections/callback" && method === "POST") {
       if (body["code"] !== "c-1" || body["state"] !== "s-1") return [400, { error: "invalid_state" }];

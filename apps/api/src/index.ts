@@ -8,7 +8,7 @@ import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
 import { listAccounts, patchAccount } from "./accounts.ts";
 import { deleteBudget, getBudget, putBudget } from "./budget.ts";
-import { createCategory, listCategories, mergeCategory, patchCategory } from "./categories.ts";
+import { createCategory, listCategories, mergeCategory, patchCategory, resetCategories } from "./categories.ts";
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
 import { deleteLoan, listLoans, putLoan } from "./loans.ts";
@@ -249,6 +249,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     if (request.method === "GET") return listCategories(env);
     if (request.method === "POST") return createCategory(request, env, context.sync);
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
+  }
+
+  if (pathname === "/api/categories/reset") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return resetCategories(request, env);
   }
 
   const mergeMatch = /^\/api\/categories\/([A-Za-z0-9_-]{1,64})\/merge$/u.exec(pathname);

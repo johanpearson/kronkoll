@@ -71,7 +71,7 @@ const click = async (name: string) => {
 
 async function fillNewRule(pattern: string, categoryId: string) {
   await click("Ny regel");
-  fireEvent.change(screen.getByLabelText("Allt som börjar med"), { target: { value: pattern } });
+  fireEvent.change(screen.getByLabelText("Text"), { target: { value: pattern } });
   fireEvent.change(screen.getByLabelText("Får kategorin"), { target: { value: categoryId } });
   await click("Spara");
 }
@@ -81,9 +81,9 @@ describe("regler i Inställningar (#34, KK-18-B, KK-18-C)", () => {
     api();
     await open();
     expect(rows().map((r) => r.querySelector(".tx-notes")?.textContent)).toEqual([
-      "→ Mat › Livsmedel · Mall · 14 träffar",
-      "→ Hushåll · Egen · 1 träff",
-      "→ Nöje · Egen · 0 träffar",
+      "Börjar med → Mat › Livsmedel · Mall · 14 träffar",
+      "Börjar med → Hushåll · Egen · 1 träff",
+      "Börjar med → Nöje · Egen · 0 träffar",
     ]);
     expect(rows()[2]?.textContent).toContain("Kategorin är arkiverad");
   });
@@ -106,10 +106,41 @@ describe("regler i Inställningar (#34, KK-18-B, KK-18-C)", () => {
     expect(screen.getByText("Regeln matchar 12 tidigare transaktioner. 1 manuellt valda ändras inte.")).toBeTruthy();
     await click("Applicera på dem");
     expect(changes(calls)).toEqual([
-      { method: "POST", path: "/api/rules", body: { pattern: "skanetrafiken", category_id: "mat" }, csrf: "1" },
+      { method: "POST", path: "/api/rules", body: { pattern: "skanetrafiken", match: "prefix", category_id: "mat" }, csrf: "1" },
       { method: "POST", path: "/api/rules/r-ny/apply", body: {}, csrf: "1" },
     ]);
     expect(screen.getByRole("status").textContent).toBe("12 transaktioner fick den nya kategorin.");
+  });
+
+  it("en regel som innehåller en text skickar med slaget, och Innehåller visas i listan (KK-47-B)", async () => {
+    const calls = api({
+      save: [201, { rule: { id: "r-ny" }, retroactive_candidates: 0, protected_manual: 0 }],
+      rules: [200, { items: [...RULES.items, { id: "r-amazon", match: "description_contains", pattern: "AMAZON", category_id: "hushall", source: "learned", hits: 4, category_archived: false }] }],
+    });
+    await open();
+    expect(rows().map((r) => r.querySelector(".tx-notes")?.textContent)).toContain("Innehåller → Hushåll · Egen · 4 träffar");
+    await click("Ny regel");
+    fireEvent.change(screen.getByLabelText("Träffar"), { target: { value: "contains" } });
+    expect(screen.getByLabelText<HTMLInputElement>("Text").placeholder).toBe("amazon");
+    expect(screen.getByText("Versaler och gemener spelar ingen roll.")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "Amazon" } });
+    fireEvent.change(screen.getByLabelText("Får kategorin"), { target: { value: "hushall" } });
+    await click("Spara");
+    expect(changes(calls)).toEqual([{ method: "POST", path: "/api/rules", body: { pattern: "Amazon", match: "contains", category_id: "hushall" }, csrf: "1" }]);
+  });
+
+  it("en befintlig innehåller-regel öppnas som Innehåller och behåller slaget när den ändras", async () => {
+    const calls = api({
+      save: [200, { rule: { id: "r-amazon" }, retroactive_candidates: 0, protected_manual: 0 }],
+      rules: [200, { items: [{ id: "r-amazon", match: "description_contains", pattern: "AMAZON", category_id: "hushall", source: "learned", hits: 4, category_archived: false }] }],
+    });
+    await open();
+    await click("Ändra regeln AMAZON");
+    await click("Ändra namn eller kategori");
+    expect(screen.getByLabelText<HTMLSelectElement>("Träffar").value).toBe("contains");
+    fireEvent.change(screen.getByLabelText("Träffar"), { target: { value: "prefix" } });
+    await click("Spara");
+    expect(changes(calls)).toEqual([{ method: "PATCH", path: "/api/rules/r-amazon", body: { pattern: "AMAZON", match: "prefix", category_id: "hushall" }, csrf: "1" }]);
   });
 
   it("\"Inte nu\" sparar regeln utan att ändra tidigare, och utan träffar bakåt frågar den inte", async () => {
@@ -131,10 +162,10 @@ describe("regler i Inställningar (#34, KK-18-B, KK-18-C)", () => {
     await open();
     await click("Ändra regeln ICA");
     await click("Ändra namn eller kategori");
-    expect(screen.getByLabelText<HTMLInputElement>("Allt som börjar med").value).toBe("ICA");
+    expect(screen.getByLabelText<HTMLInputElement>("Text").value).toBe("ICA");
     fireEvent.change(screen.getByLabelText("Får kategorin"), { target: { value: "mat" } });
     await click("Spara");
-    expect(changes(calls)).toEqual([{ method: "PATCH", path: "/api/rules/r-ica", body: { pattern: "ICA", category_id: "mat" }, csrf: "1" }]);
+    expect(changes(calls)).toEqual([{ method: "PATCH", path: "/api/rules/r-ica", body: { pattern: "ICA", match: "prefix", category_id: "mat" }, csrf: "1" }]);
   });
 
   it("tar bort efter en fråga, och Stäng och Avbryt ändrar ingenting", async () => {
@@ -156,7 +187,7 @@ describe("regler i Inställningar (#34, KK-18-B, KK-18-C)", () => {
   });
 
   it.each([
-    [[400, { error: "invalid_request" }], "Skriv början av ett namn, till exempel IKEA."],
+    [[400, { error: "invalid_request" }], "Skriv en text, till exempel IKEA."],
     [[400, { error: "unknown_category" }], "Välj en kategori som finns."],
     [[503, { error: "unavailable" }], "Det gick inte att spara regeln. Försök igen."],
   ] as [[number, unknown], string][])("visar varför en regel inte sparas: %j", async (save, message) => {

@@ -65,7 +65,7 @@ const writes = (calls: Call[]) => calls.filter((c) => c.method !== "GET").map(({
 
 async function newExcludeRule(pattern: string) {
   await click("Ny regel");
-  fireEvent.change(screen.getByLabelText("Allt som börjar med"), { target: { value: pattern } });
+  fireEvent.change(screen.getByLabelText("Text"), { target: { value: pattern } });
   fireEvent.change(screen.getByLabelText("Får kategorin"), { target: { value: "exclude" } });
   await click("Spara");
 }
@@ -74,7 +74,7 @@ describe("regler med åtgärden Räkna inte (KK-39-C)", () => {
   it("visas i listan med Räknas inte i stället för kategori, och går att söka fram", async () => {
     api();
     await open();
-    expect(row("PAHITTADE MOBLER").querySelector(".tx-notes")?.textContent).toBe("→ Räknas inte · Egen · 3 träffar");
+    expect(row("PAHITTADE MOBLER").querySelector(".tx-notes")?.textContent).toBe("Börjar med → Räknas inte · Egen · 3 träffar");
     fireEvent.change(screen.getByRole("searchbox", { name: "Sök regel" }), { target: { value: "räknas" } });
     expect(within(screen.getByRole("list", { name: "Regler" })).getAllByRole("listitem")).toHaveLength(1);
   });
@@ -83,10 +83,10 @@ describe("regler med åtgärden Räkna inte (KK-39-C)", () => {
     const calls = api();
     await open();
     await newExcludeRule("påhittade möbler");
-    expect(writes(calls)).toEqual([{ method: "POST", path: "/api/rules", body: { pattern: "påhittade möbler", action: "exclude", preview: true } }]);
+    expect(writes(calls)).toEqual([{ method: "POST", path: "/api/rules", body: { pattern: "påhittade möbler", match: "prefix", action: "exclude", preview: true } }]);
     expect(screen.getByText("Regeln träffar 3 transaktioner. De räknas inte i budget och översikt. Det du själv har valt ändras inte.")).toBeDefined();
     await click("Spara regeln");
-    expect(writes(calls).at(-1)).toEqual({ method: "POST", path: "/api/rules", body: { pattern: "påhittade möbler", action: "exclude" } });
+    expect(writes(calls).at(-1)).toEqual({ method: "POST", path: "/api/rules", body: { pattern: "påhittade möbler", match: "prefix", action: "exclude" } });
     expect(screen.getByRole("status").textContent).toBe("Regeln är sparad. 3 transaktioner räknas inte längre.");
   });
 
@@ -122,9 +122,9 @@ describe("regler med åtgärden Räkna inte (KK-39-C)", () => {
     expect(within(row("PAHITTADE MOBLER")).queryByRole("button", { name: "Visa träffar" })).toBeNull();
     await click("Ändra namn", row("PAHITTADE MOBLER"));
     expect(within(row("PAHITTADE MOBLER")).queryByLabelText("Får kategorin")).toBeNull();
-    fireEvent.change(within(row("PAHITTADE MOBLER")).getByLabelText("Allt som börjar med"), { target: { value: "påhittade möbler ab" } });
+    fireEvent.change(within(row("PAHITTADE MOBLER")).getByLabelText("Text"), { target: { value: "påhittade möbler ab" } });
     await click("Spara", row("PAHITTADE MOBLER"));
-    expect(writes(calls)).toEqual([{ method: "PATCH", path: "/api/rules/r-mobler", body: { pattern: "påhittade möbler ab" } }]);
+    expect(writes(calls)).toEqual([{ method: "PATCH", path: "/api/rules/r-mobler", body: { pattern: "påhittade möbler ab", match: "prefix" } }]);
     expect(screen.getByRole("status").textContent).toBe("Regeln är sparad. 1 transaktioner räknas inte längre.");
 
     await click("Ändra regeln PAHITTADE MOBLER");

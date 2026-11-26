@@ -109,7 +109,7 @@ describe("förhandsvisa regler (#34, KK-18-C)", () => {
     api();
     await open();
     await click("Ny regel");
-    fireEvent.change(screen.getByLabelText("Allt som börjar med"), { target: { value: "ikea" } });
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "ikea" } });
     fireEvent.change(screen.getByLabelText("Får kategorin"), { target: { value: "hushall" } });
     await click("Spara");
     expect(screen.getByText(/Regeln matchar 1 tidigare transaktioner/u)).toBeTruthy();

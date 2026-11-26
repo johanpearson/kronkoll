@@ -48,6 +48,30 @@ test("kategorisera med Gör alltid så skapar en regel som även tar tidigare k�
   await expect(page.getByRole("main")).toContainText("HÖRNBUTIKEN EXEMPELVÄGEN");
 });
 
+test("lägg till en regel som innehåller en text, oavsett versaler (V-e2e-rule-contains, KK-47)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/installningar/regler");
+  await page.getByRole("button", { name: "Ny regel" }).click();
+  await page.getByLabel("Träffar").selectOption("contains");
+  await page.getByLabel("Text").fill("Amazon");
+  await page.getByLabel("Får kategorin").selectOption({ label: "Hushåll › Förbrukning" });
+  await page.getByRole("button", { name: "Spara" }).click();
+  await expect(page.getByRole("status")).toHaveText("Regeln är sparad och gäller nya transaktioner.");
+  await expect(page.getByRole("list", { name: "Regler" }).getByRole("listitem").filter({ hasText: "AMAZON" })).toContainText("Innehåller → Hushåll › Förbrukning");
+});
+
+test("rensa alla kategorier efter en fråga och börja om (V-e2e-categories-reset, KK-48)", async ({ page }) => {
+  const api = await useFakeApi(page);
+  await page.goto("/installningar/kategorier");
+  await page.getByRole("button", { name: "Rensa alla kategorier" }).click();
+  const dialog = page.getByRole("region", { name: "Rensa alla kategorier" });
+  await expect(dialog).toContainText("37 kategorier och 14 regler tas bort");
+  await dialog.getByRole("button", { name: "Rensa alla kategorier" }).click();
+  await expect(page.getByRole("status")).toHaveText("Alla kategorier är rensade. Lägg till nya från början.");
+  await expect(page.getByText("Det finns inga kategorier.")).toBeVisible();
+  expect(api.categoryResets).toEqual([{ confirm: true, restore_template: false }]);
+});
+
 test("planera en budget från förväntad inkomst, se vad som blir över och spara den (V-e2e-planner, KK-42)", async ({ page }) => {
   const api = await useFakeApi(page);
   await page.goto("/budget");

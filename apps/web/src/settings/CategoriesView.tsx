@@ -6,6 +6,7 @@ import { useEffect, useState, type SyntheticEvent } from "react";
 import { field, getJson, patchJson, postJson, type ApiResult } from "../api.ts";
 import { IconButton } from "../icon-button.tsx";
 import { Link } from "../router.tsx";
+import { ResetCategories } from "./ResetCategories.tsx";
 
 interface Category {
   readonly id: string;
@@ -202,6 +203,7 @@ export function CategoriesView() {
           </section>
         );
       })}
+      {categories.length === 0 && <p>Det finns inga kategorier. Lägg till en huvudkategori för att komma igång.</p>}
       {edit?.id === null ? (
         <section className="card">
           <InlineForm label="Namn på huvudkategorin" submit="Lägg till" initial="" onSubmit={(name) => done(postJson("/api/categories", { parent_id: null, name }))} onClose={close} />
@@ -213,6 +215,7 @@ export function CategoriesView() {
           </button>
         </p>
       )}
+      <ResetCategories onDone={() => { setEdit(null); setReload((n) => n + 1); }} />
     </main>
   );
 }

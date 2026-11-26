@@ -1,5 +1,6 @@
 // Regler (#34, KK-18-B, KK-18-C): alla kategoriseringsregler, med hur många transaktioner varje regel
-// träffar. Lägg till en regel direkt ("allt som börjar med IKEA → Hushåll"), ändra eller ta bort. En ny
+// träffar. Lägg till en regel direkt ("allt som börjar med IKEA → Hushåll", eller "allt som innehåller amazon"
+// oavsett versaler, KK-47), ändra eller ta bort. En ny
 // eller ändrad regel gäller nya transaktioner direkt; för tidigare frågar vyn först. Manuellt valda
 // ändras aldrig. En regel vars kategori är arkiverad markeras med text. "Visa träffar" och frågan efter
 // att en regel sparats visar vilka transaktioner den gäller. "Applicera alla regler" kör alla regler över
@@ -25,6 +26,8 @@ interface Rule {
   /** Null för en Räkna inte-regel. */
   readonly categoryId: string | null;
   readonly exclude: boolean;
+  /** Börjar med en motpart, eller innehåller en text var som helst (KK-47). */
+  readonly contains: boolean;
   readonly learned: boolean;
   readonly hits: number;
   readonly archived: boolean;
@@ -42,6 +45,7 @@ function toRule(raw: unknown): Rule | null {
     pattern,
     categoryId: exclude ? null : (categoryId as string),
     exclude,
+    contains: field(raw, "match") === "description_contains",
     learned: field(raw, "source") === "learned",
     hits: typeof hits === "number" ? hits : 0,
     archived: field(raw, "category_archived") === true,
@@ -58,7 +62,7 @@ type Ask = { readonly ruleId: string; readonly candidates: number; readonly prot
 
 /** Svaret på en sparad regel: frågan om tidigare transaktioner, null om det inte finns några, eller ett fel. */
 function outcome({ status, body }: ApiResult): Ask | null | string {
-  if (status === 400) return field(body, "error") === "unknown_category" ? "Välj en kategori som finns." : "Skriv början av ett namn, till exempel IKEA.";
+  if (status === 400) return field(body, "error") === "unknown_category" ? "Välj en kategori som finns." : "Skriv en text, till exempel IKEA.";
   if (status !== 200 && status !== 201) return "Det gick inte att spara regeln. Försök igen.";
   const ruleId = field(field(body, "rule"), "id");
   const candidates = field(body, "retroactive_candidates");
@@ -70,6 +74,7 @@ function outcome({ status, body }: ApiResult): Ask | null | string {
 /** Mönster och kategori (eller Räkna inte), för en ny regel eller en som ändras. */
 function RuleForm(props: { title: string; rule?: Rule; categories: Categories; onSaved: (ask: Ask | null) => void; onExcluded: (matches: number) => void; onClose: () => void }) {
   const [pattern, setPattern] = useState(props.rule?.pattern ?? "");
+  const [match, setMatch] = useState<"prefix" | "contains">(props.rule?.contains ? "contains" : "prefix");
   const [categoryId, setCategoryId] = useState(props.rule?.exclude ? EXCLUDE : (props.rule?.categoryId ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,11 +84,11 @@ function RuleForm(props: { title: string; rule?: Rule; categories: Categories; o
   /** Sparar en Räkna inte-regel: ny med POST, ändrad med PATCH där bara namnet går att byta. */
   const saveExclude = async () => {
     setBusy(true);
-    const result = props.rule ? await patchJson(`/api/rules/${encodeURIComponent(props.rule.id)}`, { pattern }) : await postJson("/api/rules", { pattern, action: EXCLUDE });
+    const result = props.rule ? await patchJson(`/api/rules/${encodeURIComponent(props.rule.id)}`, { pattern, match }) : await postJson("/api/rules", { pattern, match, action: EXCLUDE });
     setBusy(false);
     const matches = field(result.body, "matches");
     if ((result.status === 200 || result.status === 201) && typeof matches === "number") props.onExcluded(matches);
-    else setError(result.status === 400 ? "Skriv början av ett namn, till exempel IKEA." : "Det gick inte att spara regeln. Försök igen.");
+    else setError(result.status === 400 ? "Skriv en text, till exempel IKEA." : "Det gick inte att spara regeln. Försök igen.");
   };
 
   const save = async (event: SyntheticEvent<HTMLFormElement>) => {
@@ -92,14 +97,14 @@ function RuleForm(props: { title: string; rule?: Rule; categories: Categories; o
     if (categoryId === EXCLUDE && props.rule) return saveExclude();
     setBusy(true);
     if (categoryId === EXCLUDE) {
-      const { status, body } = await postJson("/api/rules", { pattern, action: EXCLUDE, preview: true });
+      const { status, body } = await postJson("/api/rules", { pattern, match, action: EXCLUDE, preview: true });
       setBusy(false);
       const matches = field(body, "matches");
       if (status === 200 && typeof matches === "number") setConfirm(matches);
-      else setError(status === 400 ? "Skriv början av ett namn, till exempel IKEA." : "Det gick inte att räkna träffarna. Försök igen.");
+      else setError(status === 400 ? "Skriv en text, till exempel IKEA." : "Det gick inte att räkna träffarna. Försök igen.");
       return;
     }
-    const body = { pattern, category_id: categoryId };
+    const body = { pattern, match, category_id: categoryId };
     const result = props.rule ? await patchJson(`/api/rules/${encodeURIComponent(props.rule.id)}`, body) : await postJson("/api/rules", body);
     setBusy(false);
     const next = outcome(result);
@@ -126,9 +131,17 @@ function RuleForm(props: { title: string; rule?: Rule; categories: Categories; o
   return (
     <form className="tx-editor" aria-label={props.title} onSubmit={(e) => void save(e)}>
       <label>
-        Allt som börjar med
-        <input value={pattern} maxLength={60} placeholder="IKEA" onChange={(e) => { setPattern(e.target.value); }} />
+        Träffar
+        <select value={match} onChange={(e) => { setMatch(e.target.value === "contains" ? "contains" : "prefix"); }}>
+          <option value="prefix">Allt som börjar med</option>
+          <option value="contains">Allt som innehåller</option>
+        </select>
       </label>
+      <label>
+        Text
+        <input value={pattern} maxLength={60} placeholder={match === "contains" ? "amazon" : "IKEA"} aria-describedby="rule-case-hint" onChange={(e) => { setPattern(e.target.value); }} />
+      </label>
+      <small id="rule-case-hint">Versaler och gemener spelar ingen roll.</small>
       {!props.rule?.exclude && (
         <label>
           Får kategorin
@@ -241,7 +254,7 @@ export function RulesView() {
   return (
     <main>
       {header}
-      <p>En regel ger en kategori åt allt som börjar med ett visst namn. Den används vid varje synk. Manuellt valda kategorier ändras aldrig. En regel kan också göra att det den träffar inte räknas i budget och översikt.</p>
+      <p>En regel ger en kategori åt allt som börjar med eller innehåller en viss text, oavsett versaler. Den används vid varje synk. Manuellt valda kategorier ändras aldrig. En regel kan också göra att det den träffar inte räknas i budget och översikt.</p>
       <div className="sync">
         <SyncButton onDone={() => { setReload((n) => n + 1); }} />
         <button type="button" onClick={() => void previewAll()}>
@@ -309,7 +322,7 @@ export function RulesView() {
                   )}
                 </div>
                 <small className="tx-notes">
-                  → {name(r)} · {r.learned ? "Egen" : "Mall"} · {r.hits === 1 ? "1 träff" : `${String(r.hits)} träffar`}
+                  {r.contains ? "Innehåller" : "Börjar med"} → {name(r)} · {r.learned ? "Egen" : "Mall"} · {r.hits === 1 ? "1 träff" : `${String(r.hits)} träffar`}
                 </small>
                 {r.archived && <span className="badge warn">Kategorin är arkiverad</span>}
                 {open === "menu" && (
