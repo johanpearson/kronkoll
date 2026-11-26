@@ -14,6 +14,7 @@ import { PeriodNav } from "../icon-button.tsx";
 import { Link } from "../router.tsx";
 import { useToast } from "../toast.tsx";
 import { fetchCategories, NO_CATEGORIES, shiftPeriodKey, type Categories } from "../transactions/TransactionsView.tsx";
+import { ExportSection } from "./ExportSection.tsx";
 import { clearDraft, loadDraft, saveDraft, type Draft, type IncomeRow } from "./planner-draft.ts";
 
 /** Hur många av de tidigare perioderna förslaget räknas på (samma som domänens NORMAL_MONTHS). */
@@ -286,6 +287,7 @@ export function PlannerView() {
       {guidelines && (
         <PlannerForm key={`${guidelines.period.key}-${String(reload)}-${accountIds.join(",")}`} guidelines={guidelines} categories={categories} accountIds={accountIds} onChanged={() => { setReload((n) => n + 1); }} />
       )}
+      {guidelines && <ExportSection guidelines={guidelines} categories={categories} accountIds={accountIds} />}
     </main>
   );
 }

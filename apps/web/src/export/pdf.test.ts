@@ -4,7 +4,7 @@ import type { ExportDoc } from "./export-doc.ts";
 import { buildPdf, winAnsi } from "./pdf.ts";
 
 const doc = (rows = 2): ExportDoc => ({
-  title: "Budget och riktlinjer 1 nov. 2026 – 30 nov. 2026",
+  title: "Budget 1 nov. 2026 – 30 nov. 2026",
   fileStem: "kronkoll-budget-2026-11",
   summary: [["Läge", "Sparläge"], ["Sparmål per period", { minor: 800000 }]],
   header: ["Kategori", "Utfall", "Andel", "Status"],
@@ -53,7 +53,7 @@ describe("buildPdf (KK-43-C)", () => {
   it("innehåller texten, med svenska tecken som en byte och parenteser och snedstreck skyddade", async () => {
     const pdf = await read(buildPdf(doc()));
     // Byten 0x96 läses som tankstreck i Windows-1252, vilket är vad PDF-läsaren också gör.
-    expect(pdf).toContain("Budget och riktlinjer 1 nov. 2026 – 30 nov. 2026");
+    expect(pdf).toContain("Budget 1 nov. 2026 – 30 nov. 2026");
     expect(pdf).toContain("Mat \\(dagligvaror\\) \\\\ å");
     expect(pdf).toContain("Över");
     expect(pdf).toContain("108 %");

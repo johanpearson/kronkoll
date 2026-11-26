@@ -8,7 +8,7 @@ import { buildPdf } from "../export/pdf.ts";
 import { buildXlsx } from "../export/xlsx.ts";
 import { useToast } from "../toast.tsx";
 import type { Categories } from "../transactions/TransactionsView.tsx";
-import type { Guidelines } from "./guidelines.ts";
+import type { Guidelines } from "../guidelines/guidelines.ts";
 
 type Format = "xlsx" | "pdf";
 
@@ -45,7 +45,7 @@ export function ExportSection(props: { guidelines: Guidelines; categories: Categ
     <section className="card" aria-label="Dela eller exportera">
       <h2>Dela eller exportera</h2>
       <p>
-        Budget och riktlinjer för perioden som visas, som sparade. På telefonen öppnas delningsmenyn, annars laddas filen ned. Filen skapas här på enheten.
+        Budgeten för perioden som visas, som sparade. På telefonen öppnas delningsmenyn, annars laddas filen ned. Filen skapas här på enheten.
       </p>
       <p className="actions">
         <button type="button" disabled={busy} onClick={() => void run("xlsx")}>

@@ -88,9 +88,9 @@ test("planera en budget från förväntad inkomst, se vad som blir över och spa
   await expect(page.getByRole("status")).toHaveText("Budgeten för perioden är sparad.");
 });
 
-test("exportera budget och riktlinjer som Excel och som PDF (V-e2e-export, KK-43)", async ({ page }) => {
+test("exportera budgeten som Excel och som PDF (V-e2e-export, KK-43)", async ({ page }) => {
   await useFakeApi(page);
-  await page.goto("/budget/riktlinjer");
+  await page.goto("/budget/planera");
   // Skrivbordswebbläsaren har ingen delningsmeny, så filerna laddas ned. Excel-biblioteket hämtas först här
   // och måste få köra under samma CSP som i drift.
   const excel = page.waitForEvent("download");

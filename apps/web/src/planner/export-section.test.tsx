@@ -66,7 +66,7 @@ const settle = () =>
   });
 
 async function open() {
-  window.history.replaceState(null, "", "/budget/riktlinjer");
+  window.history.replaceState(null, "", "/budget/planera");
   await act(async () => {
     render(<App />);
     await Promise.resolve();
@@ -87,7 +87,7 @@ describe("Dela eller exportera (KK-43)", () => {
     expect(file?.name).toBe("kronkoll-budget-2026-11.xlsx");
     expect(file?.type).toBe("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
     expect(await head(file as File, 4)).toEqual([0x50, 0x4b, 0x03, 0x04]);
-    expect(title).toBe("Budget och riktlinjer 1 nov. 2026 – 30 nov. 2026");
+    expect(title).toBe("Budget 1 nov. 2026 – 30 nov. 2026");
     expect(screen.getByRole("status").textContent).toBe("Filen är nedladdad.");
   });
 
@@ -101,7 +101,7 @@ describe("Dela eller exportera (KK-43)", () => {
     expect(file?.name).toBe("kronkoll-budget-2026-11.pdf");
     expect(file?.type).toBe("application/pdf");
     expect(await head(file as File, 5)).toEqual([...new TextEncoder().encode("%PDF-")]);
-    expect(title).toBe("Budget och riktlinjer 1 nov. 2026 – 30 nov. 2026");
+    expect(title).toBe("Budget 1 nov. 2026 – 30 nov. 2026");
     expect(screen.getByRole("status").textContent).toBe("Filen är delad.");
   });
 
