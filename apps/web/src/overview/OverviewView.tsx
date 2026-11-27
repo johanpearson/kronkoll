@@ -3,11 +3,11 @@
 // Siffrorna räknas i API:t (GET /api/overview); vyn visar dem bara.
 import { formatSek } from "@kronkoll/domain";
 import { Settings } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { field, getJson } from "../api.ts";
 import { IconButton } from "../icon-button.tsx";
 import { Link, navigate } from "../router.tsx";
-import { SyncButton } from "../sync/SyncButton.tsx";
+import { SyncStatus } from "../sync/SyncStatus.tsx";
 import { toPeriod, type Period } from "../transactions/TransactionsView.tsx";
 
 /** Varning när samtycket har så här många dagar kvar eller färre (KK-8-A). */
@@ -155,21 +155,26 @@ function AccountList({ accounts }: { accounts: readonly Account[] }) {
   );
 }
 
-function SyncRow({ lastSyncAt, onDone }: { lastSyncAt: string | null; onDone: () => void }) {
+function SyncRow({ lastSyncAt }: { lastSyncAt: string | null }) {
   return (
     <div className="sync">
       <p>{lastSyncAt === null ? "Inte synkad än" : `Senast synkad ${syncTime.format(new Date(lastSyncAt))}`}</p>
-      <SyncButton onDone={onDone} />
     </div>
   );
 }
 
-/** Rubriken med kugghjulet till Inställningar, som inte har någon egen flik (planens meny). */
-function Header({ title }: { title: string }) {
+/**
+ * Rubriken med kugghjulet till Inställningar, som inte har någon egen flik (planens meny), och synkstatusen
+ * (KK-64-A) när det finns något att synka.
+ */
+function Header({ title, sync }: { title: string; sync?: ReactNode }) {
   return (
     <div className="page-header">
       <h1>{title}</h1>
-      <IconButton label="Inställningar" icon={Settings} onClick={() => { navigate("/installningar"); }} />
+      <div className="page-header-actions">
+        {sync}
+        <IconButton label="Inställningar" icon={Settings} onClick={() => { navigate("/installningar"); }} />
+      </div>
     </div>
   );
 }
@@ -214,14 +219,14 @@ export function OverviewView() {
 
   return (
     <main>
-      <Header title="Översikt" />
+      <Header title="Översikt" sync={<SyncStatus lastSyncAt={o.lastSyncAt} onDone={() => { setReload((n) => n + 1); }} />} />
       <p>{monthOf(o.period.key, monthName).replace(/^./u, (c) => c.toUpperCase())}</p>
       {o.offlineSavedAt && (
         <p className="note" role="note">
           Offline – visar data från {syncTime.format(new Date(o.offlineSavedAt))}.
         </p>
       )}
-      <SyncRow lastSyncAt={o.lastSyncAt} onDone={() => { setReload((n) => n + 1); }} />
+      <SyncRow lastSyncAt={o.lastSyncAt} />
       {expiring.map((c) => (
         <p key={c.id} role="alert">
           {(c.consentDaysLeft ?? 0) < 0

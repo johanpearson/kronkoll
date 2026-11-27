@@ -91,7 +91,7 @@ describe("sidan om en bankkoppling (#34, KK-7-A, KK-8-A)", () => {
     ]);
     const badges = within(screen.getByRole("list", { name: "Synklogg" })).getAllByRole("listitem").map((li) => li.querySelector(".badge")?.textContent);
     expect(badges).toEqual(["Klar", "Misslyckades", "Delvis"]);
-    expect(screen.getByRole("button", { name: "Synka nu" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Synkstatus" })).toBeTruthy();
   });
 
   it("varnar för misslyckade synkar och ett utgånget samtycke", async () => {

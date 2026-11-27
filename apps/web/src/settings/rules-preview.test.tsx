@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen, within } from "@testing-librar
 import { formatSek } from "@kronkoll/domain";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { App } from "../App.tsx";
-import { POLL_MS } from "../sync/SyncButton.tsx";
+import { POLL_MS } from "../sync/SyncStatus.tsx";
 
 afterEach(() => {
   cleanup();
@@ -162,11 +162,12 @@ describe("applicera alla regler (#34, KK-18-C)", () => {
     expect(screen.getByRole("alert").textContent).toBe("Det gick inte att applicera reglerna. Försök igen.");
   });
 
-  it("Synka nu finns på sidan och hämtar reglerna igen när synken är klar", async () => {
+  it("synkstatusen finns på sidan och hämtar reglerna igen när synken är klar", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const calls = api();
     await open();
     const before = calls.filter((c) => c.method === "GET" && c.path === "/api/rules").length;
+    await click("Synkstatus");
     await click("Synka nu");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(POLL_MS * 3);
