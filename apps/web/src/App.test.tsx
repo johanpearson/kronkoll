@@ -61,10 +61,70 @@ describe("appskalet (#30, KK-4)", () => {
 
   it("vyn får en klass för hur den kommer in (KK-62-H)", async () => {
     const { container } = at("/budget");
-    expect(container.querySelector(".ui-view")?.className).toBe("ui-view ui-view-initial");
+    expect(container.querySelector(".ui-view")?.classList.contains("ui-view-initial")).toBe(true);
     fireEvent.click(screen.getByRole("link", { name: "Lån" }));
     await waitFor(() => {
-      expect(container.querySelector(".ui-view")?.className).toBe("ui-view ui-view-tab");
+      expect(container.querySelector(".ui-view")?.classList.contains("ui-view-tab")).toBe(true);
+    });
+  });
+
+  describe("svep mellan flikar (KK-63)", () => {
+    const view = (container: HTMLElement) => container.querySelector(".ui-view") as HTMLElement;
+    const swipe = (element: HTMLElement, from: [number, number], to: [number, number], target: Element = element) => {
+      fireEvent.pointerDown(target, { pointerId: 1, clientX: from[0], clientY: from[1] });
+      fireEvent.pointerMove(target, { pointerId: 1, clientX: (from[0] + to[0]) / 2, clientY: (from[1] + to[1]) / 2 });
+      fireEvent.pointerMove(target, { pointerId: 1, clientX: to[0], clientY: to[1] });
+      fireEvent.pointerUp(target, { pointerId: 1, clientX: to[0], clientY: to[1] });
+    };
+
+    it("ett svep åt vänster går till nästa flik och åt höger till föregående, utan nytt steg (KK-63-A, C)", async () => {
+      const { container } = at("/budget");
+      const before = window.history.length;
+      swipe(view(container), [700, 300], [200, 310]);
+      await waitFor(() => {
+        expect(window.location.pathname).toBe("/lan");
+      });
+      expect(window.history.length).toBe(before);
+      swipe(view(container), [300, 300], [800, 300]);
+      await waitFor(() => {
+        expect(window.location.pathname).toBe("/budget");
+      });
+    });
+
+    it("vyn följer fingret och studsar tillbaka efter ett kort svep", async () => {
+      const { container } = at("/budget");
+      const element = view(container);
+      fireEvent.pointerDown(element, { pointerId: 1, clientX: 600, clientY: 300 });
+      fireEvent.pointerMove(element, { pointerId: 1, clientX: 560, clientY: 300 });
+      expect(element.style.transform).toBe("translateX(-40px)");
+      await new Promise((r) => setTimeout(r, 120));
+      fireEvent.pointerUp(element, { pointerId: 1, clientX: 560, clientY: 300 });
+      expect(element.style.transform).toBe("");
+      expect(window.location.pathname).toBe("/budget");
+    });
+
+    it("ett lodrätt drag är scrollning och byter inte flik", () => {
+      const { container } = at("/budget");
+      swipe(view(container), [600, 100], [400, 700]);
+      expect(window.location.pathname).toBe("/budget");
+    });
+
+    it("svep startar inte i undervyer, från kanten, i formulär eller förbi menyns ände (KK-63-B)", () => {
+      let { container } = at("/installningar/regler");
+      swipe(view(container), [700, 300], [100, 300]);
+      expect(window.location.pathname).toBe("/installningar/regler");
+      cleanup();
+      ({ container } = at("/budget"));
+      swipe(view(container), [10, 300], [700, 300]);
+      expect(window.location.pathname).toBe("/budget");
+      const input = document.createElement("input");
+      view(container).append(input);
+      swipe(view(container), [700, 300], [100, 300], input);
+      expect(window.location.pathname).toBe("/budget");
+      cleanup();
+      ({ container } = at("/inkomst"));
+      swipe(view(container), [700, 300], [100, 300]);
+      expect(window.location.pathname).toBe("/inkomst");
     });
   });
 
