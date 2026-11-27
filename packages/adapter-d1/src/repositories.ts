@@ -198,16 +198,20 @@ export interface NamedAccount {
   readonly bankName: string;
   readonly bank: string | null;
   readonly type: (typeof accounts.$inferSelect)["type"];
+  /** Kontot räknas med i budget, översikt och insikter (KK-41-A). */
+  readonly counted: boolean;
+  /** Sparkonto: överföringar dit räknas som sparande (KK-52). */
+  readonly saving: boolean;
 }
 
-/** Egna kontonamn (KK-37). Behöver inga nycklar, eftersom inget krypterat läses eller skrivs. */
+/** Egna kontonamn (KK-37) och om kontot räknas med (KK-41). Behöver inga nycklar, eftersom inget krypterat läses eller skrivs. */
 export function accountNameRepository(d1: D1Database) {
   const db = drizzle(d1);
   return {
     /** Kontona med eget namn, bankens maskerade namn och bankens namn, för Inställningar. */
     async list(): Promise<NamedAccount[]> {
       return db
-        .select({ id: accounts.id, nickname: accounts.nickname, bankName: accounts.displayName, bank: bankConnections.aspspName, type: accounts.type })
+        .select({ id: accounts.id, nickname: accounts.nickname, bankName: accounts.displayName, bank: bankConnections.aspspName, type: accounts.type, counted: accounts.included, saving: accounts.saving })
         .from(accounts)
         .innerJoin(bankConnections, eq(bankConnections.id, accounts.connectionId))
         .orderBy(asc(accounts.displayName), asc(accounts.id))
@@ -216,6 +220,16 @@ export function accountNameRepository(d1: D1Database) {
     /** Sätter kontots egna namn, eller tar bort det med null. Falskt om kontot inte finns. */
     async set(accountId: string, nickname: string | null): Promise<boolean> {
       const updated = await db.update(accounts).set({ nickname }).where(eq(accounts.id, accountId)).returning({ id: accounts.id }).all();
+      return updated.length > 0;
+    },
+    /** Väljer om kontot räknas med (KK-41-A). Synken rör aldrig valet. Falskt om kontot inte finns. */
+    async setCounted(accountId: string, counted: boolean): Promise<boolean> {
+      const updated = await db.update(accounts).set({ included: counted }).where(eq(accounts.id, accountId)).returning({ id: accounts.id }).all();
+      return updated.length > 0;
+    },
+    /** Väljer om kontot är ett sparkonto (KK-52). Synken rör aldrig valet. Falskt om kontot inte finns. */
+    async setSaving(accountId: string, saving: boolean): Promise<boolean> {
+      const updated = await db.update(accounts).set({ saving }).where(eq(accounts.id, accountId)).returning({ id: accounts.id }).all();
       return updated.length > 0;
     },
   };

@@ -101,3 +101,9 @@ describe("inkomsttyp på transaktionens sida (#40, KK-22-A)", () => {
     expect(screen.getByRole("status").textContent).toBe("Inkomsttypen är sparad.");
   });
 });
+
+describe("källan till en inkomsttyp (KK-22-A)", () => {
+  it("en typ som ännu inte har klassats av en regel är automatisk, inte okänd", () => {
+    expect(incomeLabel("other", "none")).toBe("Övrigt (automatiskt)");
+  });
+});

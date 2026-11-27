@@ -46,7 +46,7 @@ async function settle() {
   });
 }
 
-async function open(path = "/sparmal/lan") {
+async function open(path = "/lan") {
   window.history.replaceState(null, "", path);
   await act(async () => {
     render(<App />);
@@ -61,12 +61,9 @@ const type = (scope: HTMLElement, label: string, value: string) => {
 };
 
 describe("Lån (#72, KK-36)", () => {
-  it("nås från Sparmål och visar totalsummor och varje lån (KK-36-C)", async () => {
+  it("visar totalsummor och varje lån (KK-36-C)", async () => {
     api();
-    await open("/sparmal");
-    fireEvent.click(screen.getByRole("button", { name: "Lån" }));
-    await settle();
-    expect(window.location.pathname).toBe("/sparmal/lan");
+    await open();
     expect(screen.getAllByRole("definition").map((d) => d.textContent)).toEqual([formatSek(128_600_000), formatSek(844_808)]);
     expect(rows()[0]?.textContent).toContain(`Bolån del 1 · Exempelbanken${formatSek(550_000)}/mån`);
     expect(rows()[0]?.textContent).toContain(`Skuld ${formatSek(120_000_000)} · 3,50 % · ränta ${formatSek(350_000)} + amortering ${formatSek(200_000)}`);

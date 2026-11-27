@@ -2,14 +2,22 @@
  * Interna överföringar och kortfaktura (KK-20-C). Sådana transaktioner flyttar bara pengar mellan
  * hushållets egna konton och räknas därför inte som utgift eller inkomst i budgeten.
  *
+ * 0. En dold transaktion (KK-49) räknas aldrig och ingår aldrig i ett par. Det vinner över allt, men rör inte
+ *    användarens egen markering, som gäller igen när transaktionen visas.
  * 1. En manuell markering vinner alltid ("är en överföring" eller "inte en överföring").
  * 2. Par: motsatta belopp på två olika egna konton inom ±3 dagar. Varje transaktion ingår i högst
  *    ett par, och närmast i datum vinner. Eftersom Visa-kortet är ett eget konto fångar detta även
  *    betalningen av kortfakturan.
+ *    Mellan ett sparkonto (KK-52) och ett annat konto räknas raden på det andra kontot: dit är det sparande,
+ *    därifrån en inkomst. Sparkontots egen rad räknas inte.
  * 3. Kortfaktura utan motpost: ett uttag från ett eget konto som inte är ett kortkonto, till en
  *    känd kortmottagare (t.ex. "skandia visa"). Listan är konfigurerbar (antagande A-6).
  * 4. Regler med åtgärden Räkna inte (KK-39-C): det användaren vill hålla utanför budget och översikt,
  *    t.ex. utlägg som betalas tillbaka. De är inte överföringar, men räknas inte på samma sätt.
+ *
+ * 5. Konton som inte räknas med (KK-41): deras transaktioner räknas inte och syns inte i listan, och de
+ *    ingår aldrig i ett par. En överföring dit är därför en vanlig utgift på det andra kontot, och en
+ *    överföring därifrån en vanlig inkomst.
  *
  * En insättning på kortkontot utan motpost räknas inte som intern: det kan vara en återbetalning.
  */
@@ -22,6 +30,10 @@ export const TRANSFER_WINDOW_DAYS = 3;
 export interface OwnAccount {
   readonly id: string;
   readonly type: "checking" | "savings" | "credit_card" | "manual";
+  /** Kontot räknas med (KK-41-A). Utelämnat betyder att det räknas med. */
+  readonly counted?: boolean;
+  /** Ett sparkonto, t.ex. en buffert (KK-52). Utelämnat betyder att det inte är det. */
+  readonly saving?: boolean;
 }
 
 export interface TransferInput {
@@ -35,6 +47,8 @@ export interface TransferInput {
   readonly manualTransfer: boolean | null;
   /** Bankens meddelande, för regler som Räkna inte när banken inte skickar motpart (KK-39-C). */
   readonly description: string;
+  /** Dold av användaren (KK-49): räknas inte och ingår aldrig i ett par. Utelämnat betyder inte dold. */
+  readonly hidden?: boolean;
 }
 
 /** En regel med åtgärden Räkna inte: bara villkoret, ingen kategori (KK-39-C). */
@@ -45,7 +59,7 @@ export interface TransferClassification {
   readonly internal: boolean;
   /** Den andra halvan av en överföring, om den finns. */
   readonly pairId: string | null;
-  readonly reason: "manual" | "pair" | "card_payment" | "rule" | "none";
+  readonly reason: "hidden" | "manual" | "pair" | "saving" | "card_payment" | "rule" | "account" | "none";
 }
 
 export interface ClassifyTransfersInput {
@@ -66,19 +80,23 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
     parseDate(tx.transactionDate);
   }
   const accountType = new Map(input.accounts.map((a) => [a.id, a.type]));
+  const uncounted = new Set(input.accounts.filter((a) => a.counted === false).map((a) => a.id));
+  const savingAccounts = new Set(input.accounts.filter((a) => a.saving === true).map((a) => a.id));
   const cardPayees = new Set(input.cardPaymentCounterparties);
   const result = new Map<string, TransferClassification>();
 
-  // 1. Manuella markeringar.
+  // 0. Dolda transaktioner (KK-49) och 1. manuella markeringar.
   for (const tx of input.transactions) {
-    if (tx.manualTransfer !== null) {
+    if (tx.hidden === true) {
+      result.set(tx.id, { id: tx.id, internal: true, pairId: null, reason: "hidden" });
+    } else if (tx.manualTransfer !== null) {
       result.set(tx.id, { id: tx.id, internal: tx.manualTransfer, pairId: null, reason: "manual" });
     }
   }
 
   // 2. Par mellan olika egna konton.
   const eligible = input.transactions
-    .filter((tx) => tx.manualTransfer === null && tx.status !== "removed" && accountType.has(tx.accountId))
+    .filter((tx) => tx.hidden !== true && tx.manualTransfer === null && tx.status !== "removed" && accountType.has(tx.accountId) && !uncounted.has(tx.accountId))
     .sort(byDateThenId);
   const paired = new Set<string>();
   for (const out of eligible.filter((tx) => tx.amountMinor < 0)) {
@@ -97,8 +115,12 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
       )[0];
     if (match) {
       paired.add(out.id).add(match.id);
-      result.set(out.id, { id: out.id, internal: true, pairId: match.id, reason: "pair" });
-      result.set(match.id, { id: match.id, internal: true, pairId: out.id, reason: "pair" });
+      const toSaving = !savingAccounts.has(out.accountId) && savingAccounts.has(match.accountId);
+      const fromSaving = savingAccounts.has(out.accountId) && !savingAccounts.has(match.accountId);
+      // Till ett sparkonto är sparande och därifrån en inkomst, räknat på det andra kontot. Sparkontots egen
+      // rad räknas inte, så att samma pengar inte räknas två gånger (KK-52).
+      result.set(out.id, toSaving ? { id: out.id, internal: false, pairId: null, reason: "saving" } : { id: out.id, internal: true, pairId: match.id, reason: "pair" });
+      result.set(match.id, fromSaving ? { id: match.id, internal: false, pairId: null, reason: "saving" } : { id: match.id, internal: true, pairId: out.id, reason: "pair" });
     }
   }
 
@@ -114,6 +136,13 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
   for (const tx of eligible) {
     if (!result.has(tx.id) && matchingRule(tx, input.excludeRules) !== null) {
       result.set(tx.id, { id: tx.id, internal: true, pairId: null, reason: "rule" });
+    }
+  }
+
+  // 5. Konton som inte räknas med (KK-41-A), för det som inte redan är avgjort av ett eget val.
+  for (const tx of input.transactions) {
+    if (tx.hidden !== true && tx.manualTransfer === null && tx.status !== "removed" && uncounted.has(tx.accountId)) {
+      result.set(tx.id, { id: tx.id, internal: true, pairId: null, reason: "account" });
     }
   }
 

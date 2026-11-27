@@ -1,9 +1,11 @@
 // Inkomsthistorik (#40, KK-22-B): netto per månad de senaste tolv månaderna, uppdelat på lön,
 // föräldrapenning och övrigt, som staplat diagram och som lista, nyast först. Klassningen görs i synken
-// (#198); här visas bara summorna.
-import { formatSek } from "@kronkoll/domain";
+// (#198). Ett tryck på en månad visar inbetalningarna som räknas som inkomst den månaden (KK-46).
+import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
+import { Link } from "../router.tsx";
+import { incomeLabel, type IncomeType } from "../transactions/IncomeType.tsx";
 
 export interface IncomeMonth {
   readonly period: string;
@@ -30,7 +32,75 @@ export function toIncomeMonths(body: unknown): IncomeMonth[] | null {
 const MONTH = new Intl.DateTimeFormat("sv-SE", { month: "long", year: "numeric", timeZone: "UTC" });
 const monthName = (period: string) => MONTH.format(new Date(`${period}-01T00:00:00Z`)).replace(/^./u, (c) => c.toUpperCase());
 
+interface IncomeItem {
+  readonly id: string;
+  readonly date: string;
+  readonly amountMinor: number;
+  readonly name: string;
+  readonly type: IncomeType | null;
+  readonly source: string;
+  readonly pending: boolean;
+}
+
+const TYPES = new Set<unknown>(["salary", "parental_benefit", "other"]);
+
+/** Posterna bakom en månad. Banktexterna är opålitlig indata och visas bara som text (KK-30). */
+function toItems(body: unknown): IncomeItem[] | null {
+  const items = field(body, "items");
+  if (!Array.isArray(items)) return null;
+  return items.flatMap((raw): IncomeItem[] => {
+    const id = field(raw, "id");
+    const date = field(raw, "date");
+    const amount = field(raw, "amount_minor");
+    if (typeof id !== "string" || typeof date !== "string" || !Number.isSafeInteger(amount)) return [];
+    const counterparty = field(raw, "counterparty");
+    const description = field(raw, "description");
+    const type = field(raw, "income_type");
+    const source = field(raw, "income_source");
+    const name = [counterparty, description].find((t): t is string => typeof t === "string" && t.trim() !== "") ?? "Okänd avsändare";
+    return [{ id, date, amountMinor: amount as number, name, type: TYPES.has(type) ? (type as IncomeType) : null, source: typeof source === "string" ? source : "", pending: field(raw, "status") === "pending" }];
+  });
+}
+
+type ItemsState = { readonly kind: "loading" } | { readonly kind: "error" } | { readonly kind: "ready"; readonly items: readonly IncomeItem[] };
+
+function MonthItems({ period }: { period: string }) {
+  const [state, setState] = useState<ItemsState>({ kind: "loading" });
+  useEffect(() => {
+    let current = true;
+    void getJson(`/api/income/${encodeURIComponent(period)}`).then(({ status, body }) => {
+      const items = status === 200 ? toItems(body) : null;
+      if (current) setState(items ? { kind: "ready", items } : { kind: "error" });
+    });
+    return () => {
+      current = false;
+    };
+  }, [period]);
+  if (state.kind === "loading") return <p>Hämtar…</p>;
+  if (state.kind === "error") return <p role="alert">Det gick inte att hämta inbetalningarna. Försök igen om en stund.</p>;
+  if (state.items.length === 0) return <p>Inga inbetalningar räknas som inkomst den månaden.</p>;
+  return (
+    <ul aria-label={`Inbetalningar ${monthName(period)}`} className="income-items">
+      {state.items.map((i) => (
+        <li key={i.id}>
+          <div className="tx-main">
+            <span className="tx-name">
+              <Link to={`/transaktioner/${encodeURIComponent(i.id)}`}>{i.name}</Link>
+            </span>
+            <span className="amount">{formatSek(i.amountMinor)}</span>
+          </div>
+          <small className="tx-notes">
+            {formatDateShort(i.date)} · {incomeLabel(i.type, i.source)}
+            {i.pending ? " · Preliminär – väntar på bokföring" : ""}
+          </small>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function MonthRow({ m }: { m: IncomeMonth }) {
+  const [open, setOpen] = useState(false);
   const parts = [
     ["Lön", m.salaryMinor],
     ["Föräldrapenning", m.benefitMinor],
@@ -43,6 +113,14 @@ function MonthRow({ m }: { m: IncomeMonth }) {
         <span className="amount">{formatSek(m.salaryMinor + m.benefitMinor + m.otherMinor)}</span>
       </div>
       <small className="tx-notes">{parts.length === 0 ? "Ingen inkomst" : parts.map(([label, amount]) => `${label} ${formatSek(amount)}`).join(" · ")}</small>
+      {parts.length > 0 && (
+        <p>
+          <button type="button" className="small" aria-expanded={open} onClick={() => { setOpen(!open); }}>
+            {open ? `Dölj det som räknas i ${monthName(m.period).toLowerCase()}` : `Visa det som räknas i ${monthName(m.period).toLowerCase()}`}
+          </button>
+        </p>
+      )}
+      {open && <MonthItems period={m.period} />}
     </li>
   );
 }

@@ -265,3 +265,133 @@ describe("POST /api/rules/apply-all (KK-18-C)", () => {
     expect((await call("POST", "/api/rules/apply-all", {}, { DB: broken })).status).toBe(503);
   });
 });
+
+describe("regler som innehåller en text (KK-47)", () => {
+  /** Påhittade köp med olika versaler, där texten inte står först. */
+  beforeEach(async () => {
+    const rows: [string, string][] = [
+      ["a1", "AmazonMktplc*BT4W355R4, www.amazon.se"],
+      ["a2", "Betalning via WWW.AMAZON.SE"],
+      ["a3", "Kortköp amazon prime"],
+    ];
+    await db.batch(
+      rows.map(([id, description]) =>
+        db
+          .prepare(
+            `INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor, counterparty, counterparty_norm, description, category_source)
+             VALUES (?, 'acc_1', 'fp', 'booked', '2026-11-02', '2026-11-02', -100, '', '', ?, 'none')`,
+          )
+          .bind(id, description),
+      ),
+    );
+  });
+
+  it("en regel som innehåller amazon träffar alla tre oavsett versaler, och sparas med versaler (KK-47-A)", async () => {
+    const res = await call("POST", undefined, { pattern: "  amazon ", match: "contains", category_id: "hushall-forbrukning" });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toEqual({
+      rule: { id: expect.any(String) as string, match: "description_contains", pattern: "AMAZON", category_id: "hushall-forbrukning", source: "learned", action: "categorize" },
+      retroactive_candidates: 3,
+      protected_manual: 0,
+    });
+    // Samma text med andra versaler är samma regel.
+    expect((await call("POST", undefined, { pattern: "Amazon", match: "contains", category_id: "fritid-hobby" })).status).toBe(200);
+    expect((await items()).filter((r) => r.pattern === "AMAZON")).toHaveLength(1);
+  });
+
+  it("börjar med och innehåller är olika regler även med samma text, och börjar med är standard", async () => {
+    await call("POST", undefined, { pattern: "amazon", category_id: "hushall-forbrukning" });
+    await call("POST", undefined, { pattern: "amazon", match: "prefix", category_id: "hushall-forbrukning" });
+    await call("POST", undefined, { pattern: "amazon", match: "contains", category_id: "hushall-forbrukning" });
+    const amazon = (await items()).filter((r) => r.pattern === "AMAZON") as (Item & { match: string })[];
+    expect(amazon.map((r) => r.match).sort()).toEqual(["counterparty_prefix", "description_contains"]);
+    // Börjar med räknar bara motpartens början, innehåller hela texten: 0 mot 3 träffar.
+    expect(Object.fromEntries(amazon.map((r) => [r.match, r.hits]))).toEqual({ counterparty_prefix: 0, description_contains: 3 });
+  });
+
+  it("en Räkna inte-regel kan också innehålla en text, och förhandsvisningen räknar träffarna (KK-47)", async () => {
+    const preview = await call("POST", undefined, { action: "exclude", pattern: "amazon", match: "contains", preview: true });
+    expect(await preview.json()).toEqual({ matches: 3 });
+    const res = await call("POST", undefined, { action: "exclude", pattern: "amazon", match: "contains" });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ rule: { match: "description_contains", pattern: "AMAZON", action: "exclude" }, matches: 3 });
+    expect((await db.prepare(`SELECT id FROM transactions WHERE is_internal_transfer = 1 ORDER BY id`).all<{ id: string }>()).results.map((r) => r.id)).toEqual(["a1", "a2", "a3"]);
+  });
+
+  it("ett ändrat slag gäller direkt, med samma text, och en ändrad text normaliseras efter slaget", async () => {
+    const { rule } = await (await call("POST", undefined, { pattern: "amazon", category_id: "hushall-forbrukning" })).json<{ rule: { id: string } }>();
+    const toContains = await call("PATCH", `/api/rules/${rule.id}`, { match: "contains" });
+    expect(toContains.status).toBe(200);
+    expect(await toContains.json()).toMatchObject({ rule: { match: "description_contains", pattern: "AMAZON" }, retroactive_candidates: 3 });
+    const text = await call("PATCH", `/api/rules/${rule.id}`, { pattern: " www.amazon " });
+    expect(await text.json()).toMatchObject({ rule: { match: "description_contains", pattern: "WWW.AMAZON" } });
+    // En Räkna inte-regel byter slag på samma sätt.
+    const exclude = await (await call("POST", undefined, { action: "exclude", pattern: "amazon" })).json<{ rule: { id: string } }>();
+    const patched = await call("PATCH", `/api/rules/${exclude.rule.id}`, { match: "contains" });
+    expect(await patched.json()).toMatchObject({ rule: { match: "description_contains", action: "exclude" }, matches: 3 });
+  });
+
+  it.each([
+    ["ett okänt slag", { pattern: "amazon", match: "regex", category_id: "boende" }],
+    ["ett slag som inte är text", { pattern: "amazon", match: 1, category_id: "boende" }],
+    ["ett tomt mönster som innehåller", { pattern: "   ", match: "contains", category_id: "boende" }],
+  ])("%s ger 400", async (_, body) => {
+    expect((await call("POST", undefined, body)).status).toBe(400);
+  });
+
+  it("ett okänt slag eller ett tomt mönster vid ändring ger 400", async () => {
+    expect((await call("PATCH", "/api/rules/mall-ica", { match: "regex" })).status).toBe(400);
+    expect((await call("PATCH", "/api/rules/mall-ica", { match: "contains", pattern: "  " })).status).toBe(400);
+    expect((await call("POST", undefined, { action: "exclude", pattern: "x", match: "regex" })).status).toBe(400);
+  });
+});
+
+describe("POST /api/rules/reset (KK-51)", () => {
+  const reset = (body: unknown, env: Partial<Env> = {}) => call("POST", "/api/rules/reset", body, env);
+  const count = async (sql: string) => (await db.prepare(sql).first<{ n: number }>())?.n ?? -1;
+
+  it("räknar först utan att ändra något, och tar sedan bort alla kategoriserande regler och Räkna inte-regler", async () => {
+    await call("POST", undefined, { pattern: "ikea", category_id: "hushall-forbrukning" });
+    await call("POST", undefined, { action: "exclude", pattern: "ikea" });
+    await db.prepare(`INSERT INTO category_rules (id, match, pattern, category_id, income_type, source) VALUES ('inkomst-egen', 'description_contains', 'BONUS', NULL, 'salary', 'learned')`).run();
+    const before = await count(`SELECT count(*) AS n FROM category_rules WHERE action = 'categorize' AND category_id IS NOT NULL`);
+    const preview = await reset({ preview: true });
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toEqual({ rules: before, exclude_rules: 1 });
+    expect(await count(`SELECT count(*) AS n FROM category_rules`)).toBeGreaterThan(before);
+    expect(await count(`SELECT count(*) AS n FROM transactions WHERE is_internal_transfer = 1`)).toBe(3);
+
+    const res = await reset({ confirm: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reset: true });
+    expect(await count(`SELECT count(*) AS n FROM category_rules WHERE (action = 'categorize' AND category_id IS NOT NULL) OR action = 'exclude'`)).toBe(0);
+    // Regler som bara sätter inkomsttyp ligger kvar, och transaktionerna behåller sin kategori.
+    expect(await count(`SELECT count(*) AS n FROM category_rules WHERE id = 'inkomst-egen'`)).toBe(1);
+    expect(await count(`SELECT count(*) AS n FROM transactions WHERE category_id = 'mat-livsmedel'`)).toBe(1);
+    // Det som Räkna inte-regeln höll utanför räknas igen.
+    expect(await count(`SELECT count(*) AS n FROM transactions WHERE is_internal_transfer = 1`)).toBe(0);
+    await db.prepare(`DELETE FROM category_rules WHERE id = 'inkomst-egen'`).run();
+  });
+
+  it.each([
+    ["ingen åtgärd", {}],
+    ["både förhandsvisning och bekräftelse", { preview: true, confirm: true }],
+    ["en bekräftelse som inte är sant eller falskt", { confirm: "ja" }],
+    ["kroppen är inte ett objekt", "[]"],
+  ])("%s ger 400 och tar inte bort något", async (_, input) => {
+    const before = await count(`SELECT count(*) AS n FROM category_rules`);
+    expect((await reset(input)).status).toBe(400);
+    expect(await count(`SELECT count(*) AS n FROM category_rules`)).toBe(before);
+  });
+
+  it("svarar 405 på fel metod och 503 utan detaljer när databasen inte går att nå", async () => {
+    const wrong = await call("GET", "/api/rules/reset");
+    expect(wrong.status).toBe(405);
+    expect(wrong.headers.get("allow")).toBe("POST");
+    for (const input of [{ preview: true }, { confirm: true }]) {
+      const res = await reset(input, { DB: broken });
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: "unavailable" });
+    }
+  });
+});

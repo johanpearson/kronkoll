@@ -9,6 +9,8 @@ lätt att trampa fel på. Håll den kort och uppdatera den när något nytt lär
 - En liten PR i taget. Vänta på "den är mergad" innan nästa PR i samma kedja påbörjas. Ägaren mergar själv.
 - Titeln får vara högst 72 tecken **inklusive** kravid, t.ex. `… (KK-20)`. Räkna efter att kravid är tillagt.
 - Följ upp kravstatus i issue #43 när ett krav blir helt uppfyllt.
+- När ägaren säger "nästa issue" eller `/nasta-issue`: följ skillen `.claude/skills/nasta-issue/SKILL.md`. Den väljer
+  nästa arbetspaket ur etappens checklista (i dag #241) och gör en PR i taget.
 - Nya önskemål som saknas i kraven läggs först in i `plans/kronkoll/requirements.json` (nästa lediga KK-nummer),
   sedan i `plan.json`, och planen byggs om innan koden skrivs.
 
@@ -28,6 +30,9 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Täckningskravet är 90 % per paket, även grenar. `adapter-d1` ligger nära gränsen för grenar.
 - Planen kontrolleras och byggs med reqplan: `check`, `build` och `build --mode prototype` på
   `plans/kronkoll/plan.json`. HTML-filerna räknas inte i PR-storleken.
+- `requirements.json` går att skriva om med `json.dumps(..., ensure_ascii=False, indent=2)` utan diffbrus, men
+  `plan.json` är handformaterad. Redigera den som text, annars ändras tusentals rader. En post i `verification`
+  med `satisfies` räknas som täckning i `check`.
 - gitleaks (`secret-scan`) regel `generic-api-key` slår till på fältnamn som `auth`, `key`, `secret` och
   `token` följt av en slumpig sträng, även för publicerade exempelvärden i tester (RFC-vektorer). Döp om fältet
   i stället för att lägga till rader i `.gitleaksignore`. Lokalt: `gitleaks git --log-opts="origin/main..HEAD"`.
@@ -42,6 +47,11 @@ pnpm --filter @kronkoll/<paket> test:coverage
   testerna ändras. Kör med `--incremental --force` för det riktiga värdet. Det gör den nattliga körningen.
 - Överlevande mutanter dödas med tester, inte med `// Stryker disable`. Felmeddelanden testas med texten,
   t.ex. `toThrow("Ogiltigt belopp")`, inte bara `toThrow(RangeError)`.
+
+- E2E i molnsessioner (Claude Code på webben): Playwrights egen webbläsare saknas där, men Chromium finns i
+  `/opt/pw-browsers/chromium`. Kör med en tillfällig config utanför git som sätter
+  `launchOptions.executablePath` till den sökvägen. Testet `pwa.spec.ts` (installerbarhet) fallerar där med
+  `in-incognito`, vilket beror på miljön och inte på koden.
 
 ## Integrationstester (Workers-miljön)
 

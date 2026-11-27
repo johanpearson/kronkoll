@@ -1,4 +1,4 @@
-// Egna namn på konton (#34, KK-37). Varje konto visar sitt namn och, under, bankens maskerade namn och
+// Egna namn på konton (#34, KK-37), om kontot räknas med (KK-41-A) och om det är ett sparkonto (KK-52). Varje konto visar sitt namn och, under, bankens maskerade namn och
 // banken, så att det går att känna igen. Namnet är användarens text och renderas som text (KK-37-C).
 import { Pencil } from "lucide-react";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
@@ -14,6 +14,10 @@ interface Account {
   readonly nickname: string | null;
   readonly bankName: string;
   readonly bank: string | null;
+  /** Kontot räknas med i budget, översikt och insikter. Saknas fältet räknas det med. */
+  readonly counted: boolean;
+  /** Sparkonto: överföringar dit räknas som sparande (KK-52). */
+  readonly saving: boolean;
 }
 
 function toAccount(raw: unknown): Account | null {
@@ -28,6 +32,8 @@ function toAccount(raw: unknown): Account | null {
     nickname: typeof nickname === "string" ? nickname : null,
     name: typeof nickname === "string" ? nickname : bankName,
     bank: typeof bank === "string" ? bank : null,
+    counted: field(raw, "counted") !== false,
+    saving: field(raw, "saving") === true,
   };
 }
 
@@ -77,6 +83,8 @@ function NameForm(props: { account: Account; onSaved: (nickname: string | null) 
 export function AccountNames() {
   const [state, setState] = useState<State>({ kind: "loading" });
   const [editing, setEditing] = useState<string | null>(null);
+  const [saving, setSaving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -99,7 +107,22 @@ export function AccountNames() {
     setEditing(null);
   };
 
+  // Valet sparas först och visas när servern har svarat, eftersom det räknar om överföringarna (KK-41-D).
+  const setChoice = async (id: string, change: { counted: boolean } | { saving: boolean }) => {
+    setSaving(id);
+    setError(null);
+    const { status } = await patchJson(`/api/accounts/${encodeURIComponent(id)}`, change);
+    setSaving(null);
+    if (status !== 200) {
+      setError("Det gick inte att spara. Försök igen.");
+      return;
+    }
+    setState((current) => (current.kind === "ready" ? { kind: "ready", accounts: current.accounts.map((a) => (a.id === id ? { ...a, ...change } : a)) } : current));
+  };
+
   return (
+    <>
+    {error && <p role="alert">{error}</p>}
     <ul aria-label="Konton">
       {state.accounts.map((a) => {
         // Under ett eget namn står bankens namn, så att kontot går att känna igen.
@@ -111,10 +134,39 @@ export function AccountNames() {
             {editing !== a.id && <IconButton label={`Byt namn på ${a.name}`} icon={Pencil} onClick={() => { setEditing(a.id); }} />}
           </div>
           {notes !== "" && <small className="tx-notes">{notes}</small>}
+          <label className="account-counted">
+            <span>Räknas med</span>
+            <input
+              type="checkbox"
+              role="switch"
+              className="switch"
+              aria-label={`Räknas med: ${a.name}`}
+              checked={a.counted}
+              disabled={saving !== null}
+              onChange={(e) => void setChoice(a.id, { counted: e.target.checked })}
+            />
+          </label>
+          {a.counted && (
+            <label className="account-counted">
+              <span>Sparkonto</span>
+              <input
+                type="checkbox"
+                role="switch"
+                className="switch"
+                aria-label={`Sparkonto: ${a.name}`}
+                checked={a.saving}
+                disabled={saving !== null}
+                onChange={(e) => void setChoice(a.id, { saving: e.target.checked })}
+              />
+            </label>
+          )}
+          {a.counted && a.saving && <small className="tx-notes">Överföringar hit räknas som sparande och uttag härifrån som inkomst.</small>}
+          {!a.counted && <small className="tx-notes">Syns inte någonstans. Överföringar dit räknas som utgifter och överföringar därifrån som inkomster.</small>}
           {editing === a.id && <NameForm account={a} onSaved={(nickname) => { saved(a.id, nickname); }} onClose={() => { setEditing(null); }} />}
         </li>
         );
       })}
     </ul>
+    </>
   );
 }

@@ -11,6 +11,19 @@ import { categoryRules, transactions } from "./schema.ts";
 
 const SUPPORTED_MATCH = new Set<string>(["counterparty_exact", "counterparty_prefix", "description_contains"] satisfies IncomeRule["match"][]);
 
+export interface IncomeItem {
+  readonly id: string;
+  /** Dagen som räknas, ÅÅÅÅ-MM-DD. */
+  readonly date: string;
+  readonly amountMinor: number;
+  readonly counterparty: string;
+  readonly description: string;
+  readonly incomeType: IncomeType | null;
+  readonly incomeSource: string;
+  /** Preliminär (väntar på bokföring) eller bokförd. */
+  readonly status: "pending" | "booked";
+}
+
 export interface IncomeMonth {
   /** ÅÅÅÅ-MM. */
   readonly month: string;
@@ -93,6 +106,29 @@ export function incomeRepository(d1: D1Database) {
         .groupBy(month)
         .orderBy(month)
         .all();
+    },
+
+    /**
+     * Inbetalningarna som räknas som inkomst en månad (ÅÅÅÅ-MM), nyast först: samma urval som `monthly`, så att
+     * posterna summerar till månadens belopp (KK-46-A).
+     */
+    async items(month: string): Promise<IncomeItem[]> {
+      const rows = await db
+        .select({
+          id: transactions.id,
+          date: day,
+          amountMinor: transactions.amountMinor,
+          counterparty: transactions.counterparty,
+          description: transactions.description,
+          incomeType: sql<IncomeType | null>`${transactions.incomeType}`,
+          incomeSource: transactions.incomeSource,
+          status: sql<"pending" | "booked">`${transactions.status}`,
+        })
+        .from(transactions)
+        .where(and(incoming, eq(transactions.isInternalTransfer, false), sql`substr(${day}, 1, 7) = ${month}`))
+        .orderBy(sql`${day} DESC`, transactions.id)
+        .all();
+      return rows;
     },
   };
 }

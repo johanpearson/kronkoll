@@ -1,4 +1,5 @@
-// Inkomst per månad och typ (#40, KK-22-B): GET /api/income?from=ÅÅÅÅ-MM&to=ÅÅÅÅ-MM. Utan parametrar ges de
+// Inkomst per månad och typ (#40, KK-22-B): GET /api/income?from=ÅÅÅÅ-MM&to=ÅÅÅÅ-MM, och posterna bakom en
+// månads belopp (KK-46): GET /api/income/ÅÅÅÅ-MM. Utan parametrar ges de
 // senaste 12 kalendermånaderna, den pågående inräknad. Högst 24 månader. Månader utan inkomst ges som noll,
 // så att diagrammet alltid har en stapel per månad. Inbetalningarna klassas i synken (sync.ts).
 import { incomeRepository } from "@kronkoll/adapter-d1";
@@ -19,6 +20,32 @@ const index = (ym: YearMonth) => ym.year * 12 + ym.month;
 function parseMonth(value: string | null): YearMonth | null {
   const match = value === null ? null : MONTH.exec(value);
   return match ? { year: Number(match[1]), month: Number(match[2]) } : null;
+}
+
+/** Inbetalningarna som räknas som inkomst en månad, med samma urval som månadens summa (KK-46-A). */
+export async function getIncomeMonth(period: string, env: { DB: D1Database }): Promise<Response> {
+  if (!MONTH.test(period)) return json({ error: "invalid_request" }, 400);
+  try {
+    const items = await incomeRepository(env.DB).items(period);
+    return json(
+      {
+        period,
+        items: items.map((i) => ({
+          id: i.id,
+          date: i.date,
+          amount_minor: i.amountMinor,
+          counterparty: i.counterparty,
+          description: i.description,
+          income_type: i.incomeType,
+          income_source: i.incomeSource,
+          status: i.status,
+        })),
+      },
+      200,
+    );
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
 }
 
 export async function getIncome(request: Request, env: { DB: D1Database }, sync: SyncDeps): Promise<Response> {

@@ -68,6 +68,7 @@ describe("lista transaktioner (KK-9, KK-18, #32)", () => {
       isInternalTransfer: false,
       manualTransfer: null,
       split: false,
+      hidden: false,
     });
     expect(items.find((t) => t.id === "t04")).toMatchObject({ isInternalTransfer: true });
     expect(items.find((t) => t.id === "t03")).toMatchObject({ split: true });
@@ -138,5 +139,45 @@ describe("perioden räknas som i budgeten (KK-20, KK-34)", () => {
     expect(november).not.toContain("b-dec");
     expect(await ids({ from: "2026-12-01", to: "2026-12-31" })).toContain("b-dec");
     await db.prepare(`DELETE FROM transactions WHERE id IN ('b-okt', 'b-dec')`).run();
+  });
+});
+
+describe("dolda transaktioner (KK-49)", () => {
+  it("döljer och visar flera i en batch, och ger antalet som fanns", async () => {
+    const repo = transactionRepository(db);
+    expect(await repo.setHidden(["t03", "t05", "finns-inte", "t06"], true)).toBe(2);
+    // Dolda syns inte i den vanliga listan, men i listan över dolda.
+    expect(await ids()).toEqual(["t07", "t04", "t02"]);
+    expect(await ids({ hidden: true })).toEqual(["t05", "t03"]);
+    expect((await repo.list({ ...NOVEMBER, hidden: true })).items.every((t) => t.hidden)).toBe(true);
+    expect((await repo.forTransfers()).filter((t) => t.hidden).map((t) => t.id).sort()).toEqual(["t03", "t05"]);
+    expect(await repo.setHidden(["t03", "t05"], false)).toBe(2);
+    expect(await ids()).toEqual(["t07", "t05", "t04", "t03", "t02"]);
+    expect(await ids({ hidden: true })).toEqual([]);
+  });
+
+  it("utan id ändras ingenting, och en borttagen transaktion går inte att dölja", async () => {
+    const repo = transactionRepository(db);
+    expect(await repo.setHidden([], true)).toBe(0);
+    expect(await repo.setHidden(["t06"], true)).toBe(0);
+  });
+
+  it("ett eget val (Räknas inte) rörs inte när en transaktion döljs och visas", async () => {
+    const repo = transactionRepository(db);
+    await repo.setManualTransfer("t07", true);
+    await repo.setHidden(["t07"], true);
+    await repo.setHidden(["t07"], false);
+    expect((await repo.list(NOVEMBER)).items.find((t) => t.id === "t07")).toMatchObject({ manualTransfer: true, hidden: false });
+    await repo.setManualTransfer("t07", null);
+  });
+});
+
+describe("konton som inte räknas med (KK-41-A)", () => {
+  it("deras transaktioner syns inte i listan, och kommer tillbaka när kontot räknas med igen", async () => {
+    await db.prepare(`UPDATE accounts SET included = 0 WHERE id = 'acc_1'`).run();
+    expect(await ids()).toEqual([]);
+    expect(await ids({ hidden: true })).toEqual([]);
+    await db.prepare(`UPDATE accounts SET included = 1 WHERE id = 'acc_1'`).run();
+    expect((await ids()).length).toBeGreaterThan(0);
   });
 });

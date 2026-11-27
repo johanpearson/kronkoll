@@ -73,9 +73,12 @@ function mapTransaction(raw: unknown): ProviderTransaction | null {
   if (!isObject(raw)) return bad();
   const status = raw.status === "BOOK" ? "booked" : raw.status === "PDNG" ? "pending" : null;
   if (status === null) return null; // t.ex. INFO: ingen riktig transaktion
-  const magnitude = Math.abs(amountOf(raw.transaction_amount));
-  const debit = raw.credit_debit_indicator === "DBIT";
-  if (!debit && raw.credit_debit_indicator !== "CRDT") return bad();
+  const signed = amountOf(raw.transaction_amount);
+  const magnitude = Math.abs(signed);
+  if (raw.credit_debit_indicator !== "DBIT" && raw.credit_debit_indicator !== "CRDT") return bad();
+  // Ett negativt belopp är alltid en dragning. Skandia skickar preliminära dragningar (PDNG) med minustecken
+  // och CRDT, och utan tecknet blev t.ex. en preliminär hyresbetalning en inkomst.
+  const debit = raw.credit_debit_indicator === "DBIT" || signed < 0;
   const date = (key: string) => {
     const value = text(raw[key]);
     return value !== null && ISO_DATE.test(value) ? value : null;

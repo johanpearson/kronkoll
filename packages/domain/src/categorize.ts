@@ -60,7 +60,8 @@ function matches(rule: Pick<CategoryRule, "match" | "pattern">, text: MatchText)
     case "counterparty_prefix":
       return matchesWordPrefix(rule.pattern, text.key);
     case "description_contains":
-      return rule.pattern !== "" && text.description.includes(rule.pattern);
+      // Texten kan stå i motparten eller i beskrivningen, och versaler och gemener spelar ingen roll (KK-47-A).
+      return rule.pattern !== "" && (text.description.includes(rule.pattern) || text.key.includes(rule.pattern));
   }
 }
 
@@ -137,6 +138,11 @@ export interface LearnInput {
    * kortare val, t.ex. "IKEA", träffar alla varuhus i kedjan.
    */
   readonly pattern?: string;
+  /**
+   * En text som transaktionens motpart eller beskrivning ska innehålla, var som helst och oavsett versaler
+   * (KK-47). Går före `pattern`. Texten måste finnas i transaktionen, så regeln inte gäller något annat.
+   */
+  readonly contains?: string;
   readonly rules: readonly CategoryRule[];
   readonly newId: () => string;
 }
@@ -161,6 +167,16 @@ export function patternChoices(tx: Pick<CategorizableTransaction, "counterpartyN
 export function learnFromManualChoice(input: LearnInput): LearnResult {
   const transaction = { ...input.transaction, categoryId: input.categoryId, categorySource: "manual" as const };
   if (!input.alwaysDoThis) return { transaction, rule: null };
+  if (input.contains !== undefined) {
+    const text = input.contains.trim().replace(/\s+/gu, " ").toLocaleUpperCase("sv-SE");
+    const own = `${input.transaction.counterpartyNorm} ${input.transaction.description}`.toLocaleUpperCase("sv-SE");
+    if (text === "" || !own.includes(text)) throw new RangeError("Texten måste finnas i transaktionen");
+    const known = input.rules.find((r) => r.source === "learned" && r.match === "description_contains" && r.pattern === text);
+    const rule: CategoryRule = known
+      ? { ...known, categoryId: input.categoryId }
+      : { id: input.newId(), match: "description_contains", pattern: text, categoryId: input.categoryId, source: "learned" };
+    return { transaction, rule };
+  }
   const choices = patternChoices(input.transaction);
   if (input.pattern !== undefined && !choices.includes(input.pattern)) {
     throw new RangeError("Regeln måste gälla början av namnet, hela ord");

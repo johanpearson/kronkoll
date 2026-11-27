@@ -1,0 +1,1 @@
+ALTER TABLE `accounts` ADD `saving` integer DEFAULT false NOT NULL;

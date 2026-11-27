@@ -121,6 +121,8 @@ export const accounts = sqliteTable(
     balanceMinor: integer("balance_minor"),
     /** Kontot räknas in i översiktens totala saldo (KK-17-A). */
     included: integer("included", { mode: "boolean" }).notNull().default(true),
+    /** Ett sparkonto, t.ex. en buffert: överföringar dit från ett annat konto som räknas med är sparande (KK-52). */
+    saving: integer("saving", { mode: "boolean" }).notNull().default(false),
     syncCursor: text("sync_cursor"),
   },
   (t) => [
@@ -179,6 +181,8 @@ export const transactions = sqliteTable(
     transferPairId: text("transfer_pair_id").references((): AnySQLiteColumn => transactions.id, { onDelete: "set null" }),
     /** Användarens eget val (KK-20-C): 1 = räkna inte som utgift, 0 = räkna som utgift, null = automatiskt. */
     manualTransfer: integer("manual_transfer", { mode: "boolean" }),
+    /** Dold av användaren (KK-49): syns inte i listan och räknas inte någonstans. Påverkar inte `manualTransfer`. */
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
   },
   (t) => [
     check("transactions_status", oneOf("status", ["pending", "booked", "removed"])),
@@ -253,6 +257,13 @@ export const budgetLines = sqliteTable(
   ],
 );
 
+/** Perioder som markerats som engångsperioder i budgetplaneraren (KK-42-E). */
+export const guidelineOneOffPeriods = sqliteTable(
+  "guideline_one_off_periods",
+  { period: text("period").primaryKey() },
+  () => [check("guideline_one_off_period", sql`period GLOB '[0-9][0-9][0-9][0-9]-[0-1][0-9]'`)],
+);
+
 /** Driftlogg utan bankdata. Gallras efter 90 dagar (D-retention). */
 export const syncRuns = sqliteTable(
   "sync_runs",
@@ -273,53 +284,6 @@ export const syncRuns = sqliteTable(
     check("sync_runs_status", oneOf("status", ["running", "ok", "partial", "failed"])),
     check("sync_runs_error_code", sql`error_code IS NULL OR (error_code <> '' AND error_code NOT GLOB '*[^A-Z0-9_]*')`),
     index("sync_runs_started").on(t.startedAt),
-  ],
-);
-
-const GOAL_SOURCE = ["manual", "account"] as const;
-
-/**
- * Sparmål (KK-21). Ett mål bygger på manuella avsättningar eller på saldot i ett kopplat konto.
- * Försvinner kontot (kopplingen raderas) blir målet kvar utan konto, så att det inte tas bort i tysthet.
- */
-export const savingsGoals = sqliteTable(
-  "savings_goals",
-  {
-    id: text("id").primaryKey(),
-    name: text("name").notNull(),
-    targetMinor: integer("target_minor").notNull(),
-    targetDate: text("target_date"),
-    source: text("source", { enum: GOAL_SOURCE }).notNull(),
-    accountId: text("account_id").references(() => accounts.id, { onDelete: "set null" }),
-    /** Redan sparat när målet skapades, för manuella mål. */
-    initialMinor: integer("initial_minor").notNull().default(0),
-    createdAt: createdAt(),
-  },
-  () => [
-    check("savings_goals_source", oneOf("source", GOAL_SOURCE)),
-    check("savings_goals_manual_has_no_account", sql`source = 'account' OR account_id IS NULL`),
-    check("savings_goals_target", sql`target_minor > 0`),
-    check("savings_goals_initial", sql`initial_minor >= 0`),
-    check("savings_goals_name", sql`length(trim(name)) BETWEEN 1 AND 60`),
-    check("savings_goals_target_date", sql`target_date IS NULL OR ${isoDate("target_date")}`),
-  ],
-);
-
-/** Manuella avsättningar till ett sparmål. Ett negativt belopp är ett uttag. */
-export const goalContributions = sqliteTable(
-  "goal_contributions",
-  {
-    id: text("id").primaryKey(),
-    goalId: text("goal_id")
-      .notNull()
-      .references(() => savingsGoals.id, { onDelete: "cascade" }),
-    date: text("date").notNull(),
-    amountMinor: integer("amount_minor").notNull(),
-  },
-  (t) => [
-    check("goal_contributions_date", isoDate("date")),
-    check("goal_contributions_amount", sql`amount_minor <> 0`),
-    index("goal_contributions_goal_date").on(t.goalId, t.date),
   ],
 );
 

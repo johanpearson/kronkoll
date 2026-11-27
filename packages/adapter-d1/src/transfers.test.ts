@@ -54,6 +54,7 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
       description: "",
       status: "booked",
       manualTransfer: null,
+      hidden: false,
       internal: false,
       pairId: null,
     });
@@ -143,14 +144,20 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
 
   it("ett lånekonto paras som ett sparkonto", async () => {
     await db.prepare(`UPDATE accounts SET type = 'loan' WHERE id = 'acc_spar'`).run();
-    expect((await transactionRepository(db).ownAccounts()).find((a) => a.id === "acc_spar")).toEqual({ id: "acc_spar", type: "savings" });
+    expect((await transactionRepository(db).ownAccounts()).find((a) => a.id === "acc_spar")).toEqual({ id: "acc_spar", type: "savings", counted: true, saving: false });
     await db.prepare(`UPDATE accounts SET type = 'savings' WHERE id = 'acc_spar'`).run();
+  });
+
+  it("säger om kontot räknas med (KK-41-A)", async () => {
+    await db.prepare(`UPDATE accounts SET included = 0 WHERE id = 'acc_spar'`).run();
+    expect((await transactionRepository(db).ownAccounts()).find((a) => a.id === "acc_spar")?.counted).toBe(false);
+    await db.prepare(`UPDATE accounts SET included = 1 WHERE id = 'acc_spar'`).run();
   });
 
   it("ger de egna kontona med typ utan att behöva nycklar", async () => {
     expect((await transactionRepository(db).ownAccounts()).sort((a, b) => a.id.localeCompare(b.id))).toEqual([
-      { id: "acc_budget", type: "checking" },
-      { id: "acc_spar", type: "savings" },
+      { id: "acc_budget", type: "checking", counted: true, saving: false },
+      { id: "acc_spar", type: "savings", counted: true, saving: false },
     ]);
   });
 

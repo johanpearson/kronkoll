@@ -8,26 +8,26 @@ import { createLogger } from "@kronkoll/logging";
 import { cachedVerifier, guard, type AccessEnv, type GuardDeps } from "./access.ts";
 import { listAccounts, patchAccount } from "./accounts.ts";
 import { deleteBudget, getBudget, putBudget } from "./budget.ts";
-import { createCategory, listCategories, mergeCategory, patchCategory } from "./categories.ts";
+import { createCategory, listCategories, mergeCategory, patchCategory, resetCategories } from "./categories.ts";
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
-import { addContribution, createGoal, deleteContribution, deleteGoal, getGoal, listGoals, patchGoal } from "./goals.ts";
 import { deleteLoan, listLoans, putLoan } from "./loans.ts";
-import { getIncome } from "./income.ts";
+import { getIncome, getIncomeMonth } from "./income.ts";
+import { getGuidelines, putGuidelines } from "./guidelines.ts";
 import { getInsights } from "./insights.ts";
 import { createLeavePeriod, deleteLeavePeriod, listLeavePeriods } from "./leave.ts";
 import { getOverview } from "./overview.ts";
 import { webPushFrom, type PushEnv } from "./notify.ts";
 import { getPushConfig, subscribe, unsubscribe } from "./push.ts";
 import { getSettings, patchSettings } from "./settings.ts";
-import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule } from "./rules.ts";
+import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule, resetRules } from "./rules.ts";
 import { applyRule, setCategory } from "./set-category.ts";
 import { isIncomeTypeRequest, setIncomeType } from "./set-income-type.ts";
 import { getSplits, putSplits } from "./splits.ts";
 import { putTransfer } from "./transfers.ts";
 import { completeConnection, renewConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
-import { getTransaction, listTransactions } from "./transactions.ts";
+import { getTransaction, hideTransactions, listTransactions } from "./transactions.ts";
 
 export interface Env extends AccessEnv, SyncEnv, ConnectEnv, PushEnv {
   /** Secret: Enable Bankings application id. */
@@ -120,6 +120,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     return pathname === "/api/connections" ? startConnection(request, env, context, email) : completeConnection(request, env, context, email);
   }
 
+  if (pathname === "/api/transactions/hide") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return hideTransactions(request, env);
+  }
+
   const transferMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})\/transfer$/u.exec(pathname);
   if (transferMatch?.[1]) {
     if (request.method !== "PUT") return json({ error: "method_not_allowed" }, 405, { allow: "PUT" });
@@ -147,6 +152,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     if (request.method === "GET") return listRules(env);
     if (request.method === "POST") return createRule(request, env, context.sync);
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
+  }
+
+  if (pathname === "/api/rules/reset") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return resetRules(request, env);
   }
 
   if (pathname === "/api/rules/apply-all") {
@@ -185,31 +195,7 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     return listLoans(env, context.sync);
   }
 
-  const contributionMatch = /^\/api\/goals\/([A-Za-z0-9_-]{1,64})\/contributions$/u.exec(pathname);
-  if (contributionMatch?.[1]) {
-    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
-    return addContribution(request, env, contributionMatch[1], context.sync);
-  }
 
-  const oneContributionMatch = /^\/api\/goals\/([A-Za-z0-9_-]{1,64})\/contributions\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
-  if (oneContributionMatch?.[1] && oneContributionMatch[2]) {
-    if (request.method !== "DELETE") return json({ error: "method_not_allowed" }, 405, { allow: "DELETE" });
-    return deleteContribution(env, oneContributionMatch[1], oneContributionMatch[2]);
-  }
-
-  const goalMatch = /^\/api\/goals\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
-  if (goalMatch?.[1]) {
-    if (request.method === "GET") return getGoal(env, goalMatch[1], context.sync);
-    if (request.method === "PATCH") return patchGoal(request, env, goalMatch[1], context.sync);
-    if (request.method === "DELETE") return deleteGoal(env, goalMatch[1]);
-    return json({ error: "method_not_allowed" }, 405, { allow: "GET, PATCH, DELETE" });
-  }
-
-  if (pathname === "/api/goals") {
-    if (request.method === "GET") return listGoals(env, context.sync);
-    if (request.method === "POST") return createGoal(request, env, context.sync);
-    return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
-  }
   const leaveMatch = /^\/api\/leave-periods\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
   if (leaveMatch?.[1]) {
     if (request.method !== "DELETE") return json({ error: "method_not_allowed" }, 405, { allow: "DELETE" });
@@ -223,7 +209,7 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
 
   const budgetMatch = /^\/api\/budgets\/([A-Za-z0-9-]{1,16})$/u.exec(pathname);
   if (budgetMatch?.[1]) {
-    if (request.method === "GET") return getBudget(env, budgetMatch[1], context.sync);
+    if (request.method === "GET") return getBudget(request, env, budgetMatch[1], context.sync);
     if (request.method === "PUT") return putBudget(request, env, budgetMatch[1], context.sync);
     if (request.method === "DELETE") return deleteBudget(env, budgetMatch[1], context.sync);
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, PUT, DELETE" });
@@ -246,9 +232,19 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, PATCH" });
   }
 
+  const incomeMonth = /^\/api\/income\/([^/]+)$/u.exec(pathname)?.[1];
+  if (incomeMonth !== undefined) {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return getIncomeMonth(incomeMonth, env);
+  }
   if (pathname === "/api/income") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
     return getIncome(request, env, context.sync);
+  }
+  if (pathname === "/api/guidelines") {
+    if (request.method === "GET") return getGuidelines(request, env, context.sync);
+    if (request.method === "PUT") return putGuidelines(request, env);
+    return json({ error: "method_not_allowed" }, 405, { allow: "GET, PUT" });
   }
   if (pathname === "/api/insights") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
@@ -263,6 +259,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     if (request.method === "GET") return listCategories(env);
     if (request.method === "POST") return createCategory(request, env, context.sync);
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
+  }
+
+  if (pathname === "/api/categories/reset") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return resetCategories(request, env);
   }
 
   const mergeMatch = /^\/api\/categories\/([A-Za-z0-9_-]{1,64})\/merge$/u.exec(pathname);

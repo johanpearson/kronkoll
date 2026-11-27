@@ -67,6 +67,37 @@ describe("kategorisering med regler (KK-18)", () => {
     expect(categorize(tx({ id: "t1", counterpartyNorm: "", description: "Hyra november" }), [rule])?.categoryId).toBe("boende");
   });
 
+  it("en regel som innehåller en text träffar var som helst i beskrivningen eller motparten, oavsett versaler (KK-47-A)", () => {
+    const amazon: CategoryRule = { id: "r-amazon", match: "description_contains", pattern: "AMAZON", categoryId: "hushall", source: "learned" };
+    const beskrivning = tx({ id: "t1", counterpartyNorm: "", description: "AmazonMktplc*BT4W355R4, www.amazon.se" });
+    expect(categorize(beskrivning, [amazon])?.categoryId).toBe("hushall");
+    // Texten står mitt i beskrivningen, inte först.
+    expect(categorize(tx({ id: "t2", counterpartyNorm: "", description: "Betalning via www.amazon.se" }), [amazon])?.categoryId).toBe("hushall");
+    // Banken skickar en motpart: texten finns bara där, inte i beskrivningen.
+    expect(categorize(tx({ id: "t3", counterpartyNorm: "MY AMAZON STORE", description: "Kortköp" }), [amazon])?.categoryId).toBe("hushall");
+    expect(categorize(tx({ id: "t4", counterpartyNorm: "ICA NARA SOFO", description: "Kortköp" }), [amazon])).toBeNull();
+  });
+
+  it("lär in en regel på en text som transaktionen innehåller, och byter kategori på en som redan finns (KK-47)", () => {
+    const transaction = tx({ id: "t1", counterpartyNorm: "", description: "AmazonMktplc*BT4W355R4, www.amazon.se" });
+    const first = learnFromManualChoice({ transaction, categoryId: "hushall", alwaysDoThis: true, contains: " amazon ", rules: [], newId: counter() });
+    expect(first.rule).toEqual({ id: "r-ny-1", match: "description_contains", pattern: "AMAZON", categoryId: "hushall", source: "learned" });
+    expect(first.transaction).toMatchObject({ categoryId: "hushall", categorySource: "manual" });
+    const again = learnFromManualChoice({ transaction, categoryId: "fritid", alwaysDoThis: true, contains: "Amazon", rules: [first.rule as CategoryRule], newId: counter() });
+    expect(again.rule).toEqual({ ...first.rule, categoryId: "fritid" });
+    // Utan Gör alltid så lärs inget in.
+    expect(learnFromManualChoice({ transaction, categoryId: "hushall", alwaysDoThis: false, contains: "amazon", rules: [], newId: counter() }).rule).toBeNull();
+  });
+
+  it("en text som inte finns i transaktionen, eller är tom, avvisas (KK-47)", () => {
+    const transaction = tx({ id: "t1", counterpartyNorm: "ICA", description: "Kortköp" });
+    const learn = (contains: string) => learnFromManualChoice({ transaction, categoryId: "mat", alwaysDoThis: true, contains, rules: [], newId: counter() });
+    expect(() => learn("amazon")).toThrow("Texten måste finnas i transaktionen");
+    expect(() => learn("   ")).toThrow("Texten måste finnas i transaktionen");
+    expect(learn("kortköp").rule?.pattern).toBe("KORTKÖP");
+    expect(learn("ica").rule?.pattern).toBe("ICA");
+  });
+
   it("tomma mönster matchar aldrig", () => {
     const empty: CategoryRule[] = [
       { id: "e1", match: "counterparty_exact", pattern: "", categoryId: "x", source: "template" },

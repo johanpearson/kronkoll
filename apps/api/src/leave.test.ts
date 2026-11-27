@@ -31,7 +31,6 @@ afterAll(async () => {
 beforeEach(async () => {
   await db.batch([
     db.prepare(`DELETE FROM leave_periods`),
-    db.prepare(`DELETE FROM savings_goals`),
     db.prepare(`DELETE FROM budget_lines`),
     db.prepare(`DELETE FROM bank_connections`),
     db.prepare(`INSERT INTO bank_connections (id, provider, status) VALUES ('c1', 'enablebanking', 'active')`),
@@ -88,39 +87,6 @@ describe("planerad föräldraledighet (KK-23)", () => {
     });
     expect(body.impacts[0]).toEqual({ type: "budget", period: "2027-03", budget_minor: kr(32000), income_minor: 2_116_924, shortfall_minor: 1_083_076 });
     expect(await (await call("GET", "/api/leave-periods")).json()).toEqual({ items: [body] });
-  });
-
-  it("visar hur ledigheten försenar varje sparmål (KK-23-C)", async () => {
-    // Påhittade mål: 10 000 kr/mån de senaste tre månaderna och 30 000 kr sparat mot 150 000 kr i nov. 2027, ett uppnått och två utan takt.
-    await db.batch([
-      db.prepare(`INSERT INTO savings_goals (id, name, target_minor, target_date, source, initial_minor) VALUES ('resa', 'Resa', ?, '2027-11-30', 'manual', 0)`).bind(kr(150000)),
-      db.prepare(`INSERT INTO savings_goals (id, name, target_minor, target_date, source, initial_minor) VALUES ('klart', 'Klart', ?, NULL, 'manual', ?)`).bind(kr(1000), kr(1000)),
-      db.prepare(`INSERT INTO savings_goals (id, name, target_minor, target_date, source, initial_minor) VALUES ('still', 'Still', ?, NULL, 'manual', 0)`).bind(kr(1000)),
-      db.prepare(`INSERT INTO savings_goals (id, name, target_minor, target_date, source, initial_minor) VALUES ('sent', 'Sent', ?, '2027-01-31', 'manual', 0)`).bind(kr(1000)),
-      ...["2026-08-15", "2026-09-15", "2026-10-15"].map((date, i) =>
-        db.prepare(`INSERT INTO goal_contributions (id, goal_id, date, amount_minor) VALUES (?, 'resa', ?, ?)`).bind(`gc${String(i)}`, date, kr(10000)),
-      ),
-    ]);
-    const body = await (await call("POST", "/api/leave-periods", SPRING)).json<{ impacts: { type: string; goal_id?: string }[] }>();
-    // Mål som skapas i samma millisekund har ingen bestämd ordning, så de hämtas på id.
-    const goals = new Map(body.impacts.filter((i) => i.type === "goal").map((g) => [g.goal_id, g]));
-    expect([...goals.keys()].sort()).toEqual(["klart", "resa", "sent", "still"]);
-    // Ungefär 62 % av lönen i sex månader: cirka 3 800 kr mindre sparat per månad, och målet nås 3 månader senare.
-    expect(goals.get("resa")).toEqual({
-      type: "goal",
-      goal_id: "resa",
-      name: "Resa",
-      lost_saving_minor: 2_294_028,
-      delay_months: 3,
-      reach_period_before: "2027-11",
-      reach_period_after: "2028-02",
-      on_track_before: true,
-      on_track_after: false,
-    });
-    expect(goals.get("klart")).toMatchObject({ lost_saving_minor: 0, delay_months: null, reach_period_after: null, on_track_before: true, on_track_after: true });
-    expect(goals.get("still")).toMatchObject({ lost_saving_minor: 0, delay_months: null, on_track_after: null });
-    expect(goals.get("sent")).toMatchObject({ on_track_after: false });
-    await db.prepare(`DELETE FROM savings_goals`).run();
   });
 
   it("ett manuellt belopp vinner (KK-23-B), och ett år utan parametrar varnar", async () => {

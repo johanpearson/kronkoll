@@ -107,8 +107,24 @@ describe("PATCH /api/transactions/{id} (KK-18-B, KK-18-C)", () => {
     expect(await res.json()).toMatchObject({ rule: { match: "counterparty_prefix", pattern: "ICA", category_id: "mat-livsmedel" } });
   });
 
+  it("lär in en regel på en text som transaktionen innehåller, oavsett versaler (KK-47)", async () => {
+    const res = await call("PATCH", "/api/transactions/t1", { category_id: "mat-livsmedel", learn_rule: true, rule_contains: " nara " });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ rule: { match: "description_contains", pattern: "NARA", category_id: "mat-livsmedel" } });
+    // Samma text igen byter kategori på samma regel.
+    const again = await call("PATCH", "/api/transactions/t1", { category_id: "hushall-forbrukning", learn_rule: true, rule_contains: "NARA" });
+    expect(await again.json()).toMatchObject({ rule: { pattern: "NARA", category_id: "hushall-forbrukning" } });
+    expect((await db.prepare(`SELECT count(*) AS n FROM category_rules WHERE pattern = 'NARA'`).first<{ n: number }>())?.n).toBe(1);
+  });
+
   it.each([
     ["en kategori som inte finns", { category_id: "finns-inte" }, 400, "unknown_category"],
+    ["en text som transaktionen inte innehåller", { category_id: "mat-livsmedel", learn_rule: true, rule_contains: "amazon" }, 400, "invalid_pattern"],
+    ["en tom text", { category_id: "mat-livsmedel", learn_rule: true, rule_contains: "  " }, 400, "invalid_pattern"],
+    ["en text utan Gör alltid så", { category_id: "mat-livsmedel", rule_contains: "ICA" }, 400, "invalid_request"],
+    ["en text och ett mönster", { category_id: "mat-livsmedel", learn_rule: true, rule_contains: "ICA", rule_pattern: "ICA" }, 400, "invalid_request"],
+    ["en text som inte är text", { category_id: "mat-livsmedel", learn_rule: true, rule_contains: 3 }, 400, "invalid_request"],
+    ["en för lång text", { category_id: "mat-livsmedel", learn_rule: true, rule_contains: "x".repeat(61) }, 400, "invalid_request"],
     ["ingen kategori", { learn_rule: true }, 400, "invalid_request"],
     ["learn_rule som inte är sant eller falskt", { category_id: "hushall-forbrukning", learn_rule: "ja" }, 400, "invalid_request"],
     ["inte JSON", "{", 400, "invalid_request"],

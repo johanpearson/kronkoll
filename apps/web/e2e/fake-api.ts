@@ -42,28 +42,8 @@ const LEAVE = {
   },
   impacts: [
     { type: "budget", period: "2027-03", budget_minor: 3200000, income_minor: 2014000, shortfall_minor: 1186000 },
-    { type: "goal", goal_id: "g1", name: "Resa till Japan", lost_saving_minor: 840000, delay_months: 3, reach_period_before: "2027-12", reach_period_after: "2028-03", on_track_before: false, on_track_after: false },
   ],
 };
-
-/** Påhittade sparmål i samma form som GET /api/goals: i fas, sent och utan sparttakt. */
-const GOALS = [
-  {
-    id: "g1", name: "Resa till Japan", target_minor: 6000000, target_date: "2027-08-31", source: "manual", account_id: null, account_missing: false,
-    saved_minor: 2150000, monthly_rate_minor: 320000, contributions: [],
-    forecast: { kind: "eta", remaining_minor: 3850000, months_left: 13, reach_period: "2027-12", on_track: false, months_late: 4, required_monthly_minor: 427778 },
-  },
-  {
-    id: "g2", name: "Buffert", target_minor: 10000000, target_date: "2027-12-31", source: "account", account_id: "acc_2", account_missing: false,
-    saved_minor: 7400000, monthly_rate_minor: 300000, contributions: [],
-    forecast: { kind: "eta", remaining_minor: 2600000, months_left: 9, reach_period: "2027-08", on_track: true, months_late: 0, required_monthly_minor: 200000 },
-  },
-  {
-    id: "g3", name: "Ny barnvagn", target_minor: 800000, target_date: "2027-03-31", source: "manual", account_id: null, account_missing: false,
-    saved_minor: 120000, monthly_rate_minor: 0, contributions: [],
-    forecast: { kind: "never", remaining_minor: 680000, required_monthly_minor: 170000 },
-  },
-];
 
 const OVERVIEW = {
   period: NOVEMBER,
@@ -102,8 +82,8 @@ const CONNECTION = {
 };
 
 const ACCOUNTS = [
-  { id: "acc_1", name: "Vardag", nickname: "Vardag", bank_name: "Privatkonto ••1234", bank: "Exempelbanken", type: "checking" },
-  { id: "acc_2", name: "Sparkonto ••5678", nickname: null, bank_name: "Sparkonto ••5678", bank: "Exempelbanken", type: "savings" },
+  { id: "acc_1", name: "Vardag", nickname: "Vardag", bank_name: "Privatkonto ••1234", bank: "Exempelbanken", type: "checking", counted: true },
+  { id: "acc_2", name: "Sparkonto ••5678", nickname: null, bank_name: "Sparkonto ••5678", bank: "Exempelbanken", type: "savings", counted: true },
 ];
 
 /** Utfall per huvudkategori och period. November saknar budget tills ett test sparar en. */
@@ -115,8 +95,13 @@ const ACTUALS: Record<string, Record<string, number>> = {
 };
 
 export interface FakeApi {
-  readonly rules: { id: string; pattern: string; category_id: string; source: string; hits: number }[];
+  readonly rules: { id: string; pattern: string; category_id: string; source: string; hits: number; match?: string }[];
+  readonly categoryResets: unknown[];
   readonly budgetPuts: unknown[];
+  /** Sparade riktlinjer (KK-42), i den ordning de sparades. */
+  readonly guidelinePuts: unknown[];
+  /** Ändringar av Räknas med (KK-41-A), i den ordning de sparades. */
+  readonly accountPatches: unknown[];
 }
 
 /** Gör alla belopp (fält som slutar på _minor) `scale` gånger större, för att pröva långa belopp i UI:t. */
@@ -139,7 +124,8 @@ export async function useFakeApi(
     transaction("t3", "2026-11-03", -129900, "Påhittade Möbler AB"),
   ];
   const budgets = new Map<string, { category_id: string; budget_minor: number }[]>();
-  const goals: Record<string, unknown>[] = GOALS.map((g) => ({ ...g }));
+  /** Dolda transaktioner (KK-49). */
+  const hiddenIds = new Set<string>();
   const salary = {
     id: "lon1", account: { id: "acc_1", name: "Vardag", type: "checking" }, status: "booked", transaction_date: "2026-11-25", booking_date: "2026-11-25",
     amount_minor: 3361000, counterparty: "", counterparty_norm: "EXEMPELFÖRETAGET AB", description: "EXEMPELFÖRETAGET AB LÖN", category_id: null, category_source: "none",
@@ -151,7 +137,20 @@ export async function useFakeApi(
     id: "lan1", name: "Bolån del 1", lender: "Exempelbanken", balance_minor: 120000000, interest_rate_bp: 350, rate_fixed_until: "2026-12-15", amortization_minor: 200000,
     monthly_interest_minor: 350000, monthly_amortization_minor: 200000, monthly_cost_minor: 550000, rate_fixed: true, rate_fixed_days_left: 41, rate_fixed_ending: true,
   }];
-  const state: FakeApi = { rules: [], budgetPuts: [] };
+  const state: FakeApi = { rules: [], budgetPuts: [], guidelinePuts: [], accountPatches: [], categoryResets: [] };
+  let categoriesCleared = false;
+  /** Påhittat underlag till budgetplaneraren (KK-42): fasta siffror. */
+  const guidelines = () => ({
+    period: NOVEMBER,
+    one_off_periods: [],
+    expected_income_minor: 4000000,
+    fixed_minor: 900000,
+    categories: [
+      { category_id: "boende", average_minor: 980000, normal_minor: 980000, fixed_minor: 900000, actual_minor: 980000, last_minor: 980000 },
+      { category_id: "mat", average_minor: 606667, normal_minor: 610000, fixed_minor: 0, actual_minor: 655200, last_minor: 620000 },
+    ],
+  });
+  const accounts = ACCOUNTS.map((a) => ({ ...a }));
   // Utan bank visar översikten välkomstsidan. Kopplingen görs klar med koden som banken skickar tillbaka.
   let connected = options.connected ?? true;
   const overview = () =>
@@ -185,17 +184,8 @@ export async function useFakeApi(
     };
   };
 
-  const handle = (method: string, path: string, body: Record<string, unknown>): [number, unknown] => {
+  const handle = (method: string, path: string, body: Record<string, unknown>, query = new URLSearchParams()): [number, unknown] => {
     if (path === "/api/overview") return [200, overview()];
-    if (path === "/api/goals" && method === "POST") {
-      const goal = {
-        ...GOALS[2], id: `g${String(goals.length + 1)}`, name: body["name"], target_minor: body["target_minor"], target_date: body["target_date"] ?? null,
-        saved_minor: 0, monthly_rate_minor: 0, forecast: { kind: "never", remaining_minor: body["target_minor"], required_monthly_minor: null },
-      };
-      goals.push(goal);
-      return [201, goal];
-    }
-    if (path === "/api/goals") return [200, { items: goals }];
     if (path === "/api/loans") {
       return [200, {
         loans,
@@ -236,7 +226,14 @@ export async function useFakeApi(
         top_expenses: [{ id: "t1", date: "2026-11-01", name: "Möbelhuset Påhittat", amount_minor: 890000, category_id: "hushall-forbrukning", split: false }],
         top_categories: [{ category_id: "hushall", amount_minor: 890000 }, { category_id: "mat", amount_minor: 523000 }],
       }];
-    }    if (path === "/api/income") {
+    }
+    if (path === "/api/income/2026-10") {
+      return [200, { period: "2026-10", items: [
+        { id: "lon1", date: "2026-10-26", amount_minor: 3361000, counterparty: "Påhittade Bygg AB", description: "", income_type: "salary", income_source: "learned" },
+        { id: "swish1", date: "2026-10-12", amount_minor: 42000, counterparty: "", description: "Swish från Anna", income_type: null, income_source: "none" },
+      ] }];
+    }
+    if (path === "/api/income") {
       return [200, { months: [
         { period: "2026-09", salary_minor: 1120000, parental_benefit_minor: 995000, other_minor: 78000 },
         { period: "2026-10", salary_minor: 3361000, parental_benefit_minor: 0, other_minor: 42000 },
@@ -249,17 +246,20 @@ export async function useFakeApi(
       return [201, period];
     }
     if (path === "/api/leave-periods") return [200, { items: leave }];
-    const goalPath = /^\/api\/goals\/([^/]+)(\/contributions)?$/u.exec(path);
-    const goal = goals.find((g) => g["id"] === goalPath?.[1]);
-    if (goal && goalPath?.[2] && method === "POST") {
-      const amount = Number(body["amount_minor"]);
-      goal["saved_minor"] = Number(goal["saved_minor"]) + amount;
-      goal["contributions"] = [{ date: "2026-11-15", amount_minor: amount }, ...(goal["contributions"] as unknown[])];
-      return [201, goal];
+    if (path === "/api/categories") return [200, { items: categoriesCleared ? [] : CATEGORIES }];
+    if (path === "/api/rules" && method === "POST") {
+      const text = String(body["pattern"]).trim().toUpperCase();
+      const rule = { id: `r-${String(state.rules.length + 1)}`, match: body["match"] === "contains" ? "description_contains" : "counterparty_prefix", pattern: text, category_id: String(body["category_id"]), source: "learned", hits: 0 };
+      state.rules.push(rule);
+      return [201, { rule, retroactive_candidates: 0, protected_manual: 0 }];
     }
-    if (goal && !goalPath?.[2]) return [200, goal];
-    if (path === "/api/categories") return [200, { items: CATEGORIES }];
     if (path === "/api/rules") return [200, { items: state.rules }];
+    if (path === "/api/categories/reset" && method === "POST") {
+      if (body["preview"] === true) return [200, { categories: 37, rules: 14, transactions: 812, splits: 3, budget_lines: 9 }];
+      state.categoryResets.push(body);
+      categoriesCleared = true;
+      return [200, { reset: true }];
+    }
     if (path === "/api/connections" && method === "POST") return [200, { redirect_url: `${FAKE_BANK}/auth?state=s-1` }];
     if (path === "/api/connections/callback" && method === "POST") {
       if (body["code"] !== "c-1" || body["state"] !== "s-1") return [400, { error: "invalid_state" }];
@@ -267,11 +267,26 @@ export async function useFakeApi(
       return [201, { connection_id: "c1", accounts: 3, initial_sync: "started", renewed: false }];
     }
     if (path === "/api/connections") return [200, { items: [CONNECTION] }];
-    if (path === "/api/accounts") return [200, { items: ACCOUNTS }];
+    if (path === "/api/accounts") return [200, { items: accounts }];
+    const accountPath = /^\/api\/accounts\/([^/]+)$/u.exec(path);
+    const account = accounts.find((a) => a.id === accountPath?.[1]);
+    if (account && method === "PATCH") {
+      state.accountPatches.push(body);
+      account.counted = Boolean(body["counted"]);
+      return [200, { id: account.id, name: account.name, nickname: account.nickname, counted: account.counted }];
+    }
     if (path === "/api/settings") return [200, { budget_period_start_day: 1, current_period: NOVEMBER }];
     // Web Push är påslaget på servern (KK-27). I E2E är service workers avstängda, så vyn säger att enheten saknar stöd.
     if (path === "/api/push") return [200, { configured: true, public_key: "BPublicKeyForE2E", topics: ["consent", "budget_over", "sync_failed"] }];
-    if (path === "/api/transactions") return [200, { period: NOVEMBER, items: transactions, next_cursor: null }];
+    if (path === "/api/transactions/hide" && method === "POST") {
+      const ids = Array.isArray(body["ids"]) ? (body["ids"] as string[]) : [];
+      for (const id of ids) hiddenIds[body["hidden"] === true ? "add" : "delete"](id);
+      return [200, { updated: ids.length, hidden: body["hidden"] === true }];
+    }
+    if (path === "/api/transactions") {
+      const wantHidden = query.get("hidden") === "true";
+      return [200, { period: NOVEMBER, items: transactions.filter((t) => hiddenIds.has(t.id) === wantHidden).map((t) => ({ ...t, hidden: hiddenIds.has(t.id) })), next_cursor: null }];
+    }
     const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
     // En påhittad löneinbetalning som bara nås via sin adress, för inkomsttypen på detaljsidan (KK-22-A).
     if (tx?.[1] === "lon1" && method === "PATCH") {
@@ -298,6 +313,11 @@ export async function useFakeApi(
       if (rule) rule.hits += matching.length;
       return [200, { updated: matching.length, skipped_manual: 0 }];
     }
+    if (path === "/api/guidelines" && method === "GET") return [200, guidelines()];
+    if (path === "/api/guidelines" && method === "PUT") {
+      state.guidelinePuts.push(body);
+      return [200, { one_off_periods: body["one_off_periods"] }];
+    }
     const key = /^\/api\/budgets\/(.+)$/u.exec(path)?.[1]?.replace("current", NOVEMBER.key);
     if (key !== undefined && method === "PUT") {
       state.budgetPuts.push(body);
@@ -316,7 +336,7 @@ export async function useFakeApi(
   await page.route("**/api/**", async (route: Route) => {
     const request = route.request();
     const body = (request.postDataJSON() ?? {}) as Record<string, unknown>;
-    const [status, json] = handle(request.method(), new URL(request.url()).pathname, body);
+    const [status, json] = handle(request.method(), new URL(request.url()).pathname, body, new URL(request.url()).searchParams);
     await route.fulfill(status === 204 ? { status } : { status, json: scaleAmounts(json, options.scale ?? 1) });
   });
   return state;

@@ -13,7 +13,7 @@ export const INCOME_TYPES: readonly { value: IncomeType; label: string }[] = [
   { value: "other", label: "Övrigt" },
 ];
 
-const SOURCE: Record<string, string> = { template: "mall", learned: "inlärd regel", manual: "vald av dig" };
+const SOURCE: Record<string, string> = { template: "mall", learned: "inlärd regel", manual: "vald av dig", none: "automatiskt" };
 
 /** "Lön (vald av dig)", eller "Inte klassad". */
 export function incomeLabel(type: IncomeType | null, source: string): string {
