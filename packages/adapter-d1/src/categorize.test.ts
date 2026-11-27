@@ -87,6 +87,12 @@ describe("okategoriserade transaktioner (KK-18)", () => {
     ]);
   });
 
+  it("skriver över en manuell bara när det uttryckligen begärs (KK-58-B)", async () => {
+    await seed([["t4", "ICA", "booked", "hushall-forbrukning", "manual"]]);
+    await transactionRepository(db).setCategories([{ id: "t4", categoryId: "mat-livsmedel", categorySource: "learned" }], { overrideManual: true });
+    expect(await db.prepare(`SELECT category_id AS c, category_source AS s FROM transactions WHERE id = 't4'`).first()).toEqual({ c: "mat-livsmedel", s: "learned" });
+  });
+
   it("gör ingenting med en tom lista", async () => {
     await expect(transactionRepository(db).setCategories([])).resolves.toBeUndefined();
   });
