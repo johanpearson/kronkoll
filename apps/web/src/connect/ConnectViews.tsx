@@ -4,7 +4,7 @@
 import { useEffect, useRef, useState } from "react";
 import { field, postJson } from "../api.ts";
 import { browser } from "../browser.ts";
-import { Link } from "../router.tsx";
+import { Link, replaceUrl } from "../router.tsx";
 
 /**
  * Bankerna som går att koppla. Namnet måste vara exakt Enable Bankings namn för banken.
@@ -94,7 +94,7 @@ export function ConnectDone() {
     const code = params.get("code");
     const stateParam = params.get("state");
     // Koden och state ska inte ligga kvar i adressfältet eller historiken.
-    window.history.replaceState(null, "", window.location.pathname);
+    replaceUrl(window.location.pathname);
     if (params.has("error") || !code || !stateParam) {
       setState({ kind: "error", message: ABORTED });
       return;

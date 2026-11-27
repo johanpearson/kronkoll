@@ -7,9 +7,11 @@ import "./styles/components.css";
 import "./styles/ui.css";
 import { App } from "./App.tsx";
 import { registerServiceWorker } from "./pwa.ts";
+import { startHistory } from "./router.tsx";
 import { applyStoredTheme } from "./theme.ts";
 
 applyStoredTheme();
+startHistory();
 // Bara i produktionsbygget, och efter att sidan laddat så att den inte konkurrerar med första bilden.
 if (import.meta.env.PROD) {
   window.addEventListener("load", () => {
