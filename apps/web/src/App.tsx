@@ -8,6 +8,7 @@ import { IncomeView } from "./income/IncomeView.tsx";
 import { InsightsView } from "./insights/InsightsView.tsx";
 import { LoansView } from "./loans/LoansView.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
+import { useTabSwipe } from "./nav/useTabSwipe.ts";
 import { canGoBack, Link, navigationKind, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
 import { ConnectionView } from "./settings/ConnectionView.tsx";
@@ -97,11 +98,14 @@ function page(path: string): React.JSX.Element {
 
 export function App() {
   const path = usePath();
+  const subview = canGoBack();
+  // Svep byter flik på flikarnas huvudvyer, inte i undervyer (KK-63-A, B).
+  const swipe = useTabSwipe(!subview);
   return (
     <ToastProvider>
       {/* En ny vy glider in från höger, bakåt från vänster och ett flikbyte tonar (KK-62-H). */}
-      <div key={path} className={`ui-view ui-view-${navigationKind()}`}>
-        {canGoBack() && (
+      <div key={path} className={`ui-view ui-view-${navigationKind()}${subview ? "" : " ui-view-swipe"}`} {...swipe}>
+        {subview && (
           // iOS saknar bakåtknapp, så undervyer har en egen (KK-62-B). Den följer samma steg som telefonens.
           <nav className="ui-backbar" aria-label="Tillbaka">
             <IconButton
