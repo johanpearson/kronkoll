@@ -4,8 +4,8 @@
  * bara sätter inkomsttyp, KK-22) hoppas över här, så att de aldrig ger fel kategori.
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import type { CategoryRule, ExcludeRule } from "@kronkoll/domain";
-import { and, eq } from "drizzle-orm";
+import { orderRules, type CategoryRule, type ExcludeRule } from "@kronkoll/domain";
+import { and, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { categoryRules } from "./schema.ts";
 
@@ -18,14 +18,36 @@ export function ruleRepository(d1: D1Database) {
       const rows = await db.select().from(categoryRules).where(eq(categoryRules.action, "categorize")).all();
       return rows.flatMap((row): CategoryRule[] =>
         row.categoryId !== null && SUPPORTED_MATCH.has(row.match)
-          ? [{ id: row.id, match: row.match as CategoryRule["match"], pattern: row.pattern, categoryId: row.categoryId, source: row.source }]
+          ? [
+              {
+                id: row.id,
+                match: row.match as CategoryRule["match"],
+                pattern: row.pattern,
+                categoryId: row.categoryId,
+                source: row.source,
+                ...(row.source === "learned" && row.position !== null ? { position: row.position } : {}),
+              },
+            ]
           : [],
       );
     },
-    /** Sparar en inlärd regel ("Gör alltid så"). Finns regeln redan uppdateras dess kategori. */
+    /**
+     * Sparar en inlärd regel ("Gör alltid så"). Finns regeln redan uppdateras dess kategori och den behåller sin
+     * plats. En ny egen regel hamnar först i användarens ordning (KK-58-C), före den som stod först.
+     */
     async save(rule: CategoryRule): Promise<void> {
-      const values = { id: rule.id, match: rule.match, pattern: rule.pattern, categoryId: rule.categoryId, source: rule.source };
+      const first = sql`(SELECT COALESCE(MIN(${categoryRules.position}), 1) - 1 FROM ${categoryRules})`;
+      const values = { id: rule.id, match: rule.match, pattern: rule.pattern, categoryId: rule.categoryId, source: rule.source, position: rule.source === "learned" ? first : null };
       await db.insert(categoryRules).values(values).onConflictDoUpdate({ target: categoryRules.id, set: { categoryId: rule.categoryId } });
+    },
+    /**
+     * Sparar användarens ordning (KK-58-C): de egna kategorireglernas id, den som ska vinna först. Platserna blir
+     * 0, 1, 2 … Kastar och ändrar inget om ordningen inte innehåller varje egen regel exakt en gång.
+     */
+    async setOrder(order: readonly string[]): Promise<void> {
+      const rules = orderRules(await this.list(), order);
+      const updates = rules.flatMap((r) => (r.position === undefined ? [] : [d1.prepare(`UPDATE category_rules SET position = ? WHERE id = ?`).bind(r.position, r.id)]));
+      if (updates.length > 0) await d1.batch(updates);
     },
     /** Byter mönster, kategori och slag av träff på en regel. Falskt om den inte finns. */
     async update(rule: Pick<CategoryRule, "id" | "pattern" | "categoryId"> & Partial<Pick<CategoryRule, "match">>): Promise<boolean> {
