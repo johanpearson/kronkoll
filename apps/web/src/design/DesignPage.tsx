@@ -2,7 +2,7 @@
 // mörkt läge innan vyerna byggs om. Finns bara i utvecklingsläget (se DEV_ROUTES i App.tsx).
 // Färgerna läses direkt ur tokens.css, så att en ny token syns här utan att någon behöver lägga till den.
 import { formatSek } from "@kronkoll/domain";
-import { Landmark, Plus, Trash2, Wallet } from "lucide-react";
+import { Inbox, Landmark, Plus, Trash2, Wallet } from "lucide-react";
 import { useState } from "react";
 import css from "../styles/tokens.css?raw";
 import { setTheme, storedTheme, type Theme } from "../theme.ts";
@@ -10,7 +10,9 @@ import { Button, IconButton } from "../ui/Button.tsx";
 import { AmountInput } from "../ui/AmountInput.tsx";
 import { Chip } from "../ui/Chip.tsx";
 import { List, ListRow } from "../ui/ListRow.tsx";
+import { Dialog, Sheet } from "../ui/Modal.tsx";
 import { SegmentedControl } from "../ui/SegmentedControl.tsx";
+import { Card, EmptyState, Skeleton } from "../ui/Surface.tsx";
 import { Switch } from "../ui/Switch.tsx";
 import "./design.css";
 
@@ -47,6 +49,10 @@ export default function DesignPage() {
   const [notify, setNotify] = useState(true);
   const [period, setPeriod] = useState<(typeof PERIODS)[number]["value"]>("month");
   const [budget, setBudget] = useState("1 250,50");
+  const [modal, setModal] = useState<"sheet" | "dialog" | null>(null);
+  const closeModal = () => {
+    setModal(null);
+  };
   const choose = (next: Theme) => {
     setTheme(next);
     setChosen(next);
@@ -90,6 +96,59 @@ export default function DesignPage() {
         <AmountInput label="Budget för Mat" value={budget} hint="Lämna tomt för ingen budget." onChange={setBudget} />
         <AmountInput label="Ett felaktigt belopp" value="tolv" onChange={() => undefined} />
       </section>
+
+      <h2>Ytor</h2>
+      <Card title="Buffert" action={<Button variant="quiet">Visa</Button>}>
+        <p className="ui-display ui-amount">{formatSek(8_450_000)}</p>
+        <p className="ui-label">Insatt denna period: {formatSek(500_000)}</p>
+      </Card>
+      <Card title="Laddar">
+        <Skeleton lines={3} />
+      </Card>
+      <Card>
+        <EmptyState icon={Inbox} title="Inga transaktioner än" action={<Button variant="primary">Koppla bank</Button>}>
+          De kommer efter första synken med banken.
+        </EmptyState>
+      </Card>
+      <section className="design-panel ui-stack">
+        <Button
+          onClick={() => {
+            setModal("sheet");
+          }}
+        >
+          Öppna ark
+        </Button>
+        <Button
+          onClick={() => {
+            setModal("dialog");
+          }}
+        >
+          Öppna dialog
+        </Button>
+      </section>
+      <Sheet open={modal === "sheet"} title="Välj kategori" onClose={closeModal}>
+        <List label="Kategorier">
+          <ListRow label="Mat" detail="Livsmedel" onClick={closeModal} />
+          <ListRow label="Transport" detail="Kollektivtrafik" onClick={closeModal} />
+        </List>
+      </Sheet>
+      <Dialog
+        open={modal === "dialog"}
+        title="Ta bort regeln?"
+        onClose={closeModal}
+        actions={
+          <>
+            <Button variant="quiet" onClick={closeModal}>
+              Avbryt
+            </Button>
+            <Button variant="danger" onClick={closeModal}>
+              Ta bort
+            </Button>
+          </>
+        }
+      >
+        Transaktionerna behåller kategorierna de redan har.
+      </Dialog>
 
       <h2>Etiketter</h2>
       <section className="design-panel design-row">
