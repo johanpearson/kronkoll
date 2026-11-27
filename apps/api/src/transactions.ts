@@ -33,6 +33,8 @@ function toJson(item: TransactionListItem) {
     category_id: item.categoryId,
     category_source: item.categorySource,
     is_internal_transfer: item.isInternalTransfer,
+    // Hur transaktionen rör en buffert, t.ex. saving_withdrawal för Uttag från sparande (KK-55-A). Null annars.
+    kind: item.savingKind,
     manual_transfer: item.manualTransfer,
     split: item.split,
     hidden: item.hidden,
@@ -120,6 +122,7 @@ export async function getTransaction(env: { DB: D1Database }, id: string): Promi
         category_id: detail.categoryId,
         category_source: detail.categorySource,
         is_internal_transfer: detail.isInternalTransfer,
+        kind: detail.savingKind,
         manual_transfer: detail.manualTransfer,
         income_type: detail.incomeType,
         income_source: detail.incomeSource,

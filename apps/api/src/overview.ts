@@ -4,6 +4,8 @@
 // interna överföringar räknas varken som in eller ut.
 import { budgetRepository, categoryRepository, overviewRepository, settingsRepository } from "@kronkoll/adapter-d1";
 import {
+  bufferTotals,
+  bufferTrend,
   budgetByMainCategory,
   budgetPeriodForKey,
   currentBudgetPeriod,
@@ -15,6 +17,7 @@ import {
   totalBalance,
   trend,
   type BudgetPeriod,
+  type BufferTotals,
 } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
 
@@ -24,6 +27,8 @@ export const TREND_PERIODS = 12;
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
 }
+
+const bufferJson = (b: BufferTotals) => ({ period: b.period, deposited_minor: b.depositedMinor, withdrawn_minor: b.withdrawnMinor, withdrawal_count: b.withdrawalCount });
 
 export async function getOverview(request: Request, env: { DB: D1Database }, sync: SyncDeps): Promise<Response> {
   const key = new URL(request.url).searchParams.get("period") ?? "current";
@@ -69,6 +74,8 @@ export async function getOverview(request: Request, env: { DB: D1Database }, syn
         days_left: left.daysLeft,
         over: left.over,
         last_sync_at: syncs.at(-1) ?? null,
+        // Kortet Buffert (KK-55-A): insatt, uttaget och antal uttag i perioden, och samma för de 12 senaste.
+        buffer: { ...bufferJson(bufferTotals(transactions, period)), trend: bufferTrend(transactions, periods).map(bufferJson) },
         // Uteslutna konton listas inte, så listan summerar till saldot (KK-38-A, KK-53-D). Rollen visar bufferten för sig.
         accounts: accounts.filter((a) => a.included).map((a) => ({ id: a.id, name: a.name, bank: a.bank, role: a.role, balance_minor: a.balanceMinor })),
         connections: connections.map((c) => ({
