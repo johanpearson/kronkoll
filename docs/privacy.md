@@ -22,7 +22,6 @@ Kronkoll har **bara läsbehörighet** mot banken och kan inte göra betalningar 
 | Transaktioner: datum, belopp, motpart och beskrivning | Banken via Enable Banking | Kategorisera, budgetera och visa insikter |
 | Bankkopplingens session-id och giltighetstid | Enable Banking | Hämta nya transaktioner tills samtycket går ut. Session-id lagras **krypterat**. |
 | Kategorier, regler, budgetar, sparmål | Det du själv anger | Appens funktioner |
-| Inkomstparametrar, till exempel SGI, skattesats och planerad föräldraledighet | Det du själv anger | Uppskatta inkomst under ledighet |
 | E-postadress för inloggning | Cloudflare Access | Släppa in rätt personer |
 | Push-prenumeration (om du slår på notiser) | Din webbläsare | Skicka påminnelser och varningar |
 
