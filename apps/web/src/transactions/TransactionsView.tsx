@@ -260,6 +260,8 @@ export function TransactionsView() {
   /** Valda rader när flerval är på (KK-49), annars null. */
   const [selected, setSelected] = useState<ReadonlySet<string> | null>(null);
   const [busy, setBusy] = useState(false);
+  /** Döljandet som misslyckades, så att Försök igen kan göra om det (KK-64-D). */
+  const [hideFailed, setHideFailed] = useState<boolean | null>(null);
   const accounts = useAccountChoices();
   const toast = useToast();
 
@@ -306,24 +308,24 @@ export function TransactionsView() {
     if (selected === null) return;
     const next = new Set(selected);
     if (!next.delete(id)) {
-      if (next.size >= MAX_SELECTED) {
-        toast.problem(`Du kan välja högst ${String(MAX_SELECTED)} transaktioner åt gången.`);
-        return;
-      }
+      // Gränsen syns i urvalet i stället för som en notis (KK-64-D).
+      if (next.size >= MAX_SELECTED) return;
       next.add(id);
     }
+    setHideFailed(null);
     setSelected(next);
   };
   /** Döljer eller visar de valda och hämtar om listan, så att de byter plats (KK-49). */
   const setHidden = async (hidden: boolean) => {
     if (selected === null || selected.size === 0) return;
     const ids = [...selected];
+    setHideFailed(null);
     setBusy(true);
     const { status, body } = await postJson("/api/transactions/hide", { ids, hidden });
     setBusy(false);
     const updated = field(body, "updated");
     if (status !== 200 || typeof updated !== "number") {
-      toast.problem("Det gick inte att ändra. Ingenting är ändrat. Försök igen.");
+      setHideFailed(hidden);
       return;
     }
     // Ångra gör det motsatta med samma transaktioner och hämtar om listan (KK-64-F).
@@ -402,6 +404,15 @@ export function TransactionsView() {
       ) : (
         <section className="card" aria-label="Valda transaktioner">
           <p>{selected.size === 0 ? "Välj transaktioner i listan." : `${String(selected.size)} valda`}</p>
+          {selected.size >= MAX_SELECTED && <small>Du kan välja högst {MAX_SELECTED} transaktioner åt gången.</small>}
+          {hideFailed !== null && (
+            <p role="alert" className="inline-error">
+              <span>Det gick inte att ändra. Ingenting är ändrat.</span>
+              <button type="button" className="small" disabled={busy} onClick={() => void setHidden(hideFailed)}>
+                Försök igen
+              </button>
+            </p>
+          )}
           <p className="actions">
             <button type="button" className="primary" disabled={busy || selected.size === 0} onClick={() => void setHidden(!filters.hidden)}>
               {filters.hidden ? "Visa igen" : "Dölj"}
