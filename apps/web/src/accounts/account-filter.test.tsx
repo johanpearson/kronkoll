@@ -12,11 +12,13 @@ afterEach(() => {
 
 const PERIOD = { key: "2026-11", start: "2026-11-01", end: "2026-11-30" };
 
-// Påhittade konton (KK-13): det tredje räknas inte med och ska inte kunna väljas.
+// Påhittade konton (KK-13): det tredje och fjärde är uteslutna och ska inte kunna väljas. Det fjärde
+// säger det bara med rollen (KK-53), som gäller före det gamla fältet.
 const ACCOUNTS = [
   { id: "acc_1", name: "Gemensamt", nickname: "Gemensamt", bank_name: "Privatkonto ••4821", bank: "Skandia", type: "checking", counted: true },
   { id: "acc_2", name: "Privat", nickname: "Privat", bank_name: "Privatkonto ••5310", bank: "Skandia", type: "checking", counted: true },
   { id: "acc_3", name: "Privat sparande", nickname: "Privat sparande", bank_name: "Sparkonto ••7712", bank: "Skandia", type: "savings", counted: false },
+  { id: "acc_4", name: "Utesluten", nickname: "Utesluten", bank_name: "Privatkonto ••9001", bank: "Skandia", type: "checking", role: "excluded", counted: true },
 ];
 
 /** Svarar med tomma men giltiga vyer och minns vilka adresser som hämtades. */
@@ -73,6 +75,7 @@ describe.each([
     await open(path);
     expect(screen.getByRole("group", { name: "Konton" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Privat sparande" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Utesluten" })).toBeNull();
     expect(chip("Gemensamt").getAttribute("aria-pressed")).toBe("false");
     expect(screen.queryByRole("note")?.textContent ?? "").not.toContain("Visar bara");
     expect(last(urls, endpoint)).toBe(endpoint);
