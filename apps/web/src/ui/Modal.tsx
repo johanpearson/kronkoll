@@ -3,6 +3,7 @@
 // fråga som måste besvaras, t.ex. innan något tas bort. Innehållet ritas bara när det är öppet.
 import { X } from "lucide-react";
 import { useEffect, useId, useRef, type MouseEvent, type ReactNode } from "react";
+import { pushOverlay } from "../router.tsx";
 import { IconButton } from "./Button.tsx";
 
 function useModal(open: boolean, onClose: () => void) {
@@ -21,7 +22,12 @@ function useModal(open: boolean, onClose: () => void) {
       close.current();
     };
     dialog.addEventListener("cancel", onCancel);
+    // Bakåtknappen stänger arket, inte vyn bakom (KK-62-E).
+    const release = pushOverlay(() => {
+      close.current();
+    });
     return () => {
+      release();
       dialog.removeEventListener("cancel", onCancel);
       if (typeof dialog.close === "function") dialog.close();
     };

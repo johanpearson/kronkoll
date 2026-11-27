@@ -3,7 +3,7 @@
 // bakåt från Översikt lämnar appen. Webbläsarens riktiga historik i jsdom används, inte en attrapp.
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Link, navigate, replaceUrl, startHistory, usePath } from "./router.tsx";
+import { Link, navigate, pushOverlay, replaceUrl, startHistory, usePath } from "./router.tsx";
 
 const stack = () => (window.history.state as { stack: string[] } | null)?.stack;
 
@@ -157,5 +157,75 @@ describe("Link", () => {
     await settle();
     expect(screen.getByTestId("path").textContent).toBe("/lan");
     expect(stack()).toEqual(["/", "/lan"]);
+  });
+});
+
+describe("pushOverlay: bakåt stänger ett ark eller en dialog (KK-62-E)", () => {
+  const overlay = () => (window.history.state as { overlay?: boolean } | null)?.overlay === true;
+
+  it("lägger till ett steg på samma adress, och bakåt stänger i stället för att byta vy", async () => {
+    startHistory();
+    navigate("/budget", "tab");
+    await settle();
+    const before = window.history.length;
+    let closed = 0;
+    pushOverlay(() => {
+      closed += 1;
+    });
+    expect(window.history.length).toBe(before + 1);
+    expect(overlay()).toBe(true);
+    expect(window.location.pathname).toBe("/budget");
+    expect(stack()).toEqual(["/", "/budget"]);
+    await pressBack();
+    expect(closed).toBe(1);
+    expect(window.location.pathname).toBe("/budget");
+    expect(overlay()).toBe(false);
+  });
+
+  it("när arket stängs på annat sätt tas steget bort igen", async () => {
+    startHistory();
+    navigate("/budget", "tab");
+    await settle();
+    let closed = 0;
+    const release = pushOverlay(() => {
+      closed += 1;
+    });
+    release();
+    await settle();
+    expect(overlay()).toBe(false);
+    expect(window.location.pathname).toBe("/budget");
+    expect(closed).toBe(0);
+    // Nästa bakåt går till Översikt, inte till arket.
+    await pressBack();
+    expect(window.location.pathname).toBe("/");
+  });
+
+  it("öppnas det igen direkt (React StrictMode) återanvänds steget", async () => {
+    startHistory();
+    const release = pushOverlay(() => undefined);
+    release();
+    let closed = 0;
+    pushOverlay(() => {
+      closed += 1;
+    });
+    await settle();
+    expect(overlay()).toBe(true);
+    // Bara ett steg: ett tryck bakåt räcker för att stänga.
+    await pressBack();
+    expect(overlay()).toBe(false);
+    expect(closed).toBe(1);
+  });
+
+  it("att byta vy från ett öppet ark tar bort arkets steg", async () => {
+    startHistory();
+    navigate("/installningar");
+    await settle();
+    pushOverlay(() => undefined);
+    navigate("/installningar/regler");
+    await settle();
+    expect(stack()).toEqual(["/", "/installningar", "/installningar/regler"]);
+    await pressBack();
+    expect(window.location.pathname).toBe("/installningar");
+    expect(overlay()).toBe(false);
   });
 });
