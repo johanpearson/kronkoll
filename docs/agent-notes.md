@@ -11,6 +11,10 @@ lätt att trampa fel på. Håll den kort och uppdatera den när något nytt lär
 - Följ upp kravstatus i issue #43 när ett krav blir helt uppfyllt.
 - `pr-size` räknar både tillagda och borttagna rader. Att ta bort en funktion med tester blir därför snabbt
   över 400. Dela upp efter lager (UI → API → adapter och migrering → domän), som för #243.
+- PR-stackar (ägarens val 2026-11-27): varje PR grenas från den förra och har den som bas, med auto-merge
+  (squash) när basen blivit `main`. Efter en squash-merge ger `git merge origin/main` add/add-konflikter i
+  filerna som den mergade PR:en lade till. Kontrollera att `main` har samma innehåll som den mergade grenen
+  (`git diff origin/<gren> origin/main`), ta sedan grenens version (`git checkout --ours`) och för vidare uppåt.
 - När ägaren säger "nästa issue" eller `/nasta-issue`: följ skillen `.claude/skills/nasta-issue/SKILL.md`. Den väljer
   nästa arbetspaket ur etappens checklista (i dag #241) och gör en PR i taget.
 - Nya önskemål som saknas i kraven läggs först in i `plans/kronkoll/requirements.json` (nästa lediga KK-nummer),
