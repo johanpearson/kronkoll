@@ -119,14 +119,7 @@ export const accounts = sqliteTable(
     nickname: text("nickname"),
     type: text("type", { enum: ACCOUNT_TYPES }).notNull(),
     balanceMinor: integer("balance_minor"),
-    /** Kontot räknas in i översiktens totala saldo (KK-17-A). */
-    included: integer("included", { mode: "boolean" }).notNull().default(true),
-    /** Ett sparkonto, t.ex. en buffert: överföringar dit från ett annat konto som räknas med är sparande (KK-52). */
-    saving: integer("saving", { mode: "boolean" }).notNull().default(false),
-    /**
-     * Kontots roll (KK-53): Inkomst/Utgift, Buffert eller Uteslutet. Ersätter included och saving, som
-     * inte längre läses och tas bort i en senare migrering (KK-53-B).
-     */
+    /** Kontots roll (KK-53): Inkomst/Utgift, Buffert eller Uteslutet. Ersatte included och saving (KK-53-B). */
     role: text("role", { enum: ACCOUNT_ROLES }).notNull().default("spending"),
     syncCursor: text("sync_cursor"),
   },

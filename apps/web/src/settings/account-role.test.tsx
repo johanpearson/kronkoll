@@ -9,12 +9,13 @@ afterEach(() => {
   window.history.replaceState(null, "", "/");
 });
 
-// Påhittade konton (KK-13) i API:ts form. Det tredje saknar role och har bara de gamla fälten.
+// Påhittade konton (KK-13) i API:ts form. Det fjärde har en okänd roll och visas som Inkomst/Utgift.
 const ACCOUNTS = {
   items: [
-    { id: "acc_1", name: "Gemensamt", nickname: "Gemensamt", bank_name: "Privatkonto ••4821", bank: "Skandia", type: "checking", role: "spending", counted: true, saving: false },
-    { id: "acc_2", name: "Buffert", nickname: "Buffert", bank_name: "Sparkonto ••7712", bank: "Skandia", type: "savings", role: "buffer", counted: true, saving: true },
-    { id: "acc_3", name: "Privat", nickname: null, bank_name: "Privat", bank: null, type: "checking", counted: false },
+    { id: "acc_1", name: "Gemensamt", nickname: "Gemensamt", bank_name: "Privatkonto ••4821", bank: "Skandia", type: "checking", role: "spending" },
+    { id: "acc_2", name: "Buffert", nickname: "Buffert", bank_name: "Sparkonto ••7712", bank: "Skandia", type: "savings", role: "buffer" },
+    { id: "acc_3", name: "Privat", nickname: null, bank_name: "Privat", bank: null, type: "checking", role: "excluded" },
+    { id: "acc_4", name: "Nytt", nickname: null, bank_name: "Nytt", bank: null, type: "checking", role: "okänd" },
   ],
 };
 
@@ -67,10 +68,10 @@ const EXPLAINED = {
 };
 
 describe("roll per konto i Inställningar (KK-53-A)", () => {
-  it("visar varje kontos roll med en förklaring, och klarar konton med bara de gamla fälten", async () => {
+  it("visar varje kontos roll med en förklaring, och en okänd roll som Inkomst/Utgift", async () => {
     api();
     await open();
-    expect([checked("Gemensamt"), checked("Buffert"), checked("Privat")]).toEqual(["Inkomst/Utgift", "Buffert", "Uteslutet"]);
+    expect([checked("Gemensamt"), checked("Buffert"), checked("Privat"), checked("Nytt")]).toEqual(["Inkomst/Utgift", "Buffert", "Uteslutet", "Inkomst/Utgift"]);
     expect(within(rows()[0] as HTMLElement).getByText(EXPLAINED.spending)).toBeTruthy();
     expect(within(rows()[1] as HTMLElement).getByText(EXPLAINED.buffer)).toBeTruthy();
     expect(within(rows()[2] as HTMLElement).getByText(EXPLAINED.excluded)).toBeTruthy();
