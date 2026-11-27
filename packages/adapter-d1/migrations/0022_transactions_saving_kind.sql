@@ -1,0 +1,1 @@
+ALTER TABLE `transactions` ADD `saving_kind` text;

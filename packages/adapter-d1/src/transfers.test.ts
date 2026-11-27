@@ -56,6 +56,8 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
       manualTransfer: null,
       hidden: false,
       internal: false,
+      savingKind: null,
+      categorySource: "none",
       pairId: null,
     });
   });
@@ -63,15 +65,19 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
   it("sparar markering och motpost, och kan ta bort dem igen", async () => {
     const repo = transactionRepository(db);
     await repo.setTransfers([
-      { id: "ut", internal: true, pairId: "in" },
-      { id: "in", internal: true, pairId: "ut" },
+      { id: "ut", internal: true, pairId: "in", savingKind: null },
+      { id: "in", internal: true, pairId: "ut", savingKind: null },
     ]);
     expect((await repo.forTransfers()).filter((r) => r.internal).map((r) => [r.id, r.pairId]).sort()).toEqual([
       ["in", "ut"],
       ["ut", "in"],
     ]);
-    await repo.setTransfers([{ id: "ut", internal: false, pairId: null }]);
-    expect((await repo.forTransfers()).find((r) => r.id === "ut")).toMatchObject({ internal: false, pairId: null });
+    await repo.setTransfers([{ id: "ut", internal: false, pairId: null, savingKind: "saving" }]);
+    expect((await repo.forTransfers()).find((r) => r.id === "ut")).toMatchObject({ internal: false, pairId: null, savingKind: "saving" });
+    expect((await repo.list({ from: "2026-01-01", to: "2026-12-31", limit: 100 })).items.find((t) => t.id === "ut")?.savingKind).toBe("saving");
+    expect((await repo.detail("ut"))?.savingKind).toBe("saving");
+    await repo.setTransfers([{ id: "ut", internal: false, pairId: null, savingKind: null }]);
+    expect((await repo.forTransfers()).find((r) => r.id === "ut")?.savingKind).toBeNull();
   });
 
   it("gör ingenting med en tom lista", async () => {
@@ -97,8 +103,8 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
   it("detaljen för en transaktion har kontots namn och motposten för en överföring", async () => {
     const repo = transactionRepository(db);
     await repo.setTransfers([
-      { id: "ut", internal: true, pairId: "in" },
-      { id: "in", internal: true, pairId: "ut" },
+      { id: "ut", internal: true, pairId: "in", savingKind: null },
+      { id: "in", internal: true, pairId: "ut", savingKind: null },
     ]);
     expect(await repo.detail("ut")).toEqual({
       id: "ut",
@@ -115,6 +121,7 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
       categoryId: null,
       categorySource: "none",
       isInternalTransfer: true,
+      savingKind: null,
       manualTransfer: null,
       incomeType: null,
       incomeSource: "none",
@@ -125,8 +132,8 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
   it("detaljen visar kontots egna namn när det finns, även för motposten (KK-37)", async () => {
     const repo = transactionRepository(db);
     await repo.setTransfers([
-      { id: "ut", internal: true, pairId: "in" },
-      { id: "in", internal: true, pairId: "ut" },
+      { id: "ut", internal: true, pairId: "in", savingKind: null },
+      { id: "in", internal: true, pairId: "ut", savingKind: null },
     ]);
     await db.prepare(`UPDATE accounts SET nickname = 'Buffert' WHERE id = 'acc_spar'`).run();
     expect((await repo.detail("in"))?.accountName).toBe("Buffert");

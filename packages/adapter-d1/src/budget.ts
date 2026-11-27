@@ -4,7 +4,7 @@
  * den ännu inte är bokförd, precis som `BudgetTransaction.date` beskriver.
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import type { BudgetLineInput, BudgetPeriod, BudgetTransaction, SplitPart } from "@kronkoll/domain";
+import type { BudgetLineInput, BudgetPeriod, BudgetTransaction, BufferTransaction, SplitPart } from "@kronkoll/domain";
 import { and, asc, between, eq, inArray, ne, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { budgetLines, transactionSplits, transactions } from "./schema.ts";
@@ -25,7 +25,7 @@ export function budgetRepository(d1: D1Database) {
 
   return {
     /** Periodens transaktioner och deras uppdelningar, i domänens form. Bara `accountIds` om de anges (KK-41-C). */
-    async actuals(period: BudgetPeriod, accountIds?: readonly string[]): Promise<{ transactions: BudgetTransaction[]; splits: Map<string, SplitPart[]> }> {
+    async actuals(period: BudgetPeriod, accountIds?: readonly string[]): Promise<{ transactions: (BudgetTransaction & BufferTransaction)[]; splits: Map<string, SplitPart[]> }> {
       const rows = await db
         .select({
           id: transactions.id,
@@ -34,6 +34,7 @@ export function budgetRepository(d1: D1Database) {
           categoryId: transactions.categoryId,
           status: transactions.status,
           internal: transactions.isInternalTransfer,
+          savingKind: transactions.savingKind,
         })
         .from(transactions)
         .where(inPeriod(period, accountIds))

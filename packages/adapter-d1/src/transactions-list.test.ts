@@ -66,6 +66,7 @@ describe("lista transaktioner (KK-9, KK-18, #32)", () => {
       categoryId,
       categorySource: "template",
       isInternalTransfer: false,
+      savingKind: null,
       manualTransfer: null,
       split: false,
       hidden: false,
