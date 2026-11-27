@@ -473,13 +473,14 @@ export function transactionRepository(d1: D1Database) {
       if (first) await db.batch([first, ...rest]);
     },
 
-    /** Sparar kategorier i en batch. En manuellt satt kategori skrivs aldrig över (KK-18-C). */
-    async setCategories(changes: readonly CategoryChange[]): Promise<void> {
+    /** Sparar kategorier i en batch. En manuellt satt kategori skrivs aldrig över (KK-18-C), utom med `overrideManual` (KK-58-B). */
+    async setCategories(changes: readonly CategoryChange[], options: { readonly overrideManual?: boolean } = {}): Promise<void> {
+      // En manuell kategori skrivs bara över när användaren har valt Skriv över för en regel (KK-58-B).
       const statements = changes.map((change) =>
         db
           .update(transactions)
           .set({ categoryId: change.categoryId, categorySource: change.categorySource })
-          .where(and(eq(transactions.id, change.id), ne(transactions.categorySource, "manual"))),
+          .where(options.overrideManual === true ? eq(transactions.id, change.id) : and(eq(transactions.id, change.id), ne(transactions.categorySource, "manual"))),
       );
       const [first, ...rest] = statements;
       if (first) await db.batch([first, ...rest]);

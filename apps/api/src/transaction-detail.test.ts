@@ -86,7 +86,25 @@ describe("GET /api/transactions/{id} (#32, KK-9, KK-18, KK-19, KK-20-C, KK-30)",
       income_source: "none",
       transfer_pair: null,
       splits: [],
+      category_reason: { source: "template", rule: { id: "mall-ica", match: "counterparty_prefix", pattern: "ICA", category_id: "mat-livsmedel", source: "template" }, also_matched: expect.any(Array) as unknown[] },
     });
+  });
+
+  it("förklarar varför transaktionen fick sin kategori, och vilka andra regler som också träffar (KK-58-D)", async () => {
+    await db.prepare(`INSERT INTO category_rules (id, match, pattern, category_id, source, position) VALUES ('egen', 'description_contains', 'KORTKÖP', 'fritid-hobby', 'learned', 0)`).run();
+    // Regeln har inte tillämpats på transaktionen än, så kategorin kommer fortfarande från mallen och ingen regel pekas ut.
+    expect(await (await get("kop")).json()).toMatchObject({ category_reason: { source: "template", rule: null, also_matched: [{ id: "egen", pattern: "KORTKÖP" }, { id: "mall-ica" }] } });
+    await db.prepare(`UPDATE transactions SET category_id = 'fritid-hobby', category_source = 'learned' WHERE id = 'kop'`).run();
+    const reason = (await (await get("kop")).json<{ category_reason: { rule: { id: string }; also_matched: { id: string }[] } }>()).category_reason;
+    expect(reason.rule.id).toBe("egen");
+    expect(reason.also_matched[0]?.id).toBe("mall-ica");
+    // En manuell kategori kommer inte från någon regel.
+    await db.prepare(`UPDATE transactions SET category_source = 'manual' WHERE id = 'kop'`).run();
+    expect(await (await get("kop")).json()).toMatchObject({ category_reason: { source: "manual", rule: null } });
+    await db.batch([
+      db.prepare(`UPDATE transactions SET category_id = 'mat-livsmedel', category_source = 'template' WHERE id = 'kop'`),
+      db.prepare(`DELETE FROM category_rules WHERE id = 'egen'`),
+    ]);
   });
 
   it("visar inkomsttyp och vem som satte den för en inbetalning (KK-22)", async () => {
