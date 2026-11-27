@@ -23,8 +23,8 @@ describe("välja ljust, mörkt eller system (KK-26-A)", () => {
   it("följer systemet tills användaren väljer något annat", () => {
     at("/installningar");
     const group = screen.getByRole("radiogroup", { name: "Utseende" });
-    expect(within(group).getAllByRole("radio").map((r) => r.closest("label")?.textContent)).toEqual(["Som systemet", "Ljust", "Mörkt"]);
-    expect(within(group).getByRole<HTMLInputElement>("radio", { name: "Som systemet" }).checked).toBe(true);
+    expect(within(group).getAllByRole("radio").map((r) => r.textContent)).toEqual(["System", "Ljust", "Mörkt"]);
+    expect(within(group).getByRole("radio", { name: "System" }).getAttribute("aria-checked")).toBe("true");
     expect(document.documentElement.dataset.theme).toBeUndefined();
   });
 
@@ -33,7 +33,7 @@ describe("välja ljust, mörkt eller system (KK-26-A)", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Mörkt" }));
     expect(document.documentElement.dataset.theme).toBe("dark");
     expect(window.localStorage.getItem(THEME_KEY)).toBe("dark");
-    fireEvent.click(screen.getByRole("radio", { name: "Som systemet" }));
+    fireEvent.click(screen.getByRole("radio", { name: "System" }));
     expect(document.documentElement.dataset.theme).toBeUndefined();
     expect(window.localStorage.getItem(THEME_KEY)).toBeNull();
   });

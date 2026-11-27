@@ -221,7 +221,7 @@ test("insikterna nås från översikten och visar avvikelse, återkommande dragn
 
 test("ge ett konto rollen Buffert i Inställningar (V-e2e-account-role, KK-53-A)", async ({ page }) => {
   const api = await useFakeApi(page);
-  await page.goto("/installningar");
+  await page.goto("/installningar/konton");
   const role = page.getByRole("radiogroup", { name: "Roll för Sparkonto ••5678" });
   await expect(role.getByRole("radio", { name: "Inkomst/Utgift" })).toHaveAttribute("aria-checked", "true");
   await role.getByRole("radio", { name: "Buffert" }).click();

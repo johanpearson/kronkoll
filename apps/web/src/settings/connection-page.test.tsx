@@ -70,9 +70,9 @@ async function open(path = "/installningar/koppling/c1") {
 const notes = (list: string) => within(screen.getByRole("list", { name: list })).getAllByRole("listitem").map((li) => li.querySelector(".tx-notes")?.textContent);
 
 describe("sidan om en bankkoppling (#34, KK-7-A, KK-8-A)", () => {
-  it("Inställningar länkar till kopplingen", async () => {
+  it("Bank under Inställningar länkar till kopplingen", async () => {
     api();
-    await open("/installningar");
+    await open("/installningar/bank");
     fireEvent.click(screen.getByRole("link", { name: "Skandia" }));
     await settle();
     expect(screen.getByRole("heading", { level: 1, name: "Skandia" })).toBeTruthy();
