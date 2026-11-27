@@ -2,8 +2,8 @@
 // visas bara med ?hidden=true. POST /api/transactions/hide döljer eller visar flera på en gång.
 // Perioden följer startdagen i inställningarna (t.ex. lönedagen) och svensk tid. Bankens text
 // skickas som den kom och renderas alltid som text i appen (KK-30).
-import { settingsRepository, splitRepository, transactionRepository, type TransactionListItem } from "@kronkoll/adapter-d1";
-import { budgetPeriodForKey, currentBudgetPeriod, ruleKey, type BudgetPeriod } from "@kronkoll/domain";
+import { ruleRepository, settingsRepository, splitRepository, transactionRepository, type TransactionListItem } from "@kronkoll/adapter-d1";
+import { budgetPeriodForKey, currentBudgetPeriod, explainCategory, ruleKey, type BudgetPeriod } from "@kronkoll/domain";
 import { readAccountFilter } from "./account-filter.ts";
 import { recomputeTransfers } from "./transfers.ts";
 import type { SyncDeps } from "./sync.ts";
@@ -106,7 +106,12 @@ export async function getTransaction(env: { DB: D1Database }, id: string): Promi
   try {
     const detail = await transactionRepository(env.DB).detail(id);
     if (!detail) return json({ error: "not_found" }, 404);
-    const splits = await splitRepository(env.DB).get(id);
+    const [splits, rules] = await Promise.all([splitRepository(env.DB).get(id), ruleRepository(env.DB).list()]);
+    const reason = explainCategory(detail, rules);
+    const ruleItem = (ruleId: string) => {
+      const r = rules.find((x) => x.id === ruleId);
+      return r && { id: r.id, match: r.match, pattern: r.pattern, category_id: r.categoryId, source: r.source };
+    };
     return json(
       {
         id: detail.id,
@@ -133,6 +138,12 @@ export async function getTransaction(env: { DB: D1Database }, id: string): Promi
           transaction_date: detail.transferPair.transactionDate,
         },
         splits: splits.map((p) => ({ category_id: p.categoryId, amount_minor: p.amountMinor })),
+        // Varför fick den här kategorin? (KK-58-D): regeln som gav den, och andra som också träffar i vinstordning.
+        category_reason: {
+          source: reason.source,
+          rule: reason.ruleId === null ? null : ruleItem(reason.ruleId),
+          also_matched: reason.alsoMatched.flatMap((ruleId) => ruleItem(ruleId) ?? []),
+        },
       },
       200,
     );
