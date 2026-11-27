@@ -785,3 +785,12 @@ a.ui-row:active {
     transform: translateY(-12px);
   }
 }
+
+/* Ett fel där det uppstod, med Försök igen bredvid (KK-64-D). */
+.inline-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
