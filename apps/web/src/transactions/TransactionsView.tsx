@@ -317,15 +317,28 @@ export function TransactionsView() {
   /** Döljer eller visar de valda och hämtar om listan, så att de byter plats (KK-49). */
   const setHidden = async (hidden: boolean) => {
     if (selected === null || selected.size === 0) return;
+    const ids = [...selected];
     setBusy(true);
-    const { status, body } = await postJson("/api/transactions/hide", { ids: [...selected], hidden });
+    const { status, body } = await postJson("/api/transactions/hide", { ids, hidden });
     setBusy(false);
     const updated = field(body, "updated");
     if (status !== 200 || typeof updated !== "number") {
       toast.problem("Det gick inte att ändra. Ingenting är ändrat. Försök igen.");
       return;
     }
-    toast.done(hidden ? `${String(updated)} ${updated === 1 ? "transaktion är dold" : "transaktioner är dolda"}. De finns under Visa dolda.` : `${String(updated)} ${updated === 1 ? "transaktion visas" : "transaktioner visas"} igen.`);
+    // Ångra gör det motsatta med samma transaktioner och hämtar om listan (KK-64-F).
+    const undo = async () => {
+      const result = await postJson("/api/transactions/hide", { ids, hidden: !hidden });
+      if (result.status !== 200) {
+        toast.problem("Det gick inte att ångra. Försök igen.");
+        return;
+      }
+      setFilters((current) => ({ ...current }));
+    };
+    toast.done(
+      hidden ? `${String(updated)} ${updated === 1 ? "transaktion är dold" : "transaktioner är dolda"}. De finns under Visa dolda.` : `${String(updated)} ${updated === 1 ? "transaktion visas" : "transaktioner visas"} igen.`,
+      { undo: () => void undo() },
+    );
     setSelected(null);
     setFilters({ ...filters, period: period?.key ?? filters.period });
   };
