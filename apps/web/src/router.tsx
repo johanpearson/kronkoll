@@ -3,7 +3,7 @@
 // en flik ligger ovanpå den och undervyer ovanpå vyn de öppnades från. Varje steg sparar hela kedjan i
 // history.state, så att bakåt och omladdning vet var de är.
 import { useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
-import { canonicalStack, plan } from "./nav/stack.ts";
+import { canonicalStack, plan, tabOf, tabOfStack, tabTarget, type Tab } from "./nav/stack.ts";
 
 const listeners = new Set<() => void>();
 /** Sant medan routern själv går bakåt, så att mellanstegen inte ritas. */
@@ -79,7 +79,24 @@ function back(n: number): Promise<void> {
   });
 }
 
-async function apply(current: readonly string[], next: readonly string[]) {
+/** Var man senast var i varje flik, och hur långt ner man hade scrollat (KK-62-F). Bara i minnet. */
+const tabStacks = new Map<Tab, readonly string[]>();
+const tabScroll = new Map<Tab, number>();
+
+/** Scrollar till y. Vyn hämtar ofta sitt innehåll först, så det görs om tills sidan är lång nog. */
+function scrollToY(y: number) {
+  let tries = 0;
+  const step = () => {
+    window.scrollTo(0, y);
+    if (window.scrollY < y - 1 && tries < 60) {
+      tries += 1;
+      requestAnimationFrame(step);
+    }
+  };
+  step();
+}
+
+async function apply(current: readonly string[], next: readonly string[], scrollY = 0) {
   const steps = plan(current, next);
   // Ett öppet ark har ett eget steg ovanpå vyn. Det ska bort när vyn byts.
   const extra = onOverlayStep() ? 1 : 0;
@@ -96,6 +113,7 @@ async function apply(current: readonly string[], next: readonly string[]) {
     push(stack);
   }
   notify();
+  scrollToY(scrollY);
 }
 
 /**
@@ -105,7 +123,18 @@ async function apply(current: readonly string[], next: readonly string[]) {
 export function navigate(to: string, mode: "push" | "tab" = "push"): void {
   const current = currentStack();
   let next: string[];
-  if (mode === "tab" || to === "/") {
+  if (mode === "tab") {
+    // Fliken man lämnar kommer ihåg var man var. Fliken man byter till öppnas där (KK-62-F).
+    const leaving = tabOfStack(current);
+    const tab = tabOf(pathOf(to));
+    tabStacks.set(leaving, current);
+    tabScroll.set(leaving, window.scrollY);
+    next = tabTarget(tabStacks, current, tab);
+    const restored = tab !== leaving && next.join("\n") === tabStacks.get(tab)?.join("\n");
+    void apply(current, next, restored ? (tabScroll.get(tab) ?? 0) : 0);
+    return;
+  }
+  if (to === "/") {
     next = stepsTo(to);
   } else {
     const index = current.indexOf(to);

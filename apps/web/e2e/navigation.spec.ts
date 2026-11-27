@@ -45,3 +45,18 @@ test("en djuplänk får samma steg bakåt som om man gått dit (KK-62-G)", async
   await page.goBack();
   expect(page.url()).toBe("about:blank");
 });
+
+test("en flik öppnas där man senast var i den, och ett tryck till går till flikens start (KK-62-F)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/");
+  await tab(page, "Inkomst").click();
+  await page.getByRole("button", { name: "Visa det som räknas i oktober 2026" }).click();
+  await page.getByRole("list", { name: "Inbetalningar Oktober 2026" }).getByRole("listitem").first().getByRole("link").click();
+  await expect(page).toHaveURL(/\/transaktioner\/lon1$/u);
+  await tab(page, "Budget").click();
+  await expect(page).toHaveURL(/\/budget$/u);
+  await tab(page, "Inkomst").click();
+  await expect(page).toHaveURL(/\/transaktioner\/lon1$/u);
+  await tab(page, "Inkomst").click();
+  await expect(page).toHaveURL(/\/inkomst$/u);
+});
