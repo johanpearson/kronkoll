@@ -800,3 +800,8 @@ a.ui-row:active {
 .ui-sync-failed {
   color: var(--warning);
 }
+
+/* Flikarnas huvudvyer tar emot svep i sidled och låter webbläsaren sköta scrollningen (KK-63). */
+.ui-view-swipe {
+  touch-action: pan-y;
+}

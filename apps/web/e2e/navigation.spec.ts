@@ -71,3 +71,24 @@ test("undervyer har en synlig tillbakaknapp, eftersom iOS saknar bakåtknapp (KK
   await expect(page).toHaveURL(/\/$/u);
   await expect(page.getByRole("button", { name: "Tillbaka" })).toHaveCount(0);
 });
+
+test("ett svep i sidled byter flik i menyns ordning, utan nytt steg bakåt (KK-63-A, C)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/budget");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  const view = page.locator(".ui-view");
+  const swipe = async (from: number, to: number) => {
+    const init = { pointerId: 1, pointerType: "touch", isPrimary: true, bubbles: true, clientY: 400 };
+    await view.dispatchEvent("pointerdown", { ...init, clientX: from });
+    for (const x of [from + (to - from) / 3, from + ((to - from) * 2) / 3, to]) await view.dispatchEvent("pointermove", { ...init, clientX: x });
+    await view.dispatchEvent("pointerup", { ...init, clientX: to });
+  };
+  await swipe(330, 60);
+  await expect(page).toHaveURL(/\/lan$/u);
+  await expect(tab(page, "Lån")).toHaveAttribute("aria-current", "page");
+  await swipe(60, 330);
+  await expect(page).toHaveURL(/\/budget$/u);
+  // Svepen lade inte till steg: bakåt går till Översikt.
+  await page.goBack();
+  await expect(page).toHaveURL(/\/$/u);
+});
