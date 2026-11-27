@@ -1,6 +1,6 @@
 // Appens skal (#30): sidorna och huvudmenyn. Service workern (sw/) ger offline-skal och senaste
 // översikten i högst 24 h.
-import { House, Landmark, PiggyBank, ReceiptText, Wallet } from "lucide-react";
+import { ChevronLeft, House, Landmark, PiggyBank, ReceiptText, Wallet } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { PlannerView } from "./planner/PlannerView.tsx";
@@ -8,7 +8,7 @@ import { IncomeView } from "./income/IncomeView.tsx";
 import { InsightsView } from "./insights/InsightsView.tsx";
 import { LoansView } from "./loans/LoansView.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
-import { Link, usePath } from "./router.tsx";
+import { canGoBack, Link, navigationKind, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
 import { ConnectionView } from "./settings/ConnectionView.tsx";
 import { RulesView } from "./settings/RulesView.tsx";
@@ -16,6 +16,7 @@ import { SettingsView } from "./settings/SettingsView.tsx";
 import { TransactionDetail } from "./transactions/TransactionDetail.tsx";
 import { TransactionsView } from "./transactions/TransactionsView.tsx";
 import { ToastProvider } from "./toast.tsx";
+import { IconButton } from "./ui/Button.tsx";
 
 function NotFound() {
   return (
@@ -94,7 +95,22 @@ export function App() {
   const path = usePath();
   return (
     <ToastProvider>
-      {page(path)}
+      {/* En ny vy glider in från höger, bakåt från vänster och ett flikbyte tonar (KK-62-H). */}
+      <div key={path} className={`ui-view ui-view-${navigationKind()}`}>
+        {canGoBack() && (
+          // iOS saknar bakåtknapp, så undervyer har en egen (KK-62-B). Den följer samma steg som telefonens.
+          <nav className="ui-backbar" aria-label="Tillbaka">
+            <IconButton
+              label="Tillbaka"
+              icon={ChevronLeft}
+              onClick={() => {
+                window.history.back();
+              }}
+            />
+          </nav>
+        )}
+        {page(path)}
+      </div>
       <nav className="tabbar" aria-label="Huvudmeny">
         <ul>
           {TABS.map((tab) => (

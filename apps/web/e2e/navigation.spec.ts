@@ -60,3 +60,14 @@ test("en flik öppnas där man senast var i den, och ett tryck till går till fl
   await tab(page, "Inkomst").click();
   await expect(page).toHaveURL(/\/inkomst$/u);
 });
+
+test("undervyer har en synlig tillbakaknapp, eftersom iOS saknar bakåtknapp (KK-62-B, H)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/installningar/regler");
+  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+  await page.getByRole("navigation", { name: "Tillbaka" }).getByRole("button", { name: "Tillbaka" }).click();
+  await expect(page).toHaveURL(/\/installningar$/u);
+  await page.getByRole("button", { name: "Tillbaka" }).click();
+  await expect(page).toHaveURL(/\/$/u);
+  await expect(page.getByRole("button", { name: "Tillbaka" })).toHaveCount(0);
+});
