@@ -605,3 +605,76 @@ a.ui-row:active {
     background-position: -100% 0;
   }
 }
+
+/* Diagram (KK-65-B): accentfärgen mot ytan, och staplarna växer nerifrån. */
+.ui-chart {
+  position: relative;
+  margin: 0;
+}
+
+.ui-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.ui-bars rect {
+  fill: var(--primary);
+  transform-box: fill-box;
+  transform-origin: bottom;
+}
+
+.ui-chart-labels {
+  display: flex;
+  justify-content: space-around;
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.ui-ring {
+  width: 120px;
+}
+
+.ui-ring svg {
+  transform: rotate(-90deg);
+}
+
+.ui-ring circle {
+  fill: none;
+  stroke-width: 12;
+}
+
+.ui-ring-track {
+  stroke: var(--surface-sunken);
+}
+
+.ui-ring-value {
+  stroke: var(--primary);
+  stroke-linecap: round;
+}
+
+.ui-ring-over {
+  stroke: var(--danger);
+}
+
+.ui-ring-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--heading);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-line polyline {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
