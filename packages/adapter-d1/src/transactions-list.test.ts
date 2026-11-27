@@ -172,12 +172,14 @@ describe("dolda transaktioner (KK-49)", () => {
   });
 });
 
-describe("konton som inte räknas med (KK-41-A)", () => {
-  it("deras transaktioner syns inte i listan, och kommer tillbaka när kontot räknas med igen", async () => {
-    await db.prepare(`UPDATE accounts SET included = 0 WHERE id = 'acc_1'`).run();
+describe("uteslutna konton (KK-53, tidigare KK-41-A)", () => {
+  it("deras transaktioner syns inte i listan, och kommer tillbaka när kontot får en annan roll", async () => {
+    await db.prepare(`UPDATE accounts SET role = 'excluded' WHERE id = 'acc_1'`).run();
     expect(await ids()).toEqual([]);
     expect(await ids({ hidden: true })).toEqual([]);
-    await db.prepare(`UPDATE accounts SET included = 1 WHERE id = 'acc_1'`).run();
+    await db.prepare(`UPDATE accounts SET role = 'buffer' WHERE id = 'acc_1'`).run();
+    expect((await ids()).length).toBeGreaterThan(0);
+    await db.prepare(`UPDATE accounts SET role = 'spending' WHERE id = 'acc_1'`).run();
     expect((await ids()).length).toBeGreaterThan(0);
   });
 });

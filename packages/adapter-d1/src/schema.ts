@@ -101,6 +101,7 @@ export const connectStates = sqliteTable(
 );
 
 const ACCOUNT_TYPES =["checking", "credit_card", "savings", "loan", "manual"] as const;
+const ACCOUNT_ROLES = ["spending", "buffer", "excluded"] as const;
 
 export const accounts = sqliteTable(
   "accounts",
@@ -122,10 +123,16 @@ export const accounts = sqliteTable(
     included: integer("included", { mode: "boolean" }).notNull().default(true),
     /** Ett sparkonto, t.ex. en buffert: överföringar dit från ett annat konto som räknas med är sparande (KK-52). */
     saving: integer("saving", { mode: "boolean" }).notNull().default(false),
+    /**
+     * Kontots roll (KK-53): Inkomst/Utgift, Buffert eller Uteslutet. Ersätter included och saving, som
+     * inte längre läses och tas bort i en senare migrering (KK-53-B).
+     */
+    role: text("role", { enum: ACCOUNT_ROLES }).notNull().default("spending"),
     syncCursor: text("sync_cursor"),
   },
   (t) => [
     check("accounts_type", oneOf("type", ACCOUNT_TYPES)),
+    check("accounts_role", oneOf("role", ACCOUNT_ROLES)),
     uniqueIndex("accounts_provider_uid").on(t.connectionId, t.providerUid),
   ],
 );

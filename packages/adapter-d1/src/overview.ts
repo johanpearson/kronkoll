@@ -4,7 +4,7 @@
  * `budgetRepository`.
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import type { OverviewAccount } from "@kronkoll/domain";
+import type { AccountRole, OverviewAccount } from "@kronkoll/domain";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { accounts, bankConnections, syncRuns } from "./schema.ts";
@@ -14,6 +14,8 @@ export interface OverviewAccountRow extends OverviewAccount {
   /** Eget namn om det finns, annars bankens maskerade (KK-37). */
   readonly name: string;
   readonly bank: string | null;
+  /** Kontots roll (KK-53). Uteslutna konton räknas inte in i saldot (KK-53-D). */
+  readonly role: AccountRole;
 }
 
 export interface OverviewConnection {
@@ -31,11 +33,11 @@ export interface OverviewConnection {
 export function overviewRepository(d1: D1Database) {
   const db = drizzle(d1);
   return {
-    /** Kontona med namn som de visas, bank, saldo (null om banken inte har lämnat något) och om de räknas in (KK-38). */
+    /** Kontona med namn som de visas, bank, saldo (null om banken inte har lämnat något), roll och om de räknas in (KK-38, KK-53-D). */
     async accounts(): Promise<OverviewAccountRow[]> {
       const name = sql<string>`coalesce(${accounts.nickname}, ${accounts.displayName})`;
       return db
-        .select({ id: accounts.id, name, bank: bankConnections.aspspName, balanceMinor: accounts.balanceMinor, included: accounts.included })
+        .select({ id: accounts.id, name, bank: bankConnections.aspspName, balanceMinor: accounts.balanceMinor, included: sql<boolean>`${accounts.role} <> 'excluded'`.mapWith(Boolean), role: accounts.role })
         .from(accounts)
         .innerJoin(bankConnections, eq(accounts.connectionId, bankConnections.id))
         .orderBy(asc(bankConnections.aspspName), asc(name), asc(accounts.id))

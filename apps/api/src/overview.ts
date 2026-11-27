@@ -69,8 +69,8 @@ export async function getOverview(request: Request, env: { DB: D1Database }, syn
         days_left: left.daysLeft,
         over: left.over,
         last_sync_at: syncs.at(-1) ?? null,
-        // Konton som användaren har valt bort ur översikten listas inte, så listan summerar till saldot (KK-38-A).
-        accounts: accounts.filter((a) => a.included).map((a) => ({ id: a.id, name: a.name, bank: a.bank, balance_minor: a.balanceMinor })),
+        // Uteslutna konton listas inte, så listan summerar till saldot (KK-38-A, KK-53-D). Rollen visar bufferten för sig.
+        accounts: accounts.filter((a) => a.included).map((a) => ({ id: a.id, name: a.name, bank: a.bank, role: a.role, balance_minor: a.balanceMinor })),
         connections: connections.map((c) => ({
           id: c.id,
           bank: c.bank,

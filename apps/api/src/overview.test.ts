@@ -31,7 +31,7 @@ beforeAll(async () => {
   await accounts.upsertFromBank({ connectionId: "c1", providerUid: "u1", iban: null, name: "Privatkonto", type: "checking", balanceMinor: 4831240 }, () => "acc_1");
   await accounts.upsertFromBank({ connectionId: "c1", providerUid: "u2", iban: null, name: "Spar", type: "savings", balanceMinor: 7400000 }, () => "acc_2");
   await accounts.upsertFromBank({ connectionId: "c1", providerUid: "u3", iban: null, name: "Kort", type: "credit_card", balanceMinor: null }, () => "acc_3");
-  await db.prepare(`INSERT INTO accounts (id, connection_id, display_name, type, balance_minor, included) VALUES ('acc_4', 'c1', 'Lån', 'loan', -200000000, 0)`).run();
+  await db.prepare(`INSERT INTO accounts (id, connection_id, display_name, type, balance_minor, role) VALUES ('acc_4', 'c1', 'Lån', 'loan', -200000000, 'excluded')`).run();
   await db.prepare(`UPDATE accounts SET nickname = 'Vardag' WHERE id = 'acc_1'`).run();
   const rows: [string, string, number, string | null, number][] = [
     ["lon", "2026-11-01", 4125000, "inkomst-lon", 0],
@@ -96,12 +96,14 @@ describe("GET /api/overview (KK-17)", () => {
     });
   });
 
-  it("listar varje valt konto med namn, bank och saldo, och totalen är summan av dem som har saldo (KK-38)", async () => {
+  it("listar varje konto som inte är uteslutet med namn, bank, roll och saldo, och totalen omfattar bufferten (KK-38, KK-53-D)", async () => {
+    await db.prepare(`UPDATE accounts SET role = 'buffer' WHERE id = 'acc_2'`).run();
     const body = await (await call("/api/overview")).json<Overview>();
+    await db.prepare(`UPDATE accounts SET role = 'spending' WHERE id = 'acc_2'`).run();
     expect(body.accounts).toEqual([
-      { id: "acc_3", name: "Kort", bank: "Skandia", balance_minor: null },
-      { id: "acc_2", name: "Spar", bank: "Skandia", balance_minor: 7400000 },
-      { id: "acc_1", name: "Vardag", bank: "Skandia", balance_minor: 4831240 },
+      { id: "acc_3", name: "Kort", bank: "Skandia", role: "spending", balance_minor: null },
+      { id: "acc_2", name: "Spar", bank: "Skandia", role: "buffer", balance_minor: 7400000 },
+      { id: "acc_1", name: "Vardag", bank: "Skandia", role: "spending", balance_minor: 4831240 },
     ]);
     expect(body.balance_minor).toBe(7400000 + 4831240);
   });
