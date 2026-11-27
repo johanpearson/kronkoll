@@ -117,6 +117,8 @@ export async function useFakeApi(
     id: "lon1", account: { id: "acc_1", name: "Vardag", type: "checking" }, status: "booked", transaction_date: "2026-11-25", booking_date: "2026-11-25",
     amount_minor: 3361000, counterparty: "", counterparty_norm: "EXEMPELFÖRETAGET AB", description: "EXEMPELFÖRETAGET AB LÖN", category_id: null, category_source: "none",
     is_internal_transfer: false, manual_transfer: null, income_type: "other", income_source: "template", transfer_pair: null, splits: [],
+    // Varför fick den här kategorin? (KK-58-D). Ingen kategori, och ingen regel träffar.
+    category_reason: { source: "none", rule: null, also_matched: [] },
   };
   /** Ett påhittat bolån vars bindningstid slutar om 41 dagar (KK-36-C). */
   const loans: Record<string, unknown>[] = [{
@@ -233,7 +235,13 @@ export async function useFakeApi(
       state.rules.push(rule);
       return [201, { rule, applied: 0, retroactive_candidates: 0, protected_manual: 0 }];
     }
-    if (path === "/api/rules") return [200, { items: state.rules }];
+    // Platsen i användarens ordning (KK-58-C): den senast skapade står först, som i det riktiga API:t.
+    if (path === "/api/rules") return [200, { items: state.rules.map((r, i) => ({ ...r, position: r.source === "learned" ? -i : null })) }];
+    if (path === "/api/rules/order" && method === "PUT") {
+      const order = Array.isArray(body["order"]) ? (body["order"] as string[]) : [];
+      state.rules.sort((a, b) => order.indexOf(b.id) - order.indexOf(a.id));
+      return [200, { updated: 0 }];
+    }
     if (path === "/api/categories/reset" && method === "POST") {
       if (body["preview"] === true) return [200, { categories: 37, rules: 14, transactions: 812, splits: 3, budget_lines: 9 }];
       state.categoryResets.push(body);

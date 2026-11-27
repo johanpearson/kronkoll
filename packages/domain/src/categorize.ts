@@ -2,8 +2,10 @@
  * Kategorisering med deterministiska regler (KK-18, beslut D-rules).
  *
  * Prioritet: en manuellt satt kategori rörs aldrig (KK-18-C). Bland reglerna vinner en inlärd
- * över en mallregel, sedan exakt matchning före prefix före text i beskrivningen, sedan längre
- * mönster. "Gör alltid så" lär in en regel på hela den normaliserade motparten (KK-18-B).
+ * över en mallregel. Bland de inlärda vinner den som står först i användarens ordning (KK-58-C), och
+ * inlärda utan plats kommer efter dem. Annars gäller exakt matchning före prefix före text i
+ * beskrivningen, sedan längre mönster. "Gör alltid så" lär in en regel på hela den normaliserade
+ * motparten (KK-18-B).
  */
 import { learnPattern, matchesWordPrefix, normalizeCounterparty } from "./normalize.ts";
 
@@ -16,6 +18,8 @@ export interface CategoryRule {
   readonly pattern: string;
   readonly categoryId: string;
   readonly source: "learned" | "template";
+  /** Platsen i användarens ordning, 0 först (KK-58-C). Bara för inlärda; saknas för en regel som inte ordnats. */
+  readonly position?: number;
 }
 
 export interface CategorizableTransaction {
@@ -75,9 +79,14 @@ function matches(rule: Pick<CategoryRule, "match" | "pattern">, text: MatchText)
   }
 }
 
+/** Platsen i användarens ordning. En regel utan plats kommer efter. Mallregler får aldrig någon (`orderRules`). */
+const placeOf = (r: CategoryRule) => r.position ?? Infinity;
+
 function byPriority(a: CategoryRule, b: CategoryRule): number {
+  const place = placeOf(a) - placeOf(b);
   return (
     (a.source === "learned" ? 0 : 1) - (b.source === "learned" ? 0 : 1) ||
+    (Number.isNaN(place) ? 0 : place) ||
     MATCH_RANK[a.match] - MATCH_RANK[b.match] ||
     b.pattern.length - a.pattern.length ||
     (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
@@ -93,6 +102,27 @@ export function categorize(tx: CategorizableTransaction, rules: readonly Categor
   const text = matchText(tx);
   const rule = rules.filter((r) => matches(r, text)).sort(byPriority)[0];
   return rule ? { categoryId: rule.categoryId, source: rule.source, ruleId: rule.id } : null;
+}
+
+export interface CategoryExplanation {
+  /** Varifrån kategorin kommer: manuellt, en egen regel, en mallregel eller ingenstans. */
+  readonly source: CategorySource;
+  /** Regeln som ger kategorin, eller null om den är manuell, saknas eller inte längre är den regeln ger. */
+  readonly ruleId: string | null;
+  /** Andra regler som också träffar, i den ordning de skulle vinna. */
+  readonly alsoMatched: readonly string[];
+}
+
+/**
+ * Varför fick den här kategorin? (KK-58-D). Pekar bara ut en regel när den vinner nu och ger samma kategori som
+ * transaktionen har, så att svaret aldrig skyller på fel regel efter att en regel ändrats eller tagits bort.
+ */
+export function explainCategory(tx: CategorizableTransaction, rules: readonly CategoryRule[]): CategoryExplanation {
+  const text = matchText(tx);
+  const hits = rules.filter((r) => matches(r, text)).sort(byPriority);
+  const winner = hits[0];
+  const ruleId = tx.categorySource !== "manual" && winner?.categoryId === tx.categoryId ? winner.id : null;
+  return { source: tx.categorySource, ruleId, alsoMatched: hits.filter((r) => r.id !== ruleId).map((r) => r.id) };
 }
 
 /** Bara villkoret i en regel: vad den träffar, inte vad den gör. */
@@ -203,6 +233,26 @@ export function learnFromManualChoice(input: LearnInput): LearnResult {
   return { transaction, rule };
 }
 
+/**
+ * Användarens ordning på de egna reglerna (KK-58-C): `order` är de inlärda reglernas id, den som ska vinna
+ * först. Varje inlärd regel får sin plats, och mallreglerna lämnas som de är (de kommer alltid sist).
+ */
+export function orderRules(rules: readonly CategoryRule[], order: readonly string[]): CategoryRule[] {
+  const learned = new Set(rules.filter((r) => r.source === "learned").map((r) => r.id));
+  if (new Set(order).size !== order.length || order.length !== learned.size || order.some((id) => !learned.has(id))) {
+    throw new RangeError("Ordningen måste innehålla varje egen regel en gång");
+  }
+  return rules.map((r) => (r.source === "learned" ? { ...r, position: order.indexOf(r.id) } : r));
+}
+
+export interface ReachOptions {
+  /**
+   * Skriv över även manuellt kategoriserade där regeln vinner (KK-58-B). Ett engångsval när regeln sparas: de
+   * får regelns källa, och ett nytt manuellt val efter det skyddas som vanligt.
+   */
+  readonly overrideManual?: boolean;
+}
+
 export interface RuleReach {
   /** Transaktioner som får en ny kategori om regeln appliceras bakåt. */
   readonly changes: readonly CategoryChange[];
@@ -215,12 +265,15 @@ export interface RuleReach {
  * så" (KK-18-B). Bara transaktioner där just den här regeln vinner räknas, så att en annan regel
  * med högre prioritet aldrig skrivs över. Manuella transaktioner ändras aldrig, men räknas.
  */
-export function ruleReach(transactions: readonly CategorizableTransaction[], rules: readonly CategoryRule[], ruleId: string): RuleReach {
+export function ruleReach(transactions: readonly CategorizableTransaction[], rules: readonly CategoryRule[], ruleId: string, options: ReachOptions = {}): RuleReach {
   const changes: CategoryChange[] = [];
   let protectedManual = 0;
   for (const tx of transactions) {
     if (tx.categorySource === "manual") {
-      if (categorize({ ...tx, categorySource: "none" }, rules)?.ruleId === ruleId) protectedManual += 1;
+      const result = categorize({ ...tx, categorySource: "none" }, rules);
+      if (result?.ruleId !== ruleId) continue;
+      if (options.overrideManual === true) changes.push({ id: tx.id, categoryId: result.categoryId, categorySource: result.source });
+      else protectedManual += 1;
       continue;
     }
     const result = categorize(tx, rules);
