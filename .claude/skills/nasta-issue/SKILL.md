@@ -50,6 +50,15 @@ Annars:
 
 Säg i en mening vilket issue och vilken PR i kedjan du tar, och varför. Börja sedan direkt. Vänta inte på svar.
 
+**Namnge sessionen** direkt efter valet, så att ägaren ser i sessionslistan vad den gör. I molnsessioner:
+hämta sessionens id med `get_session` utan id (claude-code-remote) och sätt titeln med `set_session_title`.
+Format: `#<issue> <kort svensk titel> – PR <k>/<n>`, t.ex. `#252 Preliminära som i en bankapp – PR 1/3`.
+Om `n` inte är känt skriver du bara `PR <k>`.
+- Fortsätter du med en öppen PR (steg 2.3): `#<issue> Åtgärda PR #<pr>`.
+- Stannar du utan att göra något: `M5: väntar på merge av #<pr>`, eller `M5: blockerad – <orsak>`.
+
+Saknas verktygen, t.ex. när skillen körs lokalt, hoppar du över det här steget.
+
 ## 4. Förbered
 
 1. Läs hela issuet och dess kommentarer. Kommentarer från ägaren går före beskrivningen.
