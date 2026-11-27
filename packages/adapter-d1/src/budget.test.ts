@@ -56,6 +56,7 @@ describe("budget i D1 (KK-20)", () => {
       categoryId: "mat-livsmedel",
       status: "booked",
       internal: false,
+      savingKind: null,
     });
     expect(transactions.find((t) => t.id === "intern")).toMatchObject({ internal: true });
   });
