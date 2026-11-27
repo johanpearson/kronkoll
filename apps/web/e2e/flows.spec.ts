@@ -30,8 +30,8 @@ test("kategorisera med Gör alltid så skapar en regel som även tar tidigare k�
   await page.getByRole("combobox", { name: "Kategori" }).selectOption({ label: "Hushåll › Förbrukning" });
   await page.getByRole("checkbox", { name: "Gör alltid så för Hörnbutiken Exempelvägen" }).check();
   await page.getByRole("button", { name: "Spara" }).click();
-  await expect(page.getByText("Regeln matchar 1 tidigare transaktioner.")).toBeVisible();
-  await page.getByRole("button", { name: "Applicera på dem" }).click();
+  // Regeln tillämpas direkt på det tidigare köpet, utan fråga (KK-58-A).
+  await expect(page.getByText("1 transaktioner fick den nya kategorin.")).toBeVisible();
 
   // Listan är grupperad per dag. En rad är ett listelement utan dagens rubrik.
   const row = (name: string) => page.getByRole("listitem").filter({ hasText: name, hasNot: page.getByRole("heading") });

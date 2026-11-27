@@ -231,7 +231,7 @@ export async function useFakeApi(
       const text = String(body["pattern"]).trim().toUpperCase();
       const rule = { id: `r-${String(state.rules.length + 1)}`, match: body["match"] === "contains" ? "description_contains" : "counterparty_prefix", pattern: text, category_id: String(body["category_id"]), source: "learned", hits: 0 };
       state.rules.push(rule);
-      return [201, { rule, retroactive_candidates: 0, protected_manual: 0 }];
+      return [201, { rule, applied: 0, retroactive_candidates: 0, protected_manual: 0 }];
     }
     if (path === "/api/rules") return [200, { items: state.rules }];
     if (path === "/api/categories/reset" && method === "POST") {
@@ -279,12 +279,15 @@ export async function useFakeApi(
     if (found && method === "PATCH") {
       found.category_id = String(body["category_id"]);
       found.category_source = "manual";
-      if (body["learn_rule"] !== true) return [200, { transaction: found, rule: null, retroactive_candidates: 0, protected_manual: 0 }];
+      if (body["learn_rule"] !== true) return [200, { transaction: found, rule: null, applied: 0, retroactive_candidates: 0, protected_manual: 0 }];
       const pattern = body["rule_pattern"];
       const rule = { id: "r-1", pattern: typeof pattern === "string" ? pattern : found.counterparty.toUpperCase(), category_id: found.category_id, source: "learned", hits: 1 };
       state.rules.push(rule);
-      const candidates = transactions.filter((t) => t.counterparty === found.counterparty && t.category_id === null).length;
-      return [200, { transaction: found, rule, retroactive_candidates: candidates, protected_manual: 0 }];
+      // Som det riktiga API:t tillämpas regeln direkt på tidigare köp hos samma motpart (KK-58-A).
+      const earlier = transactions.filter((t) => t.counterparty === found.counterparty && t.category_id === null);
+      for (const t of earlier) Object.assign(t, { category_id: found.category_id, category_source: "rule" });
+      rule.hits += earlier.length;
+      return [200, { transaction: found, rule, applied: earlier.length, retroactive_candidates: 0, protected_manual: 0 }];
     }
     if (path === "/api/rules/r-1/apply" && method === "POST") {
       const rule = state.rules[0];

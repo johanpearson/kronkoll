@@ -93,15 +93,22 @@ describe("GET /api/rules (KK-18)", () => {
 });
 
 describe("POST /api/rules (KK-18-B)", () => {
-  it("lägger till \"allt som börjar med\" ett normaliserat mönster och säger vad den skulle ändra bakåt", async () => {
+  it("lägger till \"allt som börjar med\" ett normaliserat mönster och tillämpar det direkt på tidigare transaktioner (KK-58-A)", async () => {
     const res = await call("POST", undefined, { pattern: " ikea ", category_id: "hushall-forbrukning" });
     expect(res.status).toBe(201);
-    // k1 och k2 får kategorin om den appliceras; k3 är manuellt vald och ändras aldrig.
+    // k1 och k2 får kategorin direkt, utan fråga; k3 är manuellt vald och ändras aldrig.
     expect(await res.json()).toEqual({
       rule: { id: "r-1", match: "counterparty_prefix", pattern: "IKEA", category_id: "hushall-forbrukning", source: "learned", action: "categorize" },
-      retroactive_candidates: 2,
+      applied: 2,
+      retroactive_candidates: 0,
       protected_manual: 1,
     });
+    const rows = await db.prepare(`SELECT id, category_id AS c, category_source AS s FROM transactions WHERE id IN ('k1', 'k2', 'k3') ORDER BY id`).all();
+    expect(rows.results).toEqual([
+      { id: "k1", c: "hushall-forbrukning", s: "learned" },
+      { id: "k2", c: "hushall-forbrukning", s: "learned" },
+      { id: "k3", c: "fritid-hobby", s: "manual" },
+    ]);
     expect((await items()).find((r) => r.pattern === "IKEA")).toMatchObject({ hits: 3 });
   });
 
@@ -133,7 +140,7 @@ describe("PATCH och DELETE /api/rules/{id} (KK-18)", () => {
   it("byter kategori på en mallregel och gör mönstret kortare", async () => {
     const res = await call("PATCH", "/api/rules/mall-ica", { pattern: "ica", category_id: "mat-restaurang-cafe" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ rule: { id: "mall-ica", pattern: "ICA", category_id: "mat-restaurang-cafe", source: "template" }, retroactive_candidates: 1 });
+    expect(await res.json()).toMatchObject({ rule: { id: "mall-ica", pattern: "ICA", category_id: "mat-restaurang-cafe", source: "template" }, applied: 1, retroactive_candidates: 0 });
   });
 
   it.each([
@@ -223,11 +230,16 @@ describe("regler med åtgärden Räkna inte (KK-39-C)", () => {
 
 describe("GET /api/rules/{id}/matches (KK-18-C)", () => {
   it("listar transaktionerna regeln gäller, med vad som händer med var och en", async () => {
-    const { rule } = await (await call("POST", undefined, { pattern: "IKEA", category_id: "hushall-forbrukning" })).json<{ rule: { id: string } }>();
-    const res = await call("GET", `/api/rules/${rule.id}/matches`);
+    // En regel som ännu inte har tillämpats, som en mallregel efter en ny synk.
+    await db.prepare(`INSERT INTO category_rules (id, match, pattern, category_id, source) VALUES ('egen', 'counterparty_prefix', 'IKEA', 'hushall-forbrukning', 'learned')`).run();
+    const res = await call("GET", "/api/rules/egen/matches");
     expect(res.status).toBe(200);
     const body = await res.json<{ total: number; change: number; unchanged: number; manual: number; items: { id: string; name: string; effect: string }[] }>();
     expect({ total: body.total, change: body.change, unchanged: body.unchanged, manual: body.manual }).toEqual({ total: 3, change: 2, unchanged: 0, manual: 1 });
+    // En regel som sparas via API:t är redan tillämpad (KK-58-A).
+    await call("PATCH", "/api/rules/egen", { category_id: "fritid-hobby" });
+    const after = await (await call("GET", "/api/rules/egen/matches")).json<{ change: number; unchanged: number }>();
+    expect({ change: after.change, unchanged: after.unchanged }).toEqual({ change: 0, unchanged: 2 });
     expect(body.items.find((i) => i.id === "k3")).toEqual({
       id: "k3",
       transaction_date: "2026-11-02",
@@ -247,7 +259,7 @@ describe("GET /api/rules/{id}/matches (KK-18-C)", () => {
 
 describe("POST /api/rules/apply-all (KK-18-C)", () => {
   it("räknar först, applicerar sedan alla regler, och rör aldrig manuellt valda", async () => {
-    await call("POST", undefined, { pattern: "IKEA", category_id: "hushall-forbrukning" });
+    await db.prepare(`INSERT INTO category_rules (id, match, pattern, category_id, source) VALUES ('egen', 'counterparty_prefix', 'IKEA', 'hushall-forbrukning', 'learned')`).run();
     const preview = await call("POST", "/api/rules/apply-all", { preview: true });
     expect(await preview.json()).toEqual({ would_update: 2 });
     const category = async (id: string) => db.prepare(`SELECT category_id AS c FROM transactions WHERE id = ?`).bind(id).first();
@@ -291,7 +303,8 @@ describe("regler som innehåller en text (KK-47)", () => {
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({
       rule: { id: expect.any(String) as string, match: "description_contains", pattern: "AMAZON", category_id: "hushall-forbrukning", source: "learned", action: "categorize" },
-      retroactive_candidates: 3,
+      applied: 3,
+      retroactive_candidates: 0,
       protected_manual: 0,
     });
     // Samma text med andra versaler är samma regel.
@@ -322,7 +335,7 @@ describe("regler som innehåller en text (KK-47)", () => {
     const { rule } = await (await call("POST", undefined, { pattern: "amazon", category_id: "hushall-forbrukning" })).json<{ rule: { id: string } }>();
     const toContains = await call("PATCH", `/api/rules/${rule.id}`, { match: "contains" });
     expect(toContains.status).toBe(200);
-    expect(await toContains.json()).toMatchObject({ rule: { match: "description_contains", pattern: "AMAZON" }, retroactive_candidates: 3 });
+    expect(await toContains.json()).toMatchObject({ rule: { match: "description_contains", pattern: "AMAZON" }, applied: 3 });
     const text = await call("PATCH", `/api/rules/${rule.id}`, { pattern: " www.amazon " });
     expect(await text.json()).toMatchObject({ rule: { match: "description_contains", pattern: "WWW.AMAZON" } });
     // En Räkna inte-regel byter slag på samma sätt.
