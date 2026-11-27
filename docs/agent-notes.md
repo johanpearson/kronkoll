@@ -57,7 +57,9 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - E2E i molnsessioner (Claude Code på webben): Playwrights egen webbläsare saknas där, men Chromium finns i
   `/opt/pw-browsers/chromium`. Kör med en tillfällig config utanför git som sätter
   `launchOptions.executablePath` till den sökvägen. Testet `pwa.spec.ts` (installerbarhet) fallerar där med
-  `in-incognito`, vilket beror på miljön och inte på koden.
+  `in-incognito`, vilket beror på miljön och inte på koden. Configen ligger i `apps/web/e2e/playwright.config.ts`
+  och har `webServer.cwd: ".."`, så en kopia i scratchpad måste sätta `webServer.cwd` och `testDir` till
+  absoluta sökvägar, annars hittar `pnpm preview` inte webbpaketet.
 
 ## Integrationstester (Workers-miljön)
 
@@ -170,6 +172,11 @@ pnpm --filter @kronkoll/<paket> test:coverage
   (New-Object Text.UTF8Encoding $false))`. Med BOM känner `pr-description` inte igen första rubriken.
 
 ## Öppna trådar
+
+- Regler (#250, KK-58): en ny eller ändrad regel tillämpas direkt bakåt av API:t (`applied` i svaret), men bara
+  där just den regeln vinner. Den inbyggda prioriteten (inlärd före mall, exakt före prefix före Innehåller)
+  gör att en äldre prefixregel slår en ny Innehåller-regel. Det byts mot användarens ordning i #250 PR 2.
+  `retroactive_candidates` är alltid 0 och finns kvar för appar i telefonens cache.
 
 - Första riktiga förnyelsen av samtycket (#151): ett konto **utan IBAN** som får nytt uid av banken blir ett
   nytt konto. Matcha på namn och typ inom kopplingen om det händer.

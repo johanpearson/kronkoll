@@ -53,6 +53,16 @@ interface MatchText {
   readonly description: string;
 }
 
+/**
+ * Text som en Innehåller-regel söker i: versaler och ett mellanslag mellan orden, som mönstret sparas.
+ * Banken kan skicka flera mellanslag eller en tabb mellan orden, och då missade regeln (#250).
+ */
+const searchable = (text: string) => text.replace(/\s+/gu, " ").toLocaleUpperCase("sv-SE");
+
+function matchText(tx: Pick<CategorizableTransaction, "counterpartyNorm" | "description">): MatchText {
+  return { key: ruleKey(tx), description: searchable(tx.description) };
+}
+
 function matches(rule: Pick<CategoryRule, "match" | "pattern">, text: MatchText): boolean {
   switch (rule.match) {
     case "counterparty_exact":
@@ -80,7 +90,7 @@ export function categorize(tx: CategorizableTransaction, rules: readonly Categor
     return { categoryId: tx.categoryId, source: "manual", ruleId: null };
   }
   // Normaliseringen är det dyra steget, och Workern har lite processortid per anrop. Gör den en gång.
-  const text = { key: ruleKey(tx), description: tx.description.toLocaleUpperCase("sv-SE") };
+  const text = matchText(tx);
   const rule = rules.filter((r) => matches(r, text)).sort(byPriority)[0];
   return rule ? { categoryId: rule.categoryId, source: rule.source, ruleId: rule.id } : null;
 }
@@ -94,7 +104,7 @@ export type RuleCondition = Pick<CategoryRule, "id" | "match" | "pattern">;
  */
 export function matchingRule(tx: Pick<CategorizableTransaction, "counterpartyNorm" | "description">, rules: readonly RuleCondition[]): string | null {
   if (rules.length === 0) return null;
-  const text = { key: ruleKey(tx), description: tx.description.toLocaleUpperCase("sv-SE") };
+  const text = matchText(tx);
   const hit = rules
     .filter((r) => matches(r, text))
     .sort((a, b) => MATCH_RANK[a.match] - MATCH_RANK[b.match] || b.pattern.length - a.pattern.length || (a.id < b.id ? -1 : 1))[0];
@@ -169,7 +179,7 @@ export function learnFromManualChoice(input: LearnInput): LearnResult {
   if (!input.alwaysDoThis) return { transaction, rule: null };
   if (input.contains !== undefined) {
     const text = input.contains.trim().replace(/\s+/gu, " ").toLocaleUpperCase("sv-SE");
-    const own = `${input.transaction.counterpartyNorm} ${input.transaction.description}`.toLocaleUpperCase("sv-SE");
+    const own = searchable(`${input.transaction.counterpartyNorm} ${input.transaction.description}`);
     if (text === "" || !own.includes(text)) throw new RangeError("Texten måste finnas i transaktionen");
     const known = input.rules.find((r) => r.source === "learned" && r.match === "description_contains" && r.pattern === text);
     const rule: CategoryRule = known

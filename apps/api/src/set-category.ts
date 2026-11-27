@@ -1,6 +1,6 @@
 // Byta kategori (#32, KK-18-B, KK-18-C): PATCH /api/transactions/{id} sätter en manuell kategori och
-// kan lära in en regel ("Gör alltid så"). Regeln ändrar ingen historik förrän användaren väljer det
-// med POST /api/rules/{id}/apply. Manuella transaktioner rörs aldrig av regler.
+// kan lära in en regel ("Gör alltid så"). Regeln tillämpas direkt på tidigare transaktioner där den vinner
+// (KK-58-A). Manuella transaktioner rörs aldrig av regler.
 import { categoryRepository, ruleRepository, transactionRepository } from "@kronkoll/adapter-d1";
 import { learnFromManualChoice, ruleReach, type RuleReach } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
@@ -57,12 +57,15 @@ export async function setCategory(request: Request, env: { DB: D1Database }, syn
       // Den här transaktionen är nu manuell och räknas inte med.
       const others = (await store.categorizable()).filter((t) => t.id !== id);
       reach = ruleReach(others, [...rules.filter((r) => r.id !== rule.id), rule], rule.id);
+      await store.setCategories(reach.changes);
     }
     return json(
       {
         transaction: { id, category_id: input.categoryId, category_source: "manual" },
         rule: rule && { id: rule.id, match: rule.match, pattern: rule.pattern, category_id: rule.categoryId },
-        retroactive_candidates: reach.changes.length,
+        applied: reach.changes.length,
+        // Alltid 0: en äldre app i telefonens cache frågar annars om något som redan är gjort.
+        retroactive_candidates: 0,
         protected_manual: reach.protectedManual,
       },
       200,

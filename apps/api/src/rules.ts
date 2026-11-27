@@ -8,9 +8,9 @@
 //   GET    /api/rules/{id}/matches  förhandsvisning: transaktionerna regeln gäller och vad som händer
 //   POST   /api/rules/apply-all     alla regler över hela historiken ({ preview: true } räknar bara)
 //   POST   /api/rules/reset         { preview: true } hur många regler som tas bort, { confirm: true } tar bort alla (KK-51)
-// En ny eller ändrad regel gäller direkt för nya transaktioner (synken kategoriserar med den). Svaret
-// säger hur många tidigare den skulle ändra; appen frågar och använder POST /api/rules/{id}/apply.
-// Manuellt valda rörs aldrig.
+// En ny eller ändrad regel tillämpas direkt på tidigare transaktioner där den vinner, utan fråga (KK-58-A),
+// och synken kategoriserar nya med den. Svaret säger hur många som ändrades. Manuellt valda rörs aldrig.
+// POST /api/rules/{id}/apply finns kvar för äldre appar och ändrar då inget mer.
 import { categoryRepository, ruleRepository, transactionRepository } from "@kronkoll/adapter-d1";
 import { applyAllRules, excludeRuleHits, normalizeCounterparty, ruleHits, ruleMatches, ruleReach, type CategoryRule, type ExcludeRule } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
@@ -62,11 +62,16 @@ async function usable(db: D1Database, categoryId: unknown): Promise<boolean> {
   return typeof categoryId === "string" && (await categoryRepository(db).list()).some((c) => c.id === categoryId && !c.archived);
 }
 
-/** Regeln och vad den skulle ändra bakåt, som svar på en ny eller ändrad regel. */
-async function withReach(db: D1Database, rule: CategoryRule, status: number): Promise<Response> {
-  const rules = await ruleRepository(db).list();
-  const reach = ruleReach(await transactionRepository(db).categorizable(), rules, rule.id);
-  return json({ rule: toItem(rule), retroactive_candidates: reach.changes.length, protected_manual: reach.protectedManual }, status);
+/**
+ * Tillämpar en ny eller ändrad regel direkt på tidigare transaktioner där den vinner (KK-58-A), och svarar med
+ * hur många som ändrades. Manuellt valda rörs inte. `retroactive_candidates` är alltid 0 och finns kvar för
+ * en äldre app i telefonens cache, som annars frågar om något som redan är gjort.
+ */
+async function applied(db: D1Database, rule: CategoryRule, status: number): Promise<Response> {
+  const store = transactionRepository(db);
+  const reach = ruleReach(await store.categorizable(), await ruleRepository(db).list(), rule.id);
+  await store.setCategories(reach.changes);
+  return json({ rule: toItem(rule), applied: reach.changes.length, retroactive_candidates: 0, protected_manual: reach.protectedManual }, status);
 }
 
 export async function listRules(env: { DB: D1Database }): Promise<Response> {
@@ -132,7 +137,7 @@ export async function createRule(request: Request, env: { DB: D1Database }, sync
     const existing = (await repo.list()).find((r) => r.source === "learned" && r.match === match && r.pattern === pattern);
     const rule: CategoryRule = existing ? { ...existing, categoryId } : { id: sync.newId(), match, pattern, categoryId, source: "learned" };
     await repo.save(rule);
-    return await withReach(env.DB, rule, existing ? 200 : 201);
+    return await applied(env.DB, rule, existing ? 200 : 201);
   } catch {
     return json({ error: "unavailable" }, 503);
   }
@@ -166,7 +171,7 @@ export async function patchRule(request: Request, env: { DB: D1Database }, id: s
     if (categoryId !== category.categoryId && !(await usable(env.DB, categoryId))) return json({ error: "unknown_category" }, 400);
     const rule = { ...category, pattern, categoryId, match: MATCH[nextKind] };
     await repo.update(rule);
-    return await withReach(env.DB, rule, 200);
+    return await applied(env.DB, rule, 200);
   } catch {
     return json({ error: "unavailable" }, 503);
   }
