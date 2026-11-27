@@ -1,12 +1,30 @@
-// Egna namn på konton (#34, KK-37), om kontot räknas med (KK-41-A) och om det är ett sparkonto (KK-52). Varje konto visar sitt namn och, under, bankens maskerade namn och
-// banken, så att det går att känna igen. Namnet är användarens text och renderas som text (KK-37-C).
+// Egna namn på konton (#34, KK-37) och kontots roll (KK-53): Inkomst/Utgift, Buffert eller Uteslutet. Varje
+// konto visar sitt namn och, under, bankens maskerade namn och banken, så att det går att känna igen. Namnet är användarens text och renderas som text (KK-37-C).
 import { Pencil } from "lucide-react";
 import { useEffect, useRef, useState, type SyntheticEvent } from "react";
 import { field, getJson, patchJson } from "../api.ts";
 import { IconButton } from "../icon-button.tsx";
+import { SegmentedControl } from "../ui/SegmentedControl.tsx";
 
 /** Samma gräns som API:t. */
 const MAX_LENGTH = 40;
+
+type Role = "spending" | "buffer" | "excluded";
+
+const ROLES: readonly { value: Role; label: string }[] = [
+  { value: "spending", label: "Inkomst/Utgift" },
+  { value: "buffer", label: "Buffert" },
+  { value: "excluded", label: "Uteslutet" },
+];
+
+/** Vad rollen betyder, i en mening under valet (KK-53-A). */
+const EXPLAINED: Record<Role, string> = {
+  spending: "Lön och utgifter. Överföringar mellan sådana konton räknas inte.",
+  buffer: "Sparande. Överföringar hit räknas som sparande och uttag härifrån som uttag från sparande.",
+  excluded: "Syns inte någonstans. Överföringar dit räknas som utgifter och överföringar därifrån som inkomster.",
+};
+
+const isRole = (value: unknown): value is Role => value === "spending" || value === "buffer" || value === "excluded";
 
 interface Account {
   readonly id: string;
@@ -14,10 +32,13 @@ interface Account {
   readonly nickname: string | null;
   readonly bankName: string;
   readonly bank: string | null;
-  /** Kontot räknas med i budget, översikt och insikter. Saknas fältet räknas det med. */
-  readonly counted: boolean;
-  /** Sparkonto: överföringar dit räknas som sparande (KK-52). */
-  readonly saving: boolean;
+  readonly role: Role;
+}
+
+/** Rollen från API:t, Inkomst/Utgift om den saknas eller är okänd. */
+function roleOf(raw: unknown): Role {
+  const role = field(raw, "role");
+  return isRole(role) ? role : "spending";
 }
 
 function toAccount(raw: unknown): Account | null {
@@ -32,8 +53,7 @@ function toAccount(raw: unknown): Account | null {
     nickname: typeof nickname === "string" ? nickname : null,
     name: typeof nickname === "string" ? nickname : bankName,
     bank: typeof bank === "string" ? bank : null,
-    counted: field(raw, "counted") !== false,
-    saving: field(raw, "saving") === true,
+    role: roleOf(raw),
   };
 }
 
@@ -107,17 +127,17 @@ export function AccountNames() {
     setEditing(null);
   };
 
-  // Valet sparas först och visas när servern har svarat, eftersom det räknar om överföringarna (KK-41-D).
-  const setChoice = async (id: string, change: { counted: boolean } | { saving: boolean }) => {
+  // Valet sparas först och visas när servern har svarat, eftersom det räknar om överföringarna (KK-53-A).
+  const setRole = async (id: string, role: Role) => {
     setSaving(id);
     setError(null);
-    const { status } = await patchJson(`/api/accounts/${encodeURIComponent(id)}`, change);
+    const { status } = await patchJson(`/api/accounts/${encodeURIComponent(id)}`, { role });
     setSaving(null);
     if (status !== 200) {
       setError("Det gick inte att spara. Försök igen.");
       return;
     }
-    setState((current) => (current.kind === "ready" ? { kind: "ready", accounts: current.accounts.map((a) => (a.id === id ? { ...a, ...change } : a)) } : current));
+    setState((current) => (current.kind === "ready" ? { kind: "ready", accounts: current.accounts.map((a) => (a.id === id ? { ...a, role } : a)) } : current));
   };
 
   return (
@@ -134,34 +154,17 @@ export function AccountNames() {
             {editing !== a.id && <IconButton label={`Byt namn på ${a.name}`} icon={Pencil} onClick={() => { setEditing(a.id); }} />}
           </div>
           {notes !== "" && <small className="tx-notes">{notes}</small>}
-          <label className="account-counted">
-            <span>Räknas med</span>
-            <input
-              type="checkbox"
-              role="switch"
-              className="switch"
-              aria-label={`Räknas med: ${a.name}`}
-              checked={a.counted}
-              disabled={saving !== null}
-              onChange={(e) => void setChoice(a.id, { counted: e.target.checked })}
+          <div className="account-role">
+            <SegmentedControl
+              label={`Roll för ${a.name}`}
+              options={ROLES}
+              value={a.role}
+              onChange={(role) => {
+                if (saving === null && role !== a.role) void setRole(a.id, role);
+              }}
             />
-          </label>
-          {a.counted && (
-            <label className="account-counted">
-              <span>Sparkonto</span>
-              <input
-                type="checkbox"
-                role="switch"
-                className="switch"
-                aria-label={`Sparkonto: ${a.name}`}
-                checked={a.saving}
-                disabled={saving !== null}
-                onChange={(e) => void setChoice(a.id, { saving: e.target.checked })}
-              />
-            </label>
-          )}
-          {a.counted && a.saving && <small className="tx-notes">Överföringar hit räknas som sparande och uttag härifrån som inkomst.</small>}
-          {!a.counted && <small className="tx-notes">Syns inte någonstans. Överföringar dit räknas som utgifter och överföringar därifrån som inkomster.</small>}
+            <small className="ui-caption">{EXPLAINED[a.role]}</small>
+          </div>
           {editing === a.id && <NameForm account={a} onSaved={(nickname) => { saved(a.id, nickname); }} onClose={() => { setEditing(null); }} />}
         </li>
         );

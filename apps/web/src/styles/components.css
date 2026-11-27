@@ -785,8 +785,7 @@ fieldset.card > legend + * {
   border-top: 1px solid var(--border);
 }
 
-.switch-list label,
-.account-counted {
+.switch-list label {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -913,3 +912,8 @@ fieldset.account-filter > legend {
   color: var(--danger);
 }
 
+/* Kontots roll (KK-53-A): segmentkontrollen med förklaringen under. */
+.account-role {
+  display: grid;
+  gap: var(--space-2);
+}

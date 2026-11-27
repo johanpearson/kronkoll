@@ -69,8 +69,8 @@ const CONNECTION = {
 };
 
 const ACCOUNTS = [
-  { id: "acc_1", name: "Vardag", nickname: "Vardag", bank_name: "Privatkonto ••1234", bank: "Exempelbanken", type: "checking", counted: true },
-  { id: "acc_2", name: "Sparkonto ••5678", nickname: null, bank_name: "Sparkonto ••5678", bank: "Exempelbanken", type: "savings", counted: true },
+  { id: "acc_1", name: "Vardag", nickname: "Vardag", bank_name: "Privatkonto ••1234", bank: "Exempelbanken", type: "checking", role: "spending" },
+  { id: "acc_2", name: "Sparkonto ••5678", nickname: null, bank_name: "Sparkonto ••5678", bank: "Exempelbanken", type: "savings", role: "spending" },
 ];
 
 /** Utfall per huvudkategori och period. November saknar budget tills ett test sparar en. */
@@ -87,7 +87,7 @@ export interface FakeApi {
   readonly budgetPuts: unknown[];
   /** Sparade riktlinjer (KK-42), i den ordning de sparades. */
   readonly guidelinePuts: unknown[];
-  /** Ändringar av Räknas med (KK-41-A), i den ordning de sparades. */
+  /** Ändringar av kontots roll (KK-53-A), i den ordning de sparades. */
   readonly accountPatches: unknown[];
 }
 
@@ -252,8 +252,9 @@ export async function useFakeApi(
     const account = accounts.find((a) => a.id === accountPath?.[1]);
     if (account && method === "PATCH") {
       state.accountPatches.push(body);
-      account.counted = Boolean(body["counted"]);
-      return [200, { id: account.id, name: account.name, nickname: account.nickname, counted: account.counted }];
+      const role = body["role"];
+      if (typeof role === "string") account.role = role;
+      return [200, { id: account.id, name: account.name, nickname: account.nickname, role: account.role }];
     }
     if (path === "/api/settings") return [200, { budget_period_start_day: 1, current_period: NOVEMBER }];
     // Web Push är påslaget på servern (KK-27). I E2E är service workers avstängda, så vyn säger att enheten saknar stöd.

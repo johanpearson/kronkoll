@@ -68,7 +68,7 @@ describe("konton", () => {
     const id = await repo.upsertFromBank(input, newId);
     expect(await repo.upsertFromBank({ ...input, balanceMinor: 990000 }, newId)).toBe(id);
     const [row] = (await repo.list()).filter((a) => a.id === id);
-    expect(row).toMatchObject({ displayName: "Privatkonto ••7466", balanceMinor: 990000, included: true });
+    expect(row).toMatchObject({ displayName: "Privatkonto ••7466", balanceMinor: 990000, role: "spending" });
     expect(row?.ibanHash).toMatch(/^[0-9a-f]{64}$/u);
   });
 
