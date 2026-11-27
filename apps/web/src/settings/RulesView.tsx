@@ -15,6 +15,7 @@ import { SyncButton } from "../sync/SyncButton.tsx";
 import { IconButton } from "../icon-button.tsx";
 import { useToast } from "../toast.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "../transactions/TransactionsView.tsx";
+import { ResetRules } from "./ResetRules.tsx";
 import { RuleMatches } from "./RuleMatches.tsx";
 
 /** Värdet i kategorivalet som betyder Räkna inte i stället för en kategori. */
@@ -368,6 +369,10 @@ export function RulesView() {
           })}
         </ul>
       )}
+      <ResetRules onDone={() => { setMode(null); setReload((n) => n + 1); }} />
+      <p>
+        Vill du börja om med själva kategorierna? <Link to="/installningar/kategorier">Rensa alla kategorier</Link>.
+      </p>
     </main>
   );
 }

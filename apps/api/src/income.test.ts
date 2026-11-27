@@ -106,9 +106,9 @@ describe("posterna bakom en månads inkomst (KK-46-A)", () => {
     const body = await (await get("/api/income/2026-10")).json<{ period: string; items: Record<string, unknown>[] }>();
     expect(body.period).toBe("2026-10");
     expect(body.items).toEqual([
-      { id: "fk-okt-2", date: "2026-10-30", amount_minor: 40_000, counterparty: "Försäkringskassan", description: "Föräldrapenning <b>okt</b>", income_type: null, income_source: "none" },
-      { id: "lon-okt", date: "2026-10-24", amount_minor: 3_300_000, counterparty: "", description: "", income_type: "salary", income_source: "template" },
-      { id: "fk-okt", date: "2026-10-10", amount_minor: 500_000, counterparty: "", description: "", income_type: "parental_benefit", income_source: "template" },
+      { id: "fk-okt-2", date: "2026-10-30", amount_minor: 40_000, counterparty: "Försäkringskassan", description: "Föräldrapenning <b>okt</b>", income_type: null, income_source: "none", status: "booked" },
+      { id: "lon-okt", date: "2026-10-24", amount_minor: 3_300_000, counterparty: "", description: "", income_type: "salary", income_source: "template", status: "booked" },
+      { id: "fk-okt", date: "2026-10-10", amount_minor: 500_000, counterparty: "", description: "", income_type: "parental_benefit", income_source: "template", status: "booked" },
     ]);
   });
 

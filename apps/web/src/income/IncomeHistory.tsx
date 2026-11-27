@@ -39,6 +39,7 @@ interface IncomeItem {
   readonly name: string;
   readonly type: IncomeType | null;
   readonly source: string;
+  readonly pending: boolean;
 }
 
 const TYPES = new Set<unknown>(["salary", "parental_benefit", "other"]);
@@ -57,7 +58,7 @@ function toItems(body: unknown): IncomeItem[] | null {
     const type = field(raw, "income_type");
     const source = field(raw, "income_source");
     const name = [counterparty, description].find((t): t is string => typeof t === "string" && t.trim() !== "") ?? "Okänd avsändare";
-    return [{ id, date, amountMinor: amount as number, name, type: TYPES.has(type) ? (type as IncomeType) : null, source: typeof source === "string" ? source : "" }];
+    return [{ id, date, amountMinor: amount as number, name, type: TYPES.has(type) ? (type as IncomeType) : null, source: typeof source === "string" ? source : "", pending: field(raw, "status") === "pending" }];
   });
 }
 
@@ -90,6 +91,7 @@ function MonthItems({ period }: { period: string }) {
           </div>
           <small className="tx-notes">
             {formatDateShort(i.date)} · {incomeLabel(i.type, i.source)}
+            {i.pending ? " · Preliminär – väntar på bokföring" : ""}
           </small>
         </li>
       ))}

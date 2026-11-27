@@ -38,6 +38,7 @@ export async function getIncomeMonth(period: string, env: { DB: D1Database }): P
           description: i.description,
           income_type: i.incomeType,
           income_source: i.incomeSource,
+          status: i.status,
         })),
       },
       200,

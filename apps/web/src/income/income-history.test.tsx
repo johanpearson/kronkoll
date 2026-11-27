@@ -97,7 +97,7 @@ const ITEMS = {
   period: "2026-10",
   items: [
     { id: "t2", date: "2026-10-26", amount_minor: 3361000, counterparty: "Påhittade Bygg AB", description: "", income_type: "salary", income_source: "learned" },
-    { id: "t1", date: "2026-10-12", amount_minor: 42000, counterparty: "", description: "<b>Swish</b> från Anna", income_type: null, income_source: "none" },
+    { id: "t1", date: "2026-10-12", amount_minor: 42000, counterparty: "", description: "<b>Swish</b> från Anna", income_type: null, income_source: "none", status: "pending" },
     { id: "t0", date: "2026-10-02", amount_minor: 100, counterparty: " ", description: "", income_type: "other", income_source: "manual" },
   ],
 };
@@ -116,7 +116,7 @@ describe("Inkomst: vad som räknas (KK-46)", () => {
     const items = within(screen.getByRole("list", { name: "Inbetalningar Oktober 2026" })).getAllByRole("listitem");
     expect(items.map((i) => i.textContent)).toEqual([
       `Påhittade Bygg AB${formatSek(3361000)}26 okt. 2026 · Lön (inlärd regel)`,
-      `<b>Swish</b> från Anna${formatSek(42000)}12 okt. 2026 · Inte klassad`,
+      `<b>Swish</b> från Anna${formatSek(42000)}12 okt. 2026 · Inte klassad · Preliminär – väntar på bokföring`,
       `Okänd avsändare${formatSek(100)}2 okt. 2026 · Övrigt (vald av dig)`,
     ]);
     // Banktexten är text, inte HTML (KK-30), och posten leder till transaktionen där typen kan ändras.

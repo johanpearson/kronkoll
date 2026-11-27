@@ -121,6 +121,8 @@ export const accounts = sqliteTable(
     balanceMinor: integer("balance_minor"),
     /** Kontot räknas in i översiktens totala saldo (KK-17-A). */
     included: integer("included", { mode: "boolean" }).notNull().default(true),
+    /** Ett sparkonto, t.ex. en buffert: överföringar dit från ett annat konto som räknas med är sparande (KK-52). */
+    saving: integer("saving", { mode: "boolean" }).notNull().default(false),
     syncCursor: text("sync_cursor"),
   },
   (t) => [

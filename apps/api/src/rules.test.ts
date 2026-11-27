@@ -345,3 +345,53 @@ describe("regler som innehåller en text (KK-47)", () => {
     expect((await call("POST", undefined, { action: "exclude", pattern: "x", match: "regex" })).status).toBe(400);
   });
 });
+
+describe("POST /api/rules/reset (KK-51)", () => {
+  const reset = (body: unknown, env: Partial<Env> = {}) => call("POST", "/api/rules/reset", body, env);
+  const count = async (sql: string) => (await db.prepare(sql).first<{ n: number }>())?.n ?? -1;
+
+  it("räknar först utan att ändra något, och tar sedan bort alla kategoriserande regler och Räkna inte-regler", async () => {
+    await call("POST", undefined, { pattern: "ikea", category_id: "hushall-forbrukning" });
+    await call("POST", undefined, { action: "exclude", pattern: "ikea" });
+    await db.prepare(`INSERT INTO category_rules (id, match, pattern, category_id, income_type, source) VALUES ('inkomst-egen', 'description_contains', 'BONUS', NULL, 'salary', 'learned')`).run();
+    const before = await count(`SELECT count(*) AS n FROM category_rules WHERE action = 'categorize' AND category_id IS NOT NULL`);
+    const preview = await reset({ preview: true });
+    expect(preview.status).toBe(200);
+    expect(await preview.json()).toEqual({ rules: before, exclude_rules: 1 });
+    expect(await count(`SELECT count(*) AS n FROM category_rules`)).toBeGreaterThan(before);
+    expect(await count(`SELECT count(*) AS n FROM transactions WHERE is_internal_transfer = 1`)).toBe(3);
+
+    const res = await reset({ confirm: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ reset: true });
+    expect(await count(`SELECT count(*) AS n FROM category_rules WHERE (action = 'categorize' AND category_id IS NOT NULL) OR action = 'exclude'`)).toBe(0);
+    // Regler som bara sätter inkomsttyp ligger kvar, och transaktionerna behåller sin kategori.
+    expect(await count(`SELECT count(*) AS n FROM category_rules WHERE id = 'inkomst-egen'`)).toBe(1);
+    expect(await count(`SELECT count(*) AS n FROM transactions WHERE category_id = 'mat-livsmedel'`)).toBe(1);
+    // Det som Räkna inte-regeln höll utanför räknas igen.
+    expect(await count(`SELECT count(*) AS n FROM transactions WHERE is_internal_transfer = 1`)).toBe(0);
+    await db.prepare(`DELETE FROM category_rules WHERE id = 'inkomst-egen'`).run();
+  });
+
+  it.each([
+    ["ingen åtgärd", {}],
+    ["både förhandsvisning och bekräftelse", { preview: true, confirm: true }],
+    ["en bekräftelse som inte är sant eller falskt", { confirm: "ja" }],
+    ["kroppen är inte ett objekt", "[]"],
+  ])("%s ger 400 och tar inte bort något", async (_, input) => {
+    const before = await count(`SELECT count(*) AS n FROM category_rules`);
+    expect((await reset(input)).status).toBe(400);
+    expect(await count(`SELECT count(*) AS n FROM category_rules`)).toBe(before);
+  });
+
+  it("svarar 405 på fel metod och 503 utan detaljer när databasen inte går att nå", async () => {
+    const wrong = await call("GET", "/api/rules/reset");
+    expect(wrong.status).toBe(405);
+    expect(wrong.headers.get("allow")).toBe("POST");
+    for (const input of [{ preview: true }, { confirm: true }]) {
+      const res = await reset(input, { DB: broken });
+      expect(res.status).toBe(503);
+      expect(await res.json()).toEqual({ error: "unavailable" });
+    }
+  });
+});

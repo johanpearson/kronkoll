@@ -13,7 +13,7 @@ export async function listAccounts(env: { DB: D1Database }): Promise<Response> {
   try {
     const rows = await accountNameRepository(env.DB).list();
     return json(
-      { items: rows.map((a) => ({ id: a.id, name: a.nickname ?? a.bankName, nickname: a.nickname, bank_name: a.bankName, bank: a.bank, type: a.type, counted: a.counted })) },
+      { items: rows.map((a) => ({ id: a.id, name: a.nickname ?? a.bankName, nickname: a.nickname, bank_name: a.bankName, bank: a.bank, type: a.type, counted: a.counted, saving: a.saving })) },
       200,
     );
   } catch {
@@ -26,6 +26,8 @@ interface AccountChange {
   readonly nickname?: string | null;
   /** Om kontot räknas med (KK-41-A). Utelämnat betyder att valet inte ändras. */
   readonly counted?: boolean;
+  /** Om kontot är ett sparkonto (KK-52). Utelämnat betyder att valet inte ändras. */
+  readonly saving?: boolean;
 }
 
 /** Namnet ur en begäran: trimmat, null för tomt. Undefined om det är fel form, för långt eller har styrtecken. */
@@ -44,11 +46,13 @@ async function readChange(request: Request): Promise<AccountChange | undefined> 
   if (typeof body !== "object" || body === null) return undefined;
   const hasNickname = "nickname" in body;
   const hasCounted = "counted" in body;
-  if (!hasNickname && !hasCounted) return undefined;
+  const hasSaving = "saving" in body;
+  if (!hasNickname && !hasCounted && !hasSaving) return undefined;
+  if (hasSaving && typeof body.saving !== "boolean") return undefined;
   const nickname = hasNickname ? parseNickname(body.nickname) : undefined;
   if (hasNickname && nickname === undefined) return undefined;
   if (hasCounted && typeof body.counted !== "boolean") return undefined;
-  return { ...(hasNickname ? { nickname: nickname ?? null } : {}), ...(hasCounted ? { counted: body.counted as boolean } : {}) };
+  return { ...(hasNickname ? { nickname: nickname ?? null } : {}), ...(hasCounted ? { counted: body.counted as boolean } : {}), ...(hasSaving ? { saving: body.saving as boolean } : {}) };
 }
 
 export async function patchAccount(request: Request, env: { DB: D1Database }, id: string): Promise<Response> {
@@ -59,12 +63,13 @@ export async function patchAccount(request: Request, env: { DB: D1Database }, id
     if (change.nickname !== undefined && !(await names.set(id, change.nickname))) return json({ error: "not_found" }, 404);
     if (change.counted !== undefined) {
       if (!(await names.setCounted(id, change.counted))) return json({ error: "not_found" }, 404);
-      // Vad som är en intern överföring beror på vilka konton som räknas med (KK-41-D).
-      await recomputeTransfers(env.DB);
     }
+    if (change.saving !== undefined && !(await names.setSaving(id, change.saving))) return json({ error: "not_found" }, 404);
+    // Vad som är en intern överföring beror på vilka konton som räknas med och vilka som är sparkonton (KK-41-D, KK-52).
+    if (change.counted !== undefined || change.saving !== undefined) await recomputeTransfers(env.DB);
     const account = (await names.list()).find((a) => a.id === id);
     if (account === undefined) return json({ error: "not_found" }, 404);
-    return json({ id, name: account.nickname ?? account.bankName, nickname: account.nickname, counted: account.counted }, 200);
+    return json({ id, name: account.nickname ?? account.bankName, nickname: account.nickname, counted: account.counted, saving: account.saving }, 200);
   } catch {
     return json({ error: "unavailable" }, 503);
   }

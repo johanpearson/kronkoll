@@ -221,3 +221,16 @@ describe("kontraktssviten (KK-14-B, V-c-provider)", () => {
     });
   });
 });
+
+describe("tecknet på beloppet", () => {
+  it.each([
+    ["DBIT med positivt belopp", { credit_debit_indicator: "DBIT", transaction_amount: { currency: "SEK", amount: "6233.00" } }, -623300],
+    ["DBIT med negativt belopp", { credit_debit_indicator: "DBIT", transaction_amount: { currency: "SEK", amount: "-6233.00" } }, -623300],
+    ["CRDT med negativt belopp, som en preliminär dragning", { credit_debit_indicator: "CRDT", status: "PDNG", transaction_amount: { currency: "SEK", amount: "-6233.00" } }, -623300],
+    ["CRDT med positivt belopp", { credit_debit_indicator: "CRDT", transaction_amount: { currency: "SEK", amount: "6233.00" } }, 623300],
+  ])("%s", async (_, overrides, amountMinor) => {
+    const { provider } = fakeApi({ "/accounts/a/transactions": { transactions: [tx(overrides)] } });
+    const page = await provider.transactions("a", { dateFrom: "2026-11-01", continuationKey: null });
+    expect(page.transactions[0]?.amountMinor).toBe(amountMinor);
+  });
+});

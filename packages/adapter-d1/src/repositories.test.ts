@@ -95,7 +95,7 @@ describe("egna kontonamn (KK-37)", () => {
     const names = accountNameRepository(db);
     const id = await repo.upsertFromBank({ connectionId: "c1", providerUid: "named-1", iban: null, name: "Privatkonto", type: "checking", balanceMinor: 0 }, newId);
     expect(await names.set(id, "Privat kort")).toBe(true);
-    expect((await names.list()).find((a) => a.id === id)).toEqual({ id, nickname: "Privat kort", bankName: "Privatkonto", bank: "Skandia", type: "checking", counted: true });
+    expect((await names.list()).find((a) => a.id === id)).toEqual({ id, nickname: "Privat kort", bankName: "Privatkonto", bank: "Skandia", type: "checking", counted: true, saving: false });
     expect(await names.set(id, null)).toBe(true);
     expect((await names.list()).find((a) => a.id === id)?.nickname).toBeNull();
   });

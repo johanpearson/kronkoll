@@ -64,7 +64,7 @@ describe("Räknas med per konto i Inställningar (KK-41-A)", () => {
     api();
     await open();
     expect([toggle("Gemensamt").checked, toggle("Privat sparande").checked, toggle("Kort").checked]).toEqual([true, false, true]);
-    expect(rows().map((r) => within(r).queryByText("Räknas inte i budget, översikt eller insikter") !== null)).toEqual([false, true, false]);
+    expect(rows().map((r) => within(r).queryByText("Syns inte någonstans. Överföringar dit räknas som utgifter och överföringar därifrån som inkomster.") !== null)).toEqual([false, true, false]);
   });
 
   it("sparar valet med CSRF-skydd och visar det direkt", async () => {
@@ -74,7 +74,7 @@ describe("Räknas med per konto i Inställningar (KK-41-A)", () => {
     await settle();
     expect(patches).toEqual([{ path: "/api/accounts/acc_1", body: { counted: false }, csrf: "1" }]);
     expect(toggle("Gemensamt").checked).toBe(false);
-    expect(within(rows()[0] as HTMLElement).getByText("Räknas inte i budget, översikt eller insikter")).toBeTruthy();
+    expect(within(rows()[0] as HTMLElement).getByText("Syns inte någonstans. Överföringar dit räknas som utgifter och överföringar därifrån som inkomster.")).toBeTruthy();
     fireEvent.click(toggle("Privat sparande"));
     await settle();
     expect(patches[1]).toMatchObject({ path: "/api/accounts/acc_2", body: { counted: true } });
@@ -91,5 +91,30 @@ describe("Räknas med per konto i Inställningar (KK-41-A)", () => {
     fireEvent.click(toggle("Gemensamt"));
     await settle();
     expect(screen.getByRole("alert")).toBeTruthy();
+  });
+});
+
+describe("Sparkonto per konto (KK-52)", () => {
+  const savingToggle = (name: string) => screen.getByRole<HTMLInputElement>("switch", { name: `Sparkonto: ${name}` });
+
+  it("visas bara för konton som räknas med, av som standard, och sparar valet", async () => {
+    const patches = api();
+    await open();
+    expect(savingToggle("Gemensamt").checked).toBe(false);
+    expect(screen.queryByRole("switch", { name: "Sparkonto: Privat sparande" })).toBeNull();
+    fireEvent.click(savingToggle("Gemensamt"));
+    await settle();
+    expect(patches).toEqual([{ path: "/api/accounts/acc_1", body: { saving: true }, csrf: "1" }]);
+    expect(savingToggle("Gemensamt").checked).toBe(true);
+    expect(within(rows()[0] as HTMLElement).getByText("Överföringar hit räknas som sparande och uttag härifrån som inkomst.")).toBeTruthy();
+  });
+
+  it("säger till när valet inte går att spara, och lämnar det som det var", async () => {
+    api(() => [503, { error: "unavailable" }]);
+    await open();
+    fireEvent.click(savingToggle("Gemensamt"));
+    await settle();
+    expect(screen.getByRole("alert").textContent).toBe("Det gick inte att spara. Försök igen.");
+    expect(savingToggle("Gemensamt").checked).toBe(false);
   });
 });

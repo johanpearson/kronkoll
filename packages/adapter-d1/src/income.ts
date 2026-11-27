@@ -20,6 +20,8 @@ export interface IncomeItem {
   readonly description: string;
   readonly incomeType: IncomeType | null;
   readonly incomeSource: string;
+  /** Preliminär (väntar på bokföring) eller bokförd. */
+  readonly status: "pending" | "booked";
 }
 
 export interface IncomeMonth {
@@ -120,6 +122,7 @@ export function incomeRepository(d1: D1Database) {
           description: transactions.description,
           incomeType: sql<IncomeType | null>`${transactions.incomeType}`,
           incomeSource: transactions.incomeSource,
+          status: sql<"pending" | "booked">`${transactions.status}`,
         })
         .from(transactions)
         .where(and(incoming, eq(transactions.isInternalTransfer, false), sql`substr(${day}, 1, 7) = ${month}`))

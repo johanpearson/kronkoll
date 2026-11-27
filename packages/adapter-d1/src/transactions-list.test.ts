@@ -171,3 +171,13 @@ describe("dolda transaktioner (KK-49)", () => {
     await repo.setManualTransfer("t07", null);
   });
 });
+
+describe("konton som inte räknas med (KK-41-A)", () => {
+  it("deras transaktioner syns inte i listan, och kommer tillbaka när kontot räknas med igen", async () => {
+    await db.prepare(`UPDATE accounts SET included = 0 WHERE id = 'acc_1'`).run();
+    expect(await ids()).toEqual([]);
+    expect(await ids({ hidden: true })).toEqual([]);
+    await db.prepare(`UPDATE accounts SET included = 1 WHERE id = 'acc_1'`).run();
+    expect((await ids()).length).toBeGreaterThan(0);
+  });
+});

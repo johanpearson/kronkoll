@@ -241,7 +241,7 @@ test("välj bort ett konto i Inställningar så att det inte räknas med (V-e2e-
   // Valet visas när servern har svarat, så läget kontrolleras efter klicket och inte av uncheck().
   await sparkonto.click();
   await expect(sparkonto).not.toBeChecked();
-  await expect(page.getByText("Räknas inte i budget, översikt eller insikter")).toBeVisible();
+  await expect(page.getByText("Syns inte någonstans. Överföringar dit räknas som utgifter och överföringar därifrån som inkomster.")).toBeVisible();
   expect(api.accountPatches).toEqual([{ counted: false }]);
   await page.reload();
   await expect(page.getByRole("switch", { name: "Räknas med: Sparkonto ••5678" })).not.toBeChecked();
