@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
+  accountRole,
   classifyTransfers,
   excludeRuleHits,
   type ExcludeRule,
@@ -393,9 +394,9 @@ describe("sparkonton (KK-52)", () => {
     expect(result.in).toEqual({ id: "in", internal: true, pairId: "ut", reason: "pair" });
   });
 
-  it("Buffert → Gemensamt är en inkomst på Gemensamt, och Buffertens rad räknas inte", () => {
+  it("Buffert → Gemensamt är ett uttag från sparande, inte en inkomst, och Buffertens rad räknas inte (KK-55)", () => {
     const result = run([tx({ id: "ut", accountId: "buffert", amountMinor: -100000 }), tx({ id: "in", accountId: "gemensamt", amountMinor: 100000 })]);
-    expect(result.in).toEqual({ id: "in", internal: false, pairId: null, reason: "saving" });
+    expect(result.in).toEqual({ id: "in", internal: true, pairId: "ut", reason: "saving_withdrawal" });
     expect(result.ut).toEqual({ id: "ut", internal: true, pairId: "in", reason: "pair" });
   });
 
@@ -412,5 +413,156 @@ describe("sparkonton (KK-52)", () => {
     );
     expect(result.ut).toMatchObject(internal("in", "pair"));
     expect(result.in).toMatchObject(internal("ut", "pair"));
+  });
+});
+
+describe("kontoroller (KK-53, KK-55, V-u-roles)", () => {
+  // Två Inkomst/Utgift-konton (ett är kortet), en buffert och ett uteslutet konto. Skandia skickar ingen
+  // motpart, så överföringarna syns bara i meddelandet.
+  const ROLES: OwnAccount[] = [
+    { id: "gemensamt", type: "checking", role: "spending" },
+    { id: "kort", type: "checking", role: "spending" },
+    { id: "buffert", type: "checking", role: "buffer" },
+    { id: "privat", type: "checking", role: "excluded" },
+  ];
+  const skandia = (overrides: Partial<TransferInput> & { id: string }) =>
+    tx({ counterpartyNorm: "", description: "Överföring 9999 12 34567", ...overrides });
+  const run = (transactions: TransferInput[], accounts = ROLES) =>
+    Object.fromEntries(classifyTransfers({ transactions, accounts, cardPaymentCounterparties: [], excludeRules: [] }).map((c) => [c.id, c]));
+  const pair = (from: string, to: string, amountMinor: number) => [
+    skandia({ id: "ut", accountId: from, amountMinor: -amountMinor }),
+    skandia({ id: "in", accountId: to, amountMinor, transactionDate: "2026-11-11" }),
+  ];
+
+  it("ett köp på Inkomst/Utgift är en utgift", () => {
+    expect(run([skandia({ id: "kop", accountId: "gemensamt", amountMinor: -34900, description: "LIDL123EXEMPEL, STAD" })]).kop).toMatchObject(external);
+  });
+
+  it("Inkomst/Utgift → Inkomst/Utgift, t.ex. kortbetalningen, är intern", () => {
+    const result = run(pair("gemensamt", "kort", 812300));
+    expect(result.ut).toEqual({ id: "ut", internal: true, pairId: "in", reason: "pair" });
+    expect(result.in).toEqual({ id: "in", internal: true, pairId: "ut", reason: "pair" });
+  });
+
+  it("Inkomst/Utgift → Buffert är sparande på Inkomst/Utgift, och buffertens insättning räknas inte (KK-52-A)", () => {
+    const result = run(pair("gemensamt", "buffert", 200000));
+    expect(result.ut).toEqual({ id: "ut", internal: false, pairId: null, reason: "saving" });
+    expect(result.in).toEqual({ id: "in", internal: true, pairId: "ut", reason: "pair" });
+  });
+
+  it("ett köp eller en räkning direkt från Buffert är en utgift", () => {
+    expect(run([skandia({ id: "kop", accountId: "buffert", amountMinor: -459000, description: "EXEMPELVERKSTAN, STAD" })]).kop).toMatchObject(external);
+  });
+
+  it("Buffert → Inkomst/Utgift är ett uttag från sparande: varken inkomst eller utgift (KK-55)", () => {
+    const result = run(pair("buffert", "gemensamt", 150000));
+    expect(result.in).toEqual({ id: "in", internal: true, pairId: "ut", reason: "saving_withdrawal" });
+    expect(result.ut).toEqual({ id: "ut", internal: true, pairId: "in", reason: "pair" });
+  });
+
+  it("Buffert → Buffert är intern", () => {
+    const accounts: OwnAccount[] = [...ROLES, { id: "buffert2", type: "savings", role: "buffer" }];
+    const result = run(pair("buffert", "buffert2", 100000), accounts);
+    expect(result.ut).toMatchObject(internal("in", "pair"));
+    expect(result.in).toMatchObject(internal("ut", "pair"));
+  });
+
+  it("Inkomst/Utgift → Uteslutet är en utgift som kan kategoriseras, och det uteslutna kontots rad syns inte", () => {
+    const result = run(pair("gemensamt", "privat", 300000));
+    expect(result.ut).toMatchObject(external);
+    expect(result.in).toEqual({ id: "in", internal: true, pairId: null, reason: "account" });
+  });
+
+  it("Uteslutet → Inkomst/Utgift är en inkomst som kan kategoriseras", () => {
+    const result = run(pair("privat", "gemensamt", 45000));
+    expect(result.in).toMatchObject(external);
+    expect(result.ut).toEqual({ id: "ut", internal: true, pairId: null, reason: "account" });
+  });
+
+  it("Buffert → Uteslutet är en utgift som kan kategoriseras", () => {
+    expect(run(pair("buffert", "privat", 99000)).ut).toMatchObject(external);
+  });
+
+  it("Uteslutet → Buffert är en insättning på bufferten, inte en inkomst", () => {
+    const result = run(pair("privat", "buffert", 250000));
+    expect(result.in).toEqual({ id: "in", internal: true, pairId: null, reason: "saving_deposit" });
+    expect(result.ut).toEqual({ id: "ut", internal: true, pairId: null, reason: "account" });
+  });
+
+  it("en insättning på bufferten utifrån, utan motpost på ett uteslutet konto, räknas som förut", () => {
+    expect(run([skandia({ id: "ranta", accountId: "buffert", amountMinor: 1234, description: "Ränta" })]).ranta).toMatchObject(external);
+  });
+
+  it("Uteslutet → Buffert kräver samma belopp inom 3 dagar, och varje uttag används bara en gång", () => {
+    const result = run([
+      skandia({ id: "ut", accountId: "privat", amountMinor: -10000 }),
+      skandia({ id: "in1", accountId: "buffert", amountMinor: 10000 }),
+      skandia({ id: "in2", accountId: "buffert", amountMinor: 10000, transactionDate: "2026-11-12" }),
+      skandia({ id: "sent", accountId: "buffert", amountMinor: 20000, transactionDate: "2026-11-30" }),
+      skandia({ id: "ut2", accountId: "privat", amountMinor: -20000 }),
+    ]);
+    expect(result.in1).toMatchObject({ internal: true, reason: "saving_deposit" });
+    expect(result.in2).toMatchObject(external);
+    expect(result.sent).toMatchObject(external);
+  });
+
+  it("Uteslutet → Buffert gäller upp till 3 dagar, och det tidigaste uttaget används först oavsett ordning", () => {
+    const batch = [
+      skandia({ id: "a", accountId: "privat", amountMinor: -10000, transactionDate: "2026-11-08" }),
+      skandia({ id: "b", accountId: "privat", amountMinor: -10000, transactionDate: "2026-11-12" }),
+      skandia({ id: "d1", accountId: "buffert", amountMinor: 10000, transactionDate: "2026-11-11" }),
+      skandia({ id: "d2", accountId: "buffert", amountMinor: 10000, transactionDate: "2026-11-15" }),
+    ];
+    for (const order of [batch, [...batch].reverse()]) {
+      const result = run(order);
+      expect(result.d1).toMatchObject({ internal: true, reason: "saving_deposit" });
+      expect(result.d2).toMatchObject({ internal: true, reason: "saving_deposit" });
+    }
+  });
+
+  it("Uteslutet → Buffert räknar inte uttag som är borttagna eller har ett eget val, och inte buffertens egna uttag", () => {
+    const result = run([
+      skandia({ id: "borta", accountId: "privat", amountMinor: -1000, status: "removed" }),
+      skandia({ id: "in1", accountId: "buffert", amountMinor: 1000 }),
+      skandia({ id: "eget", accountId: "privat", amountMinor: -2000, manualTransfer: true }),
+      skandia({ id: "in2", accountId: "buffert", amountMinor: 2000 }),
+      skandia({ id: "kop", accountId: "buffert", amountMinor: -3000 }),
+      skandia({ id: "retur", accountId: "buffert", amountMinor: 3000 }),
+      skandia({ id: "noll-ut", accountId: "privat", amountMinor: 0 }),
+      skandia({ id: "noll", accountId: "buffert", amountMinor: 0 }),
+    ]);
+    expect(result.noll).toMatchObject(external);
+    expect(result.in1).toMatchObject(external);
+    expect(result.in2).toMatchObject(external);
+    expect(result.retur).toMatchObject(external);
+  });
+
+  it("allt annat på ett uteslutet konto syns inte", () => {
+    const result = run([
+      skandia({ id: "kop", accountId: "privat", amountMinor: -12900, description: "EXEMPELBUTIKEN, STAD" }),
+      skandia({ id: "lon", accountId: "privat", amountMinor: 3000000, description: "LÖN EXEMPEL AB" }),
+    ]);
+    expect(result.kop).toMatchObject(internal(null, "account"));
+    expect(result.lon).toMatchObject(internal(null, "account"));
+  });
+
+  it("ett eget val och en dold transaktion vinner över rollen", () => {
+    const result = run([
+      skandia({ id: "ut", accountId: "buffert", amountMinor: -150000 }),
+      skandia({ id: "in", accountId: "gemensamt", amountMinor: 150000, manualTransfer: false }),
+      skandia({ id: "ut2", accountId: "privat", amountMinor: -5000, hidden: true }),
+      skandia({ id: "in2", accountId: "buffert", amountMinor: 5000 }),
+    ]);
+    expect(result.in).toMatchObject({ internal: false, reason: "manual" });
+    expect(result.in2).toMatchObject(external);
+  });
+
+  it("KK-53-B: rollen följer de gamla brytarna när den saknas, och en roll vinner över dem", () => {
+    expect(accountRole({ id: "a", type: "checking" })).toBe("spending");
+    expect(accountRole({ id: "a", type: "checking", saving: true })).toBe("buffer");
+    expect(accountRole({ id: "a", type: "checking", counted: false })).toBe("excluded");
+    expect(accountRole({ id: "a", type: "checking", counted: false, saving: true })).toBe("excluded");
+    expect(accountRole({ id: "a", type: "checking", counted: false, role: "buffer" })).toBe("buffer");
+    expect(accountRole({ id: "a", type: "checking", saving: true, role: "spending" })).toBe("spending");
   });
 });

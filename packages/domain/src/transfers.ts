@@ -8,14 +8,17 @@
  * 2. Par: motsatta belopp på två olika egna konton inom ±3 dagar. Varje transaktion ingår i högst
  *    ett par, och närmast i datum vinner. Eftersom Visa-kortet är ett eget konto fångar detta även
  *    betalningen av kortfakturan.
- *    Mellan ett sparkonto (KK-52) och ett annat konto räknas raden på det andra kontot: dit är det sparande,
- *    därifrån en inkomst. Sparkontots egen rad räknas inte.
+ *    Kontots roll (KK-53) avgör hur paret räknas. Inkomst/Utgift → Buffert är sparande på Inkomst/Utgift-kontot
+ *    (KK-52-A), och Buffert → Inkomst/Utgift är ett uttag från sparande (KK-55): varken inkomst eller utgift.
+ *    Buffertens egen rad räknas aldrig. Alla andra par är interna.
+ * 2b. En insättning på en buffert från ett uteslutet konto (samma belopp, ±3 dagar) är en insättning på
+ *    bufferten och inte en inkomst (KK-53, antagande).
  * 3. Kortfaktura utan motpost: ett uttag från ett eget konto som inte är ett kortkonto, till en
  *    känd kortmottagare (t.ex. "skandia visa"). Listan är konfigurerbar (antagande A-6).
  * 4. Regler med åtgärden Räkna inte (KK-39-C): det användaren vill hålla utanför budget och översikt,
  *    t.ex. utlägg som betalas tillbaka. De är inte överföringar, men räknas inte på samma sätt.
  *
- * 5. Konton som inte räknas med (KK-41): deras transaktioner räknas inte och syns inte i listan, och de
+ * 5. Uteslutna konton (KK-53, tidigare KK-41): deras transaktioner räknas inte och syns inte i listan, och de
  *    ingår aldrig i ett par. En överföring dit är därför en vanlig utgift på det andra kontot, och en
  *    överföring därifrån en vanlig inkomst.
  *
@@ -27,13 +30,28 @@ import { assertMinor } from "./money.ts";
 
 export const TRANSFER_WINDOW_DAYS = 3;
 
+/** Kontots roll (KK-53): Inkomst/Utgift, Buffert eller Uteslutet. */
+export type AccountRole = "spending" | "buffer" | "excluded";
+
 export interface OwnAccount {
   readonly id: string;
   readonly type: "checking" | "savings" | "credit_card" | "manual";
-  /** Kontot räknas med (KK-41-A). Utelämnat betyder att det räknas med. */
+  /** Kontots roll (KK-53). Vinner över de gamla brytarna nedan. */
+  readonly role?: AccountRole;
+  /** Ersätts av role (KK-53) och tas bort när databasen har rollen. Kontot räknas med (KK-41-A). Utelämnat betyder att det räknas med. */
   readonly counted?: boolean;
-  /** Ett sparkonto, t.ex. en buffert (KK-52). Utelämnat betyder att det inte är det. */
+  /** Ersätts av role (KK-53) och tas bort när databasen har rollen. Ett sparkonto (KK-52). Utelämnat betyder att det inte är det. */
   readonly saving?: boolean;
+}
+
+/**
+ * Kontots roll. Saknas den gäller samma regel som migreringen (KK-53-B): ett konto som inte räknas med är
+ * Uteslutet, ett sparkonto är Buffert och resten är Inkomst/Utgift.
+ */
+export function accountRole(account: OwnAccount): AccountRole {
+  if (account.role !== undefined) return account.role;
+  if (account.counted === false) return "excluded";
+  return account.saving === true ? "buffer" : "spending";
 }
 
 export interface TransferInput {
@@ -59,7 +77,7 @@ export interface TransferClassification {
   readonly internal: boolean;
   /** Den andra halvan av en överföring, om den finns. */
   readonly pairId: string | null;
-  readonly reason: "hidden" | "manual" | "pair" | "saving" | "card_payment" | "rule" | "account" | "none";
+  readonly reason: "hidden" | "manual" | "pair" | "saving" | "saving_withdrawal" | "saving_deposit" | "card_payment" | "rule" | "account" | "none";
 }
 
 export interface ClassifyTransfersInput {
@@ -80,8 +98,9 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
     parseDate(tx.transactionDate);
   }
   const accountType = new Map(input.accounts.map((a) => [a.id, a.type]));
-  const uncounted = new Set(input.accounts.filter((a) => a.counted === false).map((a) => a.id));
-  const savingAccounts = new Set(input.accounts.filter((a) => a.saving === true).map((a) => a.id));
+  const role = new Map(input.accounts.map((a) => [a.id, accountRole(a)]));
+  const uncounted = new Set(input.accounts.filter((a) => role.get(a.id) === "excluded").map((a) => a.id));
+  const savingAccounts = new Set(input.accounts.filter((a) => role.get(a.id) === "buffer").map((a) => a.id));
   const cardPayees = new Set(input.cardPaymentCounterparties);
   const result = new Map<string, TransferClassification>();
 
@@ -117,10 +136,27 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
       paired.add(out.id).add(match.id);
       const toSaving = !savingAccounts.has(out.accountId) && savingAccounts.has(match.accountId);
       const fromSaving = savingAccounts.has(out.accountId) && !savingAccounts.has(match.accountId);
-      // Till ett sparkonto är sparande och därifrån en inkomst, räknat på det andra kontot. Sparkontots egen
-      // rad räknas inte, så att samma pengar inte räknas två gånger (KK-52).
+      // Till en buffert är sparande, räknat på det andra kontot (KK-52-A). Från en buffert är ett uttag från
+      // sparande (KK-55), som inte räknas som inkomst. Buffertens egen rad räknas aldrig.
       result.set(out.id, toSaving ? { id: out.id, internal: false, pairId: null, reason: "saving" } : { id: out.id, internal: true, pairId: match.id, reason: "pair" });
-      result.set(match.id, fromSaving ? { id: match.id, internal: false, pairId: null, reason: "saving" } : { id: match.id, internal: true, pairId: out.id, reason: "pair" });
+      result.set(match.id, { id: match.id, internal: true, pairId: out.id, reason: fromSaving ? "saving_withdrawal" : "pair" });
+    }
+  }
+
+  // 2b. Uteslutet → Buffert: en insättning på bufferten, inte en inkomst (KK-53). Det uteslutna kontots rad
+  // räknas inte ändå (steg 5), så bara buffertens rad markeras. Uttaget är negativt, så insättningen blir positiv.
+  // Varje uttag används högst en gång, det tidigaste först.
+  const excludedOut = input.transactions
+    .filter((tx) => tx.hidden !== true && tx.manualTransfer === null && tx.status !== "removed" && tx.amountMinor < 0 && uncounted.has(tx.accountId))
+    .sort(byDateThenId);
+  const usedOut = new Set<string>();
+  for (const deposit of eligible.filter((tx) => !paired.has(tx.id) && savingAccounts.has(tx.accountId))) {
+    const source = excludedOut.find(
+      (tx) => !usedOut.has(tx.id) && tx.amountMinor === -deposit.amountMinor && Math.abs(daysBetween(tx.transactionDate, deposit.transactionDate)) <= TRANSFER_WINDOW_DAYS,
+    );
+    if (source) {
+      usedOut.add(source.id);
+      result.set(deposit.id, { id: deposit.id, internal: true, pairId: null, reason: "saving_deposit" });
     }
   }
 
@@ -139,7 +175,7 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
     }
   }
 
-  // 5. Konton som inte räknas med (KK-41-A), för det som inte redan är avgjort av ett eget val.
+  // 5. Uteslutna konton (KK-53, tidigare KK-41-A), för det som inte redan är avgjort av ett eget val.
   for (const tx of input.transactions) {
     if (tx.hidden !== true && tx.manualTransfer === null && tx.status !== "removed" && uncounted.has(tx.accountId)) {
       result.set(tx.id, { id: tx.id, internal: true, pairId: null, reason: "account" });
