@@ -2,9 +2,13 @@
 // mörkt läge innan vyerna byggs om. Finns bara i utvecklingsläget (se DEV_ROUTES i App.tsx).
 // Färgerna läses direkt ur tokens.css, så att en ny token syns här utan att någon behöver lägga till den.
 import { formatSek } from "@kronkoll/domain";
+import { Landmark, Plus, Trash2, Wallet } from "lucide-react";
 import { useState } from "react";
 import css from "../styles/tokens.css?raw";
 import { setTheme, storedTheme, type Theme } from "../theme.ts";
+import { Button, IconButton } from "../ui/Button.tsx";
+import { Chip } from "../ui/Chip.tsx";
+import { List, ListRow } from "../ui/ListRow.tsx";
 import "./design.css";
 
 const LIGHT = css.slice(css.indexOf(":root {"), css.indexOf("}"));
@@ -47,6 +51,40 @@ export default function DesignPage() {
           </button>
         ))}
       </div>
+
+      <h2>Knappar</h2>
+      <section className="design-panel ui-stack">
+        <Button variant="primary" icon={Plus}>
+          Primär
+        </Button>
+        <Button>Sekundär</Button>
+        <Button variant="quiet">Tyst</Button>
+        <Button variant="danger">Fara</Button>
+        <Button variant="primary" busy>
+          Upptagen
+        </Button>
+        <div className="design-row">
+          <IconButton label="Lägg till" icon={Plus} />
+          <IconButton label="Ta bort" icon={Trash2} danger />
+        </div>
+      </section>
+
+      <h2>Etiketter</h2>
+      <section className="design-panel design-row">
+        <Chip>Neutral</Chip>
+        <Chip tone="primary">Buffert</Chip>
+        <Chip tone="success">Inkomst</Chip>
+        <Chip tone="warning">Preliminär</Chip>
+        <Chip tone="danger">Över budget</Chip>
+      </section>
+
+      <h2>Listrader</h2>
+      <List label="Exempelrader">
+        <ListRow icon={Wallet} label="Gemensamt" detail="Inkomst/Utgift" value={formatSek(1_230_000)} />
+        <ListRow icon={Landmark} label="Bolån" detail="Visar lånet" to="/_design" />
+        <ListRow label="Tema" value="System" onClick={() => undefined} />
+        <ListRow label="Ta bort koppling" danger onClick={() => undefined} />
+      </List>
 
       <h2>Färger</h2>
       <ul className="design-swatches">

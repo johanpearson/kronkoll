@@ -28,7 +28,7 @@ describe("designsidan (KK-65-E)", () => {
 
   it("visar typografi, avstånd, radier, skuggor och rörelse", () => {
     render(<DesignPage />);
-    for (const name of ["Färger", "Typografi", "Avstånd", "Radier", "Skuggor", "Rörelse"]) {
+    for (const name of ["Knappar", "Etiketter", "Listrader", "Färger", "Typografi", "Avstånd", "Radier", "Skuggor", "Rörelse"]) {
       expect(screen.getByRole("heading", { level: 2, name })).toBeDefined();
     }
     // Stort saldo med tabellsiffror (KK-65-D).
