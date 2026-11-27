@@ -1,10 +1,14 @@
-// Inställningar (#34, KK-18-A, KK-26-A, KK-27, KK-34, KK-35, KK-37): bankkopplingarna och att koppla en bank,
-// egna kontonamn, budgetperiodens startdag, länkar till kategorierna och reglerna, notiser, utseende, och
-// logga ut och rensa enheten.
-import { useState } from "react";
+// Inställningar (#259, KK-62-B, KK-65-A): grupperade listrader med ikon och chevron som leder till varsin
+// undervy, utseendet direkt på sidan och Logga ut som en tydlig knapp längst ned (KK-35-A). Undervyerna har
+// sina egna sidor nedan, så att bakåt går tillbaka hit.
+import { Bell, CalendarDays, Landmark, ListChecks, Tag, Wallet } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { browser } from "../browser.ts";
-import { Link } from "../router.tsx";
 import { setTheme, storedTheme, type Theme } from "../theme.ts";
+import { Button } from "../ui/Button.tsx";
+import { List, ListRow } from "../ui/ListRow.tsx";
+import { SegmentedControl } from "../ui/SegmentedControl.tsx";
+import { Card } from "../ui/Surface.tsx";
 import { AccountNames } from "./AccountNames.tsx";
 import { Connections } from "./Connections.tsx";
 import { Notifications } from "./Notifications.tsx";
@@ -13,8 +17,8 @@ import { PeriodStart } from "./PeriodStart.tsx";
 /** Cloudflare Access utloggning på samma adress som appen. */
 const ACCESS_LOGOUT = "/cdn-cgi/access/logout";
 
-const THEMES: { value: Theme; label: string }[] = [
-  { value: "system", label: "Som systemet" },
+const THEMES: readonly { value: Theme; label: string }[] = [
+  { value: "system", label: "System" },
   { value: "light", label: "Ljust" },
   { value: "dark", label: "Mörkt" },
 ];
@@ -37,42 +41,76 @@ export function SettingsView() {
   return (
     <main>
       <h1>Inställningar</h1>
-      <h2>Bankkopplingar</h2>
-      <Connections />
-      <h2>Konton</h2>
+      <List label="Konton och bank">
+        <ListRow icon={Wallet} label="Konton" detail="Roller och egna namn" to="/installningar/konton" />
+        <ListRow icon={Landmark} label="Bank" detail="Kopplingar och samtycke" to="/installningar/bank" />
+      </List>
+      <List label="Budget">
+        <ListRow icon={Tag} label="Kategorier" to="/installningar/kategorier" />
+        <ListRow icon={ListChecks} label="Regler" to="/installningar/regler" />
+        <ListRow icon={CalendarDays} label="Budgetperiod" detail="Vilken dag perioden börjar" to="/installningar/budgetperiod" />
+      </List>
+      <List label="Appen">
+        <ListRow icon={Bell} label="Notiser" to="/installningar/notiser" />
+      </List>
+      <Card title="Utseende">
+        <SegmentedControl label="Utseende" options={THEMES} value={theme} onChange={choose} />
+      </Card>
+      <Card>
+        <p className="ui-body">Utloggningen tar bort allt Kronkoll har sparat i webbläsaren och avslutar inloggningen.</p>
+        <Button variant="danger" block busy={busy} onClick={() => void logOut()}>
+          {busy ? "Loggar ut…" : "Logga ut och rensa enheten"}
+        </Button>
+      </Card>
+    </main>
+  );
+}
+
+function Page(props: { title: string; children: ReactNode }) {
+  return (
+    <main>
+      <h1>{props.title}</h1>
+      {props.children}
+    </main>
+  );
+}
+
+/** /installningar/konton: roller (KK-53) och egna namn (KK-37). */
+export function AccountsSettings() {
+  return (
+    <Page title="Konton">
       <AccountNames />
-      <h2>Budget</h2>
+    </Page>
+  );
+}
+
+/** /installningar/bank: kopplingarna, att koppla en bank och samtycket (KK-8, KK-11). */
+export function BankSettings() {
+  return (
+    <Page title="Bank">
+      <Connections />
+    </Page>
+  );
+}
+
+/** /installningar/budgetperiod: start på lönedagen (KK-34). */
+export function PeriodSettings() {
+  return (
+    <Page title="Budgetperiod">
       <section className="card">
         <PeriodStart />
       </section>
-      <section className="card">
-        <p className="actions">
-          <Link to="/installningar/kategorier">Kategorier</Link>
-          <Link to="/installningar/regler">Regler</Link>
-        </p>
-      </section>
-      <h2>Notiser</h2>
+    </Page>
+  );
+}
+
+/** /installningar/notiser: push (KK-27). */
+export function NotificationSettings() {
+  return (
+    <Page title="Notiser">
       <section className="card">
         <Notifications />
       </section>
-      <h2 id="theme-heading">Utseende</h2>
-      <section className="card">
-        <div role="radiogroup" aria-labelledby="theme-heading" className="choices">
-          {THEMES.map((t) => (
-            <label key={t.value}>
-              <input type="radio" name="theme" value={t.value} checked={theme === t.value} onChange={() => { choose(t.value); }} />
-              {t.label}
-            </label>
-          ))}
-        </div>
-      </section>
-      <h2>Den här enheten</h2>
-      <section className="card">
-        <p>Utloggningen tar bort allt Kronkoll har sparat i webbläsaren och avslutar inloggningen.</p>
-        <button type="button" className="danger" disabled={busy} onClick={() => void logOut()}>
-          {busy ? "Loggar ut…" : "Logga ut och rensa enheten"}
-        </button>
-      </section>
-    </main>
+    </Page>
   );
 }

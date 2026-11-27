@@ -40,7 +40,7 @@ async function settle() {
 }
 
 async function open() {
-  window.history.replaceState(null, "", "/installningar");
+  window.history.replaceState(null, "", "/installningar/budgetperiod");
   await act(async () => {
     render(<App />);
     await Promise.resolve();

@@ -40,7 +40,7 @@ function api(connections: [number, unknown]) {
 }
 
 async function open() {
-  window.history.replaceState(null, "", "/installningar");
+  window.history.replaceState(null, "", "/installningar/bank");
   await act(async () => {
     render(<App />);
     await Promise.resolve();

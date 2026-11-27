@@ -37,13 +37,14 @@ describe("canonicalStack: stegen bakåt från en djuplänk (KK-62-G)", () => {
 
   it("sidor under Inställningar har Inställningar och Översikt bakom sig", () => {
     expect(canonicalStack("/installningar/regler")).toEqual(["/", "/installningar", "/installningar/regler"]);
-    expect(canonicalStack("/installningar/koppling/k-1")).toEqual(["/", "/installningar", "/installningar/koppling/k-1"]);
+    expect(canonicalStack("/installningar/koppling/k-1")).toEqual(["/", "/installningar", "/installningar/bank", "/installningar/koppling/k-1"]);
+    expect(canonicalStack("/installningar/konton")).toEqual(["/", "/installningar", "/installningar/konton"]);
     expect(canonicalStack("/insikter")).toEqual(["/", "/insikter"]);
   });
 
-  it("bankkopplingens steg leder bakåt genom flödet, men klar-sidan går till Inställningar", () => {
-    expect(canonicalStack("/koppla/samtycke")).toEqual(["/", "/installningar", "/koppla", "/koppla/samtycke"]);
-    expect(canonicalStack("/koppla/klar")).toEqual(["/", "/installningar", "/koppla/klar"]);
+  it("bankkopplingens steg leder bakåt genom flödet, men klar-sidan går till Bank", () => {
+    expect(canonicalStack("/koppla/samtycke")).toEqual(["/", "/installningar", "/installningar/bank", "/koppla", "/koppla/samtycke"]);
+    expect(canonicalStack("/koppla/klar")).toEqual(["/", "/installningar", "/installningar/bank", "/koppla/klar"]);
   });
 
   it("en okänd adress har Översikt bakom sig", () => {

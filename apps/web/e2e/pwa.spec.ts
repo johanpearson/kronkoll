@@ -36,7 +36,7 @@ test("appen går att installera, och utan nät visas senaste översikten med tid
 test("med service worker och tillåtna notiser visas reglagen för notiser, alla avslagna från början (KK-27)", async ({ page, context }) => {
   await useFakeApi(context);
   await context.grantPermissions(["notifications"]);
-  await page.goto("/installningar");
+  await page.goto("/installningar/notiser");
   await page.evaluate(() => navigator.serviceWorker.ready.then(() => undefined));
   await page.reload();
   for (const name of ["Samtycket hos banken går snart ut", "En budget är överskriden", "Synken misslyckas flera gånger i rad"]) {
