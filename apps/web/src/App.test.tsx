@@ -48,6 +48,26 @@ describe("appskalet (#30, KK-4)", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "Designsystem" })).toBeDefined();
   });
 
+  it("undervyer har en tillbakaknapp, flikar har det inte (KK-62-B)", async () => {
+    at("/installningar/regler");
+    fireEvent.click(screen.getByRole("button", { name: "Tillbaka" }));
+    await waitFor(() => {
+      expect(window.location.pathname).toBe("/installningar");
+    });
+    cleanup();
+    at("/budget");
+    expect(screen.queryByRole("button", { name: "Tillbaka" })).toBeNull();
+  });
+
+  it("vyn får en klass för hur den kommer in (KK-62-H)", async () => {
+    const { container } = at("/budget");
+    expect(container.querySelector(".ui-view")?.className).toBe("ui-view ui-view-initial");
+    fireEvent.click(screen.getByRole("link", { name: "Lån" }));
+    await waitFor(() => {
+      expect(container.querySelector(".ui-view")?.className).toBe("ui-view ui-view-tab");
+    });
+  });
+
   it("en länk med modifierare öppnas som vanligt av webbläsaren", () => {
     at("/finns-inte");
     const link = screen.getByRole("link", { name: "Till start" });

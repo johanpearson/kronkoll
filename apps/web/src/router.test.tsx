@@ -3,7 +3,7 @@
 // bakåt från Översikt lämnar appen. Webbläsarens riktiga historik i jsdom används, inte en attrapp.
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Link, navigate, pushOverlay, replaceUrl, startHistory, usePath } from "./router.tsx";
+import { Link, canGoBack, navigate, navigationKind, pushOverlay, replaceUrl, startHistory, usePath } from "./router.tsx";
 
 const stack = () => (window.history.state as { stack: string[] } | null)?.stack;
 
@@ -298,5 +298,41 @@ describe("flikarna kommer ihåg var man var (KK-62-F)", () => {
     navigate("/installningar");
     await settle();
     expect(scrolls.at(-1)).toEqual([0, 0]);
+  });
+});
+
+describe("navigationKind: åt vilket håll vyn ska glida (KK-62-H)", () => {
+  it("är initial från början, push för en undervy, tab för ett flikbyte och back för bakåt", async () => {
+    startHistory();
+    navigate("/budget", "tab");
+    await settle();
+    expect(navigationKind()).toBe("tab");
+    navigate("/transaktioner/t-1");
+    await settle();
+    expect(navigationKind()).toBe("push");
+    await pressBack();
+    expect(navigationKind()).toBe("back");
+    navigate("/budget");
+    await settle();
+    // En länk till en vy som redan ligger bakom går tillbaka dit.
+    navigate("/", "push");
+    await settle();
+    expect(navigationKind()).toBe("back");
+  });
+});
+
+describe("canGoBack (KK-62-B)", () => {
+  it("är sant i en undervy och falskt på en flik", async () => {
+    startHistory();
+    expect(canGoBack()).toBe(false);
+    navigate("/budget", "tab");
+    await settle();
+    expect(canGoBack()).toBe(false);
+    navigate("/transaktioner/t-1");
+    await settle();
+    expect(canGoBack()).toBe(true);
+    navigate("/installningar", "push");
+    await settle();
+    expect(canGoBack()).toBe(true);
   });
 });
