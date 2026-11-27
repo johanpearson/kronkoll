@@ -13,8 +13,23 @@ const notify = () => {
   for (const listener of listeners) listener();
 };
 
+/** Ett öppet ark eller en dialog som bakåt ska stänga (KK-62-E). */
+let overlay: { onBack: () => void } | null = null;
+/** Ett steg för ett ark som just stängts, och som tas bort om inget nytt ark öppnas direkt. */
+let pendingRelease: ReturnType<typeof setTimeout> | null = null;
+
+const onOverlayStep = () => (window.history.state as { overlay?: unknown } | null)?.overlay === true;
+
 window.addEventListener("popstate", () => {
-  if (!busy) notify();
+  if (busy) return;
+  if (overlay && !onOverlayStep()) {
+    // Bakåt från arkets steg: stäng arket, vyn bakom ligger kvar.
+    const { onBack } = overlay;
+    overlay = null;
+    onBack();
+    return;
+  }
+  notify();
 });
 
 function subscribe(listener: () => void): () => void {
@@ -66,9 +81,12 @@ function back(n: number): Promise<void> {
 
 async function apply(current: readonly string[], next: readonly string[]) {
   const steps = plan(current, next);
-  if (steps.back > 0) {
+  // Ett öppet ark har ett eget steg ovanpå vyn. Det ska bort när vyn byts.
+  const extra = onOverlayStep() ? 1 : 0;
+  overlay = null;
+  if (steps.back + extra > 0) {
     busy = true;
-    await back(steps.back);
+    await back(steps.back + extra);
     busy = false;
   }
   let stack = next.slice(0, next.length - steps.push.length);
@@ -94,6 +112,34 @@ export function navigate(to: string, mode: "push" | "tab" = "push"): void {
     next = index >= 0 ? current.slice(0, index + 1) : [...current, to];
   }
   void apply(current, next);
+}
+
+/**
+ * Ett ark eller en dialog öppnas: ett steg läggs till på samma adress, så att bakåt stänger det och
+ * inte vyn bakom (KK-62-E). Funktionen som returneras anropas när arket stängs på annat sätt.
+ */
+export function pushOverlay(onBack: () => void): () => void {
+  if (pendingRelease !== null && onOverlayStep()) {
+    // Öppnas igen direkt (t.ex. React StrictMode): samma steg används.
+    clearTimeout(pendingRelease);
+    pendingRelease = null;
+  } else {
+    window.history.pushState({ stack: currentStack(), overlay: true }, "", here());
+  }
+  const entry = { onBack };
+  overlay = entry;
+  return () => {
+    if (overlay !== entry) return;
+    overlay = null;
+    pendingRelease = setTimeout(() => {
+      pendingRelease = null;
+      if (!onOverlayStep()) return;
+      busy = true;
+      void back(1).then(() => {
+        busy = false;
+      });
+    }, 0);
+  };
 }
 
 /** Byter adressen för vyn man står på, t.ex. när ett filter tas bort, utan att ändra stegen bakåt. */
