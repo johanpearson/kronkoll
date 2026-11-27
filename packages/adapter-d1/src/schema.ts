@@ -140,6 +140,7 @@ export const accounts = sqliteTable(
 const CATEGORY_SOURCE = ["manual", "learned", "template", "none"] as const;
 const INCOME_TYPES = ["salary", "parental_benefit", "other"] as const;
 const INCOME_SOURCE = CATEGORY_SOURCE;
+const SAVING_KINDS = ["saving", "saving_withdrawal", "saving_deposit"] as const;
 
 export const categories = sqliteTable(
   "categories",
@@ -189,6 +190,11 @@ export const transactions = sqliteTable(
     manualTransfer: integer("manual_transfer", { mode: "boolean" }),
     /** Dold av användaren (KK-49): syns inte i listan och räknas inte någonstans. Påverkar inte `manualTransfer`. */
     hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    /**
+     * Hur transaktionen rör en buffert (KK-53, KK-55): sparande, uttag från sparande eller insättning från ett
+     * uteslutet konto. Null annars. Skrivs när överföringarna räknas om. Ingen CHECK, av samma skäl som income_source.
+     */
+    savingKind: text("saving_kind", { enum: SAVING_KINDS }),
   },
   (t) => [
     check("transactions_status", oneOf("status", ["pending", "booked", "removed"])),

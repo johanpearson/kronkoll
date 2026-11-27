@@ -77,7 +77,7 @@ describe("GET /api/overview (KK-17)", () => {
     const res = await call("/api/overview");
     expect(res.status).toBe(200);
     const body = await res.json<Overview>();
-    expect({ ...body, trend: undefined, accounts: undefined }).toEqual({
+    expect({ ...body, trend: undefined, accounts: undefined, buffer: undefined }).toEqual({
       period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
       balance_minor: 12231240,
       income_minor: 4125000,
@@ -93,7 +93,33 @@ describe("GET /api/overview (KK-17)", () => {
       connections: [{ id: "c1", bank: "Skandia", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
       trend: undefined,
       accounts: undefined,
+      buffer: undefined,
     });
+  });
+
+  it("ger kortet Buffert: insatt, uttaget och antal uttag i perioden och för de 12 senaste (KK-55-A, V-i-roles)", async () => {
+    const insert = (id: string, account: string, date: string, amount: number, kind: string, internal: number) =>
+      db
+        .prepare(
+          `INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, booking_date, amount_minor, is_internal_transfer, saving_kind)
+           VALUES (?, ?, ?, 'booked', '2026-11-15', ?, ?, ?, ?, ?)`,
+        )
+        .bind(id, account, id, date, date, amount, internal, kind);
+    await db.batch([
+      insert("b-spar", "acc_1", "2026-11-03", -200000, "saving", 0),
+      insert("b-uttag", "acc_1", "2026-11-05", 150000, "saving_withdrawal", 1),
+      insert("b-okt", "acc_1", "2026-10-10", 40000, "saving_withdrawal", 1),
+    ]);
+    const body = await (await call("/api/overview")).json<Overview & { buffer: { trend: unknown[] } & Record<string, unknown> }>();
+    await db.prepare(`DELETE FROM transactions WHERE id LIKE 'b-%'`).run();
+    expect({ ...body.buffer, trend: undefined }).toEqual({ period: "2026-11", deposited_minor: 200000, withdrawn_minor: 150000, withdrawal_count: 1, trend: undefined });
+    expect(body.buffer.trend).toHaveLength(12);
+    expect(body.buffer.trend.slice(-2)).toEqual([
+      { period: "2026-10", deposited_minor: 0, withdrawn_minor: 40000, withdrawal_count: 1 },
+      { period: "2026-11", deposited_minor: 200000, withdrawn_minor: 150000, withdrawal_count: 1 },
+    ]);
+    // Uttaget räknas inte som inkomst (KK-55-B).
+    expect(body["income_minor"]).toBe(4125000);
   });
 
   it("listar varje konto som inte är uteslutet med namn, bank, roll och saldo, och totalen omfattar bufferten (KK-38, KK-53-D)", async () => {

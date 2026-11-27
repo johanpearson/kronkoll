@@ -141,11 +141,19 @@ describe("PATCH /api/accounts/{id} role (KK-53, V-i-roles)", () => {
     expect((await items())[1]).toMatchObject({ role: "buffer" });
     // Sparande på Inkomst/Utgift, buffertens rad räknas inte, och uttaget från bufferten är inte en inkomst (KK-55).
     expect([await isInternal("ut"), await isInternal("in"), await isInternal("uttag-in"), await isInternal("uttag-ut")]).toEqual([false, true, true, true]);
+    const kinds = await db.prepare(`SELECT id, saving_kind AS kind FROM transactions ORDER BY id`).all<{ id: string; kind: string | null }>();
+    expect(kinds.results).toEqual([
+      { id: "in", kind: null },
+      { id: "ut", kind: "saving" },
+      { id: "uttag-in", kind: "saving_withdrawal" },
+      { id: "uttag-ut", kind: null },
+    ]);
     await call("PATCH", "/api/accounts/acc_2", { role: "excluded" });
     expect((await items())[1]).toMatchObject({ role: "excluded", counted: false, saving: false });
     expect([await isInternal("ut"), await isInternal("uttag-in")]).toEqual([false, false]);
     await call("PATCH", "/api/accounts/acc_2", { role: "spending" });
     expect([await isInternal("ut"), await isInternal("uttag-in")]).toEqual([true, true]);
+    expect(await db.prepare(`SELECT count(*) AS n FROM transactions WHERE saving_kind IS NOT NULL`).first("n")).toBe(0);
   });
 
   it("de gamla valen översätts till en roll tills Inställningar använder rollen", async () => {
