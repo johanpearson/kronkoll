@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 // Ark nerifrån och dialog (KK-65-A): webbläsarens <dialog> som modal, så att fokus stannar i den,
 // Esc stänger och resten av sidan är spärrad.
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dialog, Sheet } from "./Modal.tsx";
 
@@ -86,6 +86,29 @@ describe("Sheet (KK-65-A)", () => {
       </Sheet>,
     );
     expect(screen.getByRole("dialog").hasAttribute("open")).toBe(true);
+  });
+});
+
+describe("bakåtknappen (KK-62-E)", () => {
+  it("stänger arket i stället för att lämna vyn", async () => {
+    // Tidigare test kan ha lämnat arksteg efter sig. Vänta ut dem och börja på ett vanligt steg.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    window.history.pushState({ stack: ["/", "/budget"] }, "", "/budget");
+    const onClose = vi.fn();
+    render(
+      <Sheet open title="Välj kategori" onClose={onClose}>
+        <p>Innehåll</p>
+      </Sheet>,
+    );
+    expect((window.history.state as { overlay?: boolean }).overlay).toBe(true);
+    await act(async () => {
+      window.history.back();
+      await new Promise((r) => setTimeout(r, 20));
+    });
+    expect(onClose).toHaveBeenCalledOnce();
+    expect(window.location.pathname).toBe("/budget");
   });
 });
 
