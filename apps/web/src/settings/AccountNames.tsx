@@ -35,12 +35,10 @@ interface Account {
   readonly role: Role;
 }
 
-/** Rollen från API:t. Ett äldre svar utan role har bara counted och saving. */
+/** Rollen från API:t, Inkomst/Utgift om den saknas eller är okänd. */
 function roleOf(raw: unknown): Role {
   const role = field(raw, "role");
-  if (isRole(role)) return role;
-  if (field(raw, "counted") === false) return "excluded";
-  return field(raw, "saving") === true ? "buffer" : "spending";
+  return isRole(role) ? role : "spending";
 }
 
 function toAccount(raw: unknown): Account | null {

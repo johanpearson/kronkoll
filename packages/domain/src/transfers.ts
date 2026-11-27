@@ -36,22 +36,13 @@ export type AccountRole = "spending" | "buffer" | "excluded";
 export interface OwnAccount {
   readonly id: string;
   readonly type: "checking" | "savings" | "credit_card" | "manual";
-  /** Kontots roll (KK-53). Vinner över de gamla brytarna nedan. */
+  /** Kontots roll (KK-53). Utelämnat betyder Inkomst/Utgift, som för ett nytt konto. */
   readonly role?: AccountRole;
-  /** Ersätts av role (KK-53) och tas bort när databasen har rollen. Kontot räknas med (KK-41-A). Utelämnat betyder att det räknas med. */
-  readonly counted?: boolean;
-  /** Ersätts av role (KK-53) och tas bort när databasen har rollen. Ett sparkonto (KK-52). Utelämnat betyder att det inte är det. */
-  readonly saving?: boolean;
 }
 
-/**
- * Kontots roll. Saknas den gäller samma regel som migreringen (KK-53-B): ett konto som inte räknas med är
- * Uteslutet, ett sparkonto är Buffert och resten är Inkomst/Utgift.
- */
+/** Kontots roll: Inkomst/Utgift om inget annat är valt. */
 export function accountRole(account: OwnAccount): AccountRole {
-  if (account.role !== undefined) return account.role;
-  if (account.counted === false) return "excluded";
-  return account.saving === true ? "buffer" : "spending";
+  return account.role ?? "spending";
 }
 
 export interface TransferInput {
