@@ -177,6 +177,9 @@ pnpm --filter @kronkoll/<paket> test:coverage
   där just den regeln vinner. Den inbyggda prioriteten (inlärd före mall, exakt före prefix före Innehåller)
   gör att en äldre prefixregel slår en ny Innehåller-regel. Det byts mot användarens ordning i #250 PR 2.
   `retroactive_candidates` är alltid 0 och finns kvar för appar i telefonens cache.
+- Regelns plats (`category_rules.position`, 0024): lägst vinner. En ny egen regel får `MIN(position) - 1`, så
+  platserna kan bli negativa tills `setOrder` skriver 0, 1, 2 … Mallregler och Räkna inte-regler har null.
+  `ROW_NUMBER() OVER (…)` fungerar i D1-migreringar.
 
 - Första riktiga förnyelsen av samtycket (#151): ett konto **utan IBAN** som får nytt uid av banken blir ett
   nytt konto. Matcha på namn och typ inom kopplingen om det händer.

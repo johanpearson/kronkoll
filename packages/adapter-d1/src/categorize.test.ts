@@ -87,6 +87,12 @@ describe("okategoriserade transaktioner (KK-18)", () => {
     ]);
   });
 
+  it("skriver över en manuell bara när det uttryckligen begärs (KK-58-B)", async () => {
+    await seed([["t4", "ICA", "booked", "hushall-forbrukning", "manual"]]);
+    await transactionRepository(db).setCategories([{ id: "t4", categoryId: "mat-livsmedel", categorySource: "learned" }], { overrideManual: true });
+    expect(await db.prepare(`SELECT category_id AS c, category_source AS s FROM transactions WHERE id = 't4'`).first()).toEqual({ c: "mat-livsmedel", s: "learned" });
+  });
+
   it("gör ingenting med en tom lista", async () => {
     await expect(transactionRepository(db).setCategories([])).resolves.toBeUndefined();
   });
@@ -142,7 +148,7 @@ describe("manuell kategori och inlärda regler (KK-18-B, KK-18-C)", () => {
     await rules.save({ id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "mat-livsmedel", source: "learned" });
     await rules.save({ id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "hushall-forbrukning", source: "learned" });
     expect((await rules.list()).filter((r) => r.source === "learned")).toEqual([
-      { id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "hushall-forbrukning", source: "learned" },
+      { id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "hushall-forbrukning", source: "learned", position: 0 },
     ]);
   });
 

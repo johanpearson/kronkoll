@@ -169,6 +169,13 @@
       "when": 1795798356469,
       "tag": "0023_accounts_drop_flags",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1795799659198,
+      "tag": "0024_category_rules_position",
+      "breakpoints": true
     }
   ]
 }
