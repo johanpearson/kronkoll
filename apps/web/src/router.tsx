@@ -6,6 +6,14 @@ import { useSyncExternalStore, type MouseEvent, type ReactNode } from "react";
 import { canonicalStack, plan, tabOf, tabOfStack, tabTarget, type Tab } from "./nav/stack.ts";
 
 const listeners = new Set<() => void>();
+
+/** Hur senaste vybytet gick till, så att vyn kan glida in från rätt håll (KK-62-H). */
+export type NavigationKind = "initial" | "push" | "back" | "tab";
+let kind: NavigationKind = "initial";
+
+export function navigationKind(): NavigationKind {
+  return kind;
+}
 /** Sant medan routern själv går bakåt, så att mellanstegen inte ritas. */
 let busy = false;
 
@@ -29,6 +37,7 @@ window.addEventListener("popstate", () => {
     onBack();
     return;
   }
+  kind = "back";
   notify();
 });
 
@@ -57,6 +66,7 @@ function push(stack: readonly string[]) {
 
 /** Körs en gång när appen startar: en djuplänk får samma steg bakåt som om man gått dit (KK-62-G). */
 export function startHistory(): void {
+  kind = "initial";
   const saved = (window.history.state as { stack?: unknown } | null)?.stack;
   if (Array.isArray(saved) && saved.at(-1) === here()) return;
   const steps = stepsTo(here());
@@ -96,7 +106,7 @@ function scrollToY(y: number) {
   step();
 }
 
-async function apply(current: readonly string[], next: readonly string[], scrollY = 0) {
+async function apply(current: readonly string[], next: readonly string[], scrollY = 0, tab = false) {
   const steps = plan(current, next);
   // Ett öppet ark har ett eget steg ovanpå vyn. Det ska bort när vyn byts.
   const extra = onOverlayStep() ? 1 : 0;
@@ -112,6 +122,7 @@ async function apply(current: readonly string[], next: readonly string[], scroll
     stack = [...stack, url];
     push(stack);
   }
+  kind = tab ? "tab" : steps.push.length === 0 && steps.back > 0 ? "back" : "push";
   notify();
   scrollToY(scrollY);
 }
@@ -131,7 +142,7 @@ export function navigate(to: string, mode: "push" | "tab" = "push"): void {
     tabScroll.set(leaving, window.scrollY);
     next = tabTarget(tabStacks, current, tab);
     const restored = tab !== leaving && next.join("\n") === tabStacks.get(tab)?.join("\n");
-    void apply(current, next, restored ? (tabScroll.get(tab) ?? 0) : 0);
+    void apply(current, next, restored ? (tabScroll.get(tab) ?? 0) : 0, true);
     return;
   }
   if (to === "/") {
@@ -169,6 +180,12 @@ export function pushOverlay(onBack: () => void): () => void {
       });
     }, 0);
   };
+}
+
+/** Vyn är en undervy och inte en flik, så att sidhuvudet visar en tillbakaknapp (KK-62-B, iOS saknar bakåtknapp). */
+export function canGoBack(): boolean {
+  const path = window.location.pathname;
+  return path !== "/" && tabOf(path) !== path;
 }
 
 /** Byter adressen för vyn man står på, t.ex. när ett filter tas bort, utan att ändra stegen bakåt. */

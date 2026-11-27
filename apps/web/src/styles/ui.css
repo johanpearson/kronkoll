@@ -678,3 +678,41 @@ a.ui-row:active {
   stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
+
+/* Vybyten (KK-62-H): en undervy glider in från höger, bakåt från vänster och ett flikbyte tonar. */
+@keyframes ui-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+
+@keyframes ui-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-24px);
+  }
+}
+
+.ui-view-push {
+  animation: ui-from-right var(--duration-slow) var(--easing-out) backwards;
+}
+
+.ui-view-back {
+  animation: ui-from-left var(--duration-slow) var(--easing-out) backwards;
+}
+
+.ui-view-tab {
+  animation: ui-fade var(--duration) var(--easing-out) backwards;
+}
+
+/* Tillbakaknappen ovanför en undervy, i samma kolumn som innehållet. */
+.ui-backbar {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-2) var(--space-2) 0;
+}
+
+.ui-backbar + main {
+  padding-top: var(--space-2);
+}
