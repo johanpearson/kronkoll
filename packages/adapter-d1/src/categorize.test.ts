@@ -142,7 +142,7 @@ describe("manuell kategori och inlärda regler (KK-18-B, KK-18-C)", () => {
     await rules.save({ id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "mat-livsmedel", source: "learned" });
     await rules.save({ id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "hushall-forbrukning", source: "learned" });
     expect((await rules.list()).filter((r) => r.source === "learned")).toEqual([
-      { id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "hushall-forbrukning", source: "learned" },
+      { id: "r-ica", match: "counterparty_prefix", pattern: "ICA NARA", categoryId: "hushall-forbrukning", source: "learned", position: 0 },
     ]);
   });
 

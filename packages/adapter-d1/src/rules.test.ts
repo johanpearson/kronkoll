@@ -101,3 +101,39 @@ describe("ta bort alla regler (KK-51)", () => {
     await db.prepare(`DELETE FROM category_rules WHERE id = 'r-inkomst'`).run();
   });
 });
+
+describe("användarens ordning på egna regler (KK-58-C)", () => {
+  /** Egen databas, så att ordningen inte påverkas av regler från andra tester. */
+  let own: D1Database;
+  let close: () => Promise<void>;
+  beforeAll(async () => {
+    ({ db: own, dispose: close } = await migratedDb());
+  });
+  afterAll(async () => {
+    await close();
+  });
+  const learned = (id: string, pattern: string) => ({ id, match: "counterparty_prefix" as const, pattern, categoryId: "mat-livsmedel", source: "learned" as const });
+  const places = async () => (await ruleRepository(own).list()).filter((r) => r.source === "learned").map((r) => [r.id, r.position]);
+
+  it("en ny egen regel hamnar först, och en som sparas igen behåller sin plats", async () => {
+    const repo = ruleRepository(own);
+    // Utan egna regler finns inget att ordna.
+    await repo.setOrder([]);
+    await repo.save(learned("a", "ICA"));
+    await repo.save(learned("b", "COOP"));
+    expect(Object.fromEntries(await places())).toEqual({ a: 0, b: -1 });
+    await repo.save({ ...learned("a", "ICA"), categoryId: "hushall-forbrukning" });
+    expect(Object.fromEntries(await places())).toEqual({ a: 0, b: -1 });
+    // Mallregler har ingen plats.
+    expect((await repo.list()).find((r) => r.id === "mall-ica")).not.toHaveProperty("position");
+  });
+
+  it("sparar en ny ordning som platser från 0, och en ordning som saknar en egen regel avvisas", async () => {
+    const repo = ruleRepository(own);
+    await repo.setOrder(["a", "b"]);
+    expect(Object.fromEntries(await places())).toEqual({ a: 0, b: 1 });
+    await expect(repo.setOrder(["a"])).rejects.toThrow("Ordningen måste innehålla varje egen regel en gång");
+    await expect(repo.setOrder(["a", "b", "mall-ica"])).rejects.toThrow("Ordningen måste innehålla varje egen regel en gång");
+    expect(Object.fromEntries(await places())).toEqual({ a: 0, b: 1 });
+  });
+});

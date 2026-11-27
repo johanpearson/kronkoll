@@ -233,6 +233,8 @@ export const categoryRules = sqliteTable(
     priority: integer("priority").notNull().default(0),
     hits: integer("hits").notNull().default(0),
     action: text("action", { enum: RULE_ACTION }).notNull().default("categorize"),
+    /** Platsen i användarens ordning, lägst först (KK-58-C). Bara för egna kategoriregler; null för mallregler. */
+    position: integer("position"),
   },
   () => [
     check("category_rules_match", oneOf("match", RULE_MATCH)),
