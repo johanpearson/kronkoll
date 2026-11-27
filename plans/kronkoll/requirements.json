@@ -1086,7 +1086,7 @@
         },
         {
           "id": "KK-54-E",
-          "text": "Matchningstexter är text från användaren och renderas som text (KK-30). Kontonummer lagras inte om användaren inte själv skriver in dem. Antagande: sparande på ett känt konto (t.ex. barnens) löses med standardkategorin, och ingen egen roll behövs."
+          "text": "Matchningstexter är text från användaren och renderas som text (KK-30). Kontonummer lagras inte om användaren inte själv skriver in dem. Sparande på ett känt konto (t.ex. barnens) löses med standardkategorin, och ingen egen roll behövs (bekräftat av ägaren 2026-11-27)."
         }
       ]
     },
@@ -1149,7 +1149,7 @@
       "acceptance_criteria": [
         {
           "id": "KK-57-A",
-          "text": "En kommande post har datum, belopp (in eller ut), konto, kategori och en text, och kan upprepas varje månad."
+          "text": "En kommande post har datum, belopp (in eller ut), konto, kategori och en text. Posten gäller en gång; upprepning varje månad ingår inte (ägarens svar 2026-11-27)."
         },
         {
           "id": "KK-57-B",
@@ -1161,7 +1161,7 @@
         },
         {
           "id": "KK-57-D",
-          "text": "När en transaktion från banken liknar en planerad post (samma konto, belopp ±10 %, inom ±5 dagar, med samma kategori eller text) föreslås en koppling, och den planerade posten försvinner när kopplingen godkänns. En planerad post vars datum har passerat utan transaktion markeras Försenad."
+          "text": "När en transaktion från banken liknar en planerad post (samma konto, belopp ±10 %, inom ±5 dagar, med samma kategori eller text) föreslås en koppling. Kopplingen görs alltid efter en fråga, aldrig automatiskt (ägarens svar 2026-11-27), och den planerade posten försvinner när kopplingen godkänns. En planerad post vars datum har passerat utan transaktion markeras Försenad."
         },
         {
           "id": "KK-57-E",
