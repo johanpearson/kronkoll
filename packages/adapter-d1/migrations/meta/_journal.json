@@ -141,6 +141,13 @@
       "when": 1795761269785,
       "tag": "0019_accounts_saving",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1795783422018,
+      "tag": "0020_drop_leave",
+      "breakpoints": true
     }
   ]
 }

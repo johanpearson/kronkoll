@@ -17,7 +17,7 @@ personer som ägaren har bjudit in via Cloudflare Access. Hur uppgifter hanteras
 
 ## Uppskattningar är inte besked
 
-Budgetutfall, prognoser för sparmål och uppskattad föräldrapenning är beräkningar utifrån dina uppgifter. De är
+Budgetutfall och andra prognoser är beräkningar utifrån dina uppgifter. De är
 **inte** besked från Försäkringskassan, din bank eller Skatteverket och ska inte ensamma ligga till grund för
 ekonomiska beslut.
 
