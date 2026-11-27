@@ -199,8 +199,8 @@ export function transactionRepository(d1: D1Database) {
       const conditions = [
         ne(transactions.status, "removed"),
         eq(transactions.hidden, query.hidden === true),
-        // Konton som inte räknas med syns inte i listan (KK-41-A), bara överföringar dit som utgifter.
-        sql`${transactions.accountId} IN (SELECT id FROM accounts WHERE included = 1)`,
+        // Uteslutna konton syns inte i listan (KK-53), bara överföringar dit som utgifter.
+        sql`${transactions.accountId} IN (SELECT id FROM accounts WHERE role <> 'excluded')`,
         // Perioden räknas som i budgeten: bokföringsdagen, annars köpdagen (KK-20, KK-34).
         sql`coalesce(${transactions.bookingDate}, ${transactions.transactionDate}) BETWEEN ${query.from} AND ${query.to}`,
         query.uncategorized ? isNull(transactions.categoryId) : undefined,
@@ -444,11 +444,11 @@ export function transactionRepository(d1: D1Database) {
       };
     },
 
-    /** De egna kontona med typ, för att para ihop överföringar. Kräver inga nycklar. */
+    /** De egna kontona med typ och roll (KK-53), för att para ihop överföringar. Kräver inga nycklar. */
     async ownAccounts(): Promise<OwnAccount[]> {
-      const rows = await db.select({ id: accounts.id, type: accounts.type, counted: accounts.included, saving: accounts.saving }).from(accounts).all();
+      const rows = await db.select({ id: accounts.id, type: accounts.type, role: accounts.role }).from(accounts).all();
       // Ett lånekonto paras som ett sparkonto: en amortering flyttar pengar mellan egna konton.
-      return rows.map((row) => ({ id: row.id, type: row.type === "loan" ? "savings" : row.type, counted: row.counted, saving: row.saving }));
+      return rows.map((row) => ({ id: row.id, type: row.type === "loan" ? "savings" : row.type, role: row.role }));
     },
 
     /** Sparar vilka som är interna överföringar och deras motpost, i en batch. */

@@ -31,7 +31,7 @@ afterAll(async () => {
   await dispose();
 });
 beforeEach(async () => {
-  await db.prepare(`UPDATE accounts SET nickname = NULL, included = 1`).run();
+  await db.prepare(`UPDATE accounts SET nickname = NULL, role = 'spending'`).run();
   await db.prepare(`DELETE FROM transactions`).run();
 });
 
@@ -57,8 +57,8 @@ describe("GET /api/accounts (KK-37)", () => {
     const res = await call("GET", "/api/accounts");
     expect(res.status).toBe(200);
     expect(await items()).toEqual([
-      { id: "acc_1", name: "Privatkonto ••4821", nickname: null, bank_name: "Privatkonto ••4821", bank: "Skandia", type: "checking", counted: true, saving: false },
-      { id: "acc_2", name: "Sparkonto", nickname: null, bank_name: "Sparkonto", bank: "Skandia", type: "savings", counted: true, saving: false },
+      { id: "acc_1", name: "Privatkonto ••4821", nickname: null, bank_name: "Privatkonto ••4821", bank: "Skandia", type: "checking", role: "spending", counted: true, saving: false },
+      { id: "acc_2", name: "Sparkonto", nickname: null, bank_name: "Sparkonto", bank: "Skandia", type: "savings", role: "spending", counted: true, saving: false },
     ]);
   });
 
@@ -88,7 +88,7 @@ describe("PATCH /api/accounts/{id} counted (KK-41)", () => {
     await call("PATCH", "/api/accounts/acc_2", { nickname: "Privat sparande" });
     const res = await call("PATCH", "/api/accounts/acc_2", { counted: false });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ id: "acc_2", name: "Privat sparande", nickname: "Privat sparande", counted: false, saving: false });
+    expect(await res.json()).toEqual({ id: "acc_2", name: "Privat sparande", nickname: "Privat sparande", role: "excluded", counted: false, saving: false });
     expect((await items())[1]).toMatchObject({ nickname: "Privat sparande", counted: false });
   });
 
@@ -129,18 +129,58 @@ describe("PATCH /api/accounts/{id} saving (KK-52)", () => {
   });
 });
 
+describe("PATCH /api/accounts/{id} role (KK-53, V-i-roles)", () => {
+  it("sätter rollen, svarar med den och de gamla valen, och räknar om alla perioder", async () => {
+    await insertTx("ut", "acc_1", "2026-10-10", -200000);
+    await insertTx("in", "acc_2", "2026-10-10", 200000);
+    await insertTx("uttag-ut", "acc_2", "2026-11-12", -50000);
+    await insertTx("uttag-in", "acc_1", "2026-11-12", 50000);
+    const res = await call("PATCH", "/api/accounts/acc_2", { role: "buffer" });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ id: "acc_2", role: "buffer", counted: true, saving: true });
+    expect((await items())[1]).toMatchObject({ role: "buffer" });
+    // Sparande på Inkomst/Utgift, buffertens rad räknas inte, och uttaget från bufferten är inte en inkomst (KK-55).
+    expect([await isInternal("ut"), await isInternal("in"), await isInternal("uttag-in"), await isInternal("uttag-ut")]).toEqual([false, true, true, true]);
+    await call("PATCH", "/api/accounts/acc_2", { role: "excluded" });
+    expect((await items())[1]).toMatchObject({ role: "excluded", counted: false, saving: false });
+    expect([await isInternal("ut"), await isInternal("uttag-in")]).toEqual([false, false]);
+    await call("PATCH", "/api/accounts/acc_2", { role: "spending" });
+    expect([await isInternal("ut"), await isInternal("uttag-in")]).toEqual([true, true]);
+  });
+
+  it("de gamla valen översätts till en roll tills Inställningar använder rollen", async () => {
+    const role = async () => (await items())[1]?.["role"];
+    await call("PATCH", "/api/accounts/acc_2", { saving: true });
+    expect(await role()).toBe("buffer");
+    await call("PATCH", "/api/accounts/acc_2", { counted: true });
+    expect(await role()).toBe("buffer");
+    await call("PATCH", "/api/accounts/acc_2", { counted: false });
+    expect(await role()).toBe("excluded");
+    await call("PATCH", "/api/accounts/acc_2", { saving: false });
+    expect(await role()).toBe("excluded");
+    await call("PATCH", "/api/accounts/acc_2", { counted: true });
+    expect(await role()).toBe("spending");
+    await call("PATCH", "/api/accounts/acc_2", { saving: false });
+    expect(await role()).toBe("spending");
+  });
+
+  it("ett okänt konto ger 404", async () => {
+    expect((await call("PATCH", "/api/accounts/finns-inte", { role: "buffer" })).status).toBe(404);
+  });
+});
+
 describe("PATCH /api/accounts/{id} (KK-37-A)", () => {
   it("sätter ett trimmat eget namn, som sedan är kontots namn", async () => {
     const res = await call("PATCH", "/api/accounts/acc_1", { nickname: "  Privat kort " });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ id: "acc_1", name: "Privat kort", nickname: "Privat kort", counted: true, saving: false });
+    expect(await res.json()).toEqual({ id: "acc_1", name: "Privat kort", nickname: "Privat kort", role: "spending", counted: true, saving: false });
     expect((await items())[0]).toMatchObject({ name: "Privat kort", bank_name: "Privatkonto ••4821" });
   });
 
   it.each([null, "", "   "])("%j tar bort det egna namnet, och bankens namn visas igen", async (nickname) => {
     await call("PATCH", "/api/accounts/acc_1", { nickname: "Privat kort" });
     const res = await call("PATCH", "/api/accounts/acc_1", { nickname });
-    expect(await res.json()).toEqual({ id: "acc_1", name: "Privatkonto ••4821", nickname: null, counted: true, saving: false });
+    expect(await res.json()).toEqual({ id: "acc_1", name: "Privatkonto ••4821", nickname: null, role: "spending", counted: true, saving: false });
   });
 
   it("sparar HTML-liknande text som den är; appen renderar den som text (KK-37-C)", async () => {
@@ -161,6 +201,8 @@ describe("PATCH /api/accounts/{id} (KK-37-A)", () => {
     ["inget namn och inget val", {}],
     ["ett räknas med som inte är sant eller falskt", { counted: "ja" }],
     ["ett räknas med som är null", { counted: null }],
+    ["en okänd roll", { role: "savings" }],
+    ["en roll tillsammans med ett gammalt val", { role: "buffer", saving: true }],
     ["inte JSON", "{"],
   ])("%s ger 400 och ändrar ingenting", async (_, body) => {
     const res = await call("PATCH", "/api/accounts/acc_2", body);

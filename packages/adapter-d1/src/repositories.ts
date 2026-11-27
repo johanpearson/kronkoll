@@ -6,7 +6,7 @@
  * Körningsloggen (sync_runs) hör också hit. Transaktionerna får sitt repository i ett senare steg av synken (#25).
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import { assertMinor, nextConsecutiveFailures, type SyncRunSummary } from "@kronkoll/domain";
+import { assertMinor, nextConsecutiveFailures, type AccountRole, type SyncRunSummary } from "@kronkoll/domain";
 import { and, asc, eq, max } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { decryptSessionId, encryptSessionId, hashIban, maskAccountName, type Keys } from "./crypto.ts";
@@ -198,20 +198,18 @@ export interface NamedAccount {
   readonly bankName: string;
   readonly bank: string | null;
   readonly type: (typeof accounts.$inferSelect)["type"];
-  /** Kontot räknas med i budget, översikt och insikter (KK-41-A). */
-  readonly counted: boolean;
-  /** Sparkonto: överföringar dit räknas som sparande (KK-52). */
-  readonly saving: boolean;
+  /** Kontots roll (KK-53): Inkomst/Utgift, Buffert eller Uteslutet. */
+  readonly role: AccountRole;
 }
 
-/** Egna kontonamn (KK-37) och om kontot räknas med (KK-41). Behöver inga nycklar, eftersom inget krypterat läses eller skrivs. */
+/** Egna kontonamn (KK-37) och kontots roll (KK-53). Behöver inga nycklar, eftersom inget krypterat läses eller skrivs. */
 export function accountNameRepository(d1: D1Database) {
   const db = drizzle(d1);
   return {
     /** Kontona med eget namn, bankens maskerade namn och bankens namn, för Inställningar. */
     async list(): Promise<NamedAccount[]> {
       return db
-        .select({ id: accounts.id, nickname: accounts.nickname, bankName: accounts.displayName, bank: bankConnections.aspspName, type: accounts.type, counted: accounts.included, saving: accounts.saving })
+        .select({ id: accounts.id, nickname: accounts.nickname, bankName: accounts.displayName, bank: bankConnections.aspspName, type: accounts.type, role: accounts.role })
         .from(accounts)
         .innerJoin(bankConnections, eq(bankConnections.id, accounts.connectionId))
         .orderBy(asc(accounts.displayName), asc(accounts.id))
@@ -222,14 +220,9 @@ export function accountNameRepository(d1: D1Database) {
       const updated = await db.update(accounts).set({ nickname }).where(eq(accounts.id, accountId)).returning({ id: accounts.id }).all();
       return updated.length > 0;
     },
-    /** Väljer om kontot räknas med (KK-41-A). Synken rör aldrig valet. Falskt om kontot inte finns. */
-    async setCounted(accountId: string, counted: boolean): Promise<boolean> {
-      const updated = await db.update(accounts).set({ included: counted }).where(eq(accounts.id, accountId)).returning({ id: accounts.id }).all();
-      return updated.length > 0;
-    },
-    /** Väljer om kontot är ett sparkonto (KK-52). Synken rör aldrig valet. Falskt om kontot inte finns. */
-    async setSaving(accountId: string, saving: boolean): Promise<boolean> {
-      const updated = await db.update(accounts).set({ saving }).where(eq(accounts.id, accountId)).returning({ id: accounts.id }).all();
+    /** Väljer kontots roll (KK-53). Synken rör aldrig valet. Falskt om kontot inte finns. */
+    async setRole(accountId: string, role: AccountRole): Promise<boolean> {
+      const updated = await db.update(accounts).set({ role }).where(eq(accounts.id, accountId)).returning({ id: accounts.id }).all();
       return updated.length > 0;
     },
   };

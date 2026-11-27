@@ -95,7 +95,7 @@ describe("egna kontonamn (KK-37)", () => {
     const names = accountNameRepository(db);
     const id = await repo.upsertFromBank({ connectionId: "c1", providerUid: "named-1", iban: null, name: "Privatkonto", type: "checking", balanceMinor: 0 }, newId);
     expect(await names.set(id, "Privat kort")).toBe(true);
-    expect((await names.list()).find((a) => a.id === id)).toEqual({ id, nickname: "Privat kort", bankName: "Privatkonto", bank: "Skandia", type: "checking", counted: true, saving: false });
+    expect((await names.list()).find((a) => a.id === id)).toEqual({ id, nickname: "Privat kort", bankName: "Privatkonto", bank: "Skandia", type: "checking", role: "spending" });
     expect(await names.set(id, null)).toBe(true);
     expect((await names.list()).find((a) => a.id === id)?.nickname).toBeNull();
   });
@@ -114,18 +114,20 @@ describe("egna kontonamn (KK-37)", () => {
     expect(await accountNameRepository(db).set("finns-inte", "Buffert")).toBe(false);
   });
 
-  it("väljer om kontot räknas med, och synken ändrar inte valet (KK-41-A)", async () => {
+  it("väljer kontots roll, och synken ändrar inte valet (KK-53)", async () => {
     const repo = accountRepository(db, keys);
     const names = accountNameRepository(db);
     const input = { connectionId: "c1", providerUid: "counted-1", iban: null, name: "Sparkonto", type: "savings" as const, balanceMinor: 0 };
     const id = await repo.upsertFromBank(input, newId);
-    expect(await names.setCounted(id, false)).toBe(true);
-    expect((await names.list()).find((a) => a.id === id)?.counted).toBe(false);
+    const role = async () => (await names.list()).find((a) => a.id === id)?.role;
+    expect(await role()).toBe("spending");
+    expect(await names.setRole(id, "excluded")).toBe(true);
+    expect(await role()).toBe("excluded");
     await repo.upsertFromBank({ ...input, balanceMinor: 500 }, newId);
-    expect((await names.list()).find((a) => a.id === id)?.counted).toBe(false);
-    expect(await names.setCounted(id, true)).toBe(true);
-    expect((await names.list()).find((a) => a.id === id)?.counted).toBe(true);
-    expect(await names.setCounted("finns-inte", false)).toBe(false);
+    expect(await role()).toBe("excluded");
+    expect(await names.setRole(id, "buffer")).toBe(true);
+    expect(await role()).toBe("buffer");
+    expect(await names.setRole("finns-inte", "excluded")).toBe(false);
   });
 });
 

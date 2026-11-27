@@ -20,21 +20,21 @@ beforeAll(async () => {
   const accounts = accountRepository(db, keys);
   await accounts.upsertFromBank({ connectionId: "c1", providerUid: "u1", iban: null, name: "Privatkonto", type: "checking", balanceMinor: 4831240 }, () => "acc_1");
   await accounts.upsertFromBank({ connectionId: "c1", providerUid: "u2", iban: null, name: "Kort", type: "credit_card", balanceMinor: null }, () => "acc_2");
-  await db.prepare(`INSERT INTO accounts (id, connection_id, display_name, type, balance_minor, included) VALUES ('acc_3', 'c1', 'Lån', 'loan', -200000000, 0)`).run();
+  await db.prepare(`INSERT INTO accounts (id, connection_id, display_name, type, balance_minor, role) VALUES ('acc_3', 'c1', 'Lån', 'loan', -200000000, 'excluded')`).run();
 });
 afterAll(async () => {
   await dispose();
 });
 
 describe("översikten i D1 (KK-17, KK-38)", () => {
-  it("ger kontonas namn, bank, saldo (null utan saldo från banken) och om de räknas in", async () => {
-    await db.prepare(`UPDATE accounts SET nickname = 'Vardag' WHERE id = 'acc_1'`).run();
+  it("ger kontonas namn, bank, saldo (null utan saldo från banken), roll och om de räknas in (KK-53-D)", async () => {
+    await db.prepare(`UPDATE accounts SET nickname = 'Vardag', role = 'buffer' WHERE id = 'acc_1'`).run();
     expect(await overviewRepository(db).accounts()).toEqual([
-      { id: "acc_2", name: "Kort", bank: "Skandia", balanceMinor: null, included: true },
-      { id: "acc_3", name: "Lån", bank: "Skandia", balanceMinor: -200000000, included: false },
-      { id: "acc_1", name: "Vardag", bank: "Skandia", balanceMinor: 4831240, included: true },
+      { id: "acc_2", name: "Kort", bank: "Skandia", balanceMinor: null, included: true, role: "spending" },
+      { id: "acc_3", name: "Lån", bank: "Skandia", balanceMinor: -200000000, included: false, role: "excluded" },
+      { id: "acc_1", name: "Vardag", bank: "Skandia", balanceMinor: 4831240, included: true, role: "buffer" },
     ]);
-    await db.prepare(`UPDATE accounts SET nickname = NULL WHERE id = 'acc_1'`).run();
+    await db.prepare(`UPDATE accounts SET nickname = NULL, role = 'spending' WHERE id = 'acc_1'`).run();
   });
 
   it("ger kopplingarnas bank, status, samtyckets slut, senaste lyckade synk, fel i rad och antal konton", async () => {

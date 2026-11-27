@@ -163,3 +163,6 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Migrering 0006 var den första som bygger om en tabell. `drizzle-kit generate` skriver
   `PRAGMA foreign_keys=OFF` (D1 tillåter det inte) och kopierar nya kolumner från den gamla tabellen.
   Läs och rätta genererad SQL innan commit.
+- En ny kolumn med CHECK (t.ex. `accounts.role`, 0021) får Drizzle att bygga om hela tabellen. För `accounts` raderar
+  `DROP TABLE` alla transaktioner via kaskaden. Skriv i stället `ALTER TABLE … ADD … CONSTRAINT "namn" CHECK(…)` för hand
+  och behåll snapshoten. `migratedDb({ before: "00xx_….sql" })` och `applyMigration` testar en migrering på gammal data.
