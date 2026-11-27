@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bufferTotals, bufferTrend, savingKindOf, type BufferTransaction } from "./buffer.ts";
+import { bufferTotals, bufferTrend, savingCategoryChanges, savingCategoryId, savingKindOf, type BufferTransaction } from "./buffer.ts";
 import { budgetPeriodForKey } from "./period.ts";
 
 const NOVEMBER = budgetPeriodForKey("2026-11", 1);
@@ -58,5 +58,42 @@ describe("bufferten per period (KK-55-A, V-u-roles)", () => {
     expect(savingKindOf("saving_withdrawal")).toBe("saving_withdrawal");
     expect(savingKindOf("saving_deposit")).toBe("saving_deposit");
     for (const reason of ["pair", "manual", "hidden", "card_payment", "rule", "account", "none"] as const) expect(savingKindOf(reason)).toBeNull();
+  });
+});
+
+describe("kategorin Sparande för sparande till en buffert (KK-53)", () => {
+  const CATEGORIES = [
+    { id: "sp", parentId: null, name: "Sparande & överföringar", archived: false },
+    { id: "sparande", parentId: "sp", name: "Sparande", archived: false },
+    { id: "mat", parentId: null, name: "Mat", archived: false },
+    { id: "fel-sparande", parentId: "mat", name: "Sparande", archived: false },
+  ];
+
+  it("hittar underkategorin Sparande under Sparande & överföringar", () => {
+    expect(savingCategoryId(CATEGORIES)).toBe("sparande");
+  });
+
+  it("saknas den, är den arkiverad eller omdöpt finns ingen", () => {
+    expect(savingCategoryId(CATEGORIES.map((c) => (c.id === "sparande" ? { ...c, archived: true } : c)))).toBeNull();
+    expect(savingCategoryId(CATEGORIES.map((c) => (c.id === "sp" ? { ...c, name: "Överföringar" } : c)))).toBeNull();
+    expect(savingCategoryId([])).toBeNull();
+  });
+
+  it("ger Sparande till okategoriserat sparande, men rör aldrig en kategori som redan finns", () => {
+    const changes = savingCategoryChanges(
+      [
+        { id: "spar", savingKind: "saving", categorySource: "none" },
+        { id: "eget", savingKind: "saving", categorySource: "manual" },
+        { id: "regel", savingKind: "saving", categorySource: "learned" },
+        { id: "uttag", savingKind: "saving_withdrawal", categorySource: "none" },
+        { id: "kop", savingKind: null, categorySource: "none" },
+      ],
+      "sparande",
+    );
+    expect(changes).toEqual([{ id: "spar", categoryId: "sparande", categorySource: "template" }]);
+  });
+
+  it("utan kategorin Sparande ändras ingenting", () => {
+    expect(savingCategoryChanges([{ id: "spar", savingKind: "saving", categorySource: "none" }], null)).toEqual([]);
   });
 });
