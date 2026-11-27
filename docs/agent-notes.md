@@ -98,6 +98,22 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Manifestet länkas med `crossorigin="use-credentials"`, annars hämtas det utan Access-cookie och stoppas.
 - Ikonerna ritas från `public/icons/icon.svg` med `node scripts/icons.ts` i `apps/web`.
 
+## Designsystemet (M5, #244)
+
+- Nya komponenter finns i `apps/web/src/ui/` och stilen i `styles/ui.css`. Klasserna börjar med `ui-` och
+  påverkar inte de gamla vyerna. Färger och mått kommer bara från `tokens.css`, och nya färgpar läggs till i
+  `contrast.test.ts`.
+- `/_design` visar alla tokens och komponenter. Sidan finns bara i utvecklingsläget (`import.meta.env.DEV` i
+  `App.tsx`), och ett E2E-test kontrollerar att den saknas i produktionsbygget. Därför kör E2E inte axe på den.
+  Kör axe mot dev-servern med en tillfällig spec utanför git när komponenterna ändras.
+- De gamla vyernas regler för `main h2`, `main ul` och `button` slår igenom på nya element. Nollställ det som
+  behövs i `ui-`-klassen (se `.ui-heading` och `main ul.ui-list`).
+- jsdom saknar `HTMLDialogElement.showModal`, `IntersectionObserver`, `matchMedia` och `Element.animate`.
+  Testerna stubbar dem själva, och komponenterna fungerar utan dem.
+- `formatSek` använder hårda mellanslag. Jämför text med `.replace(/\s/gu, " ")` eller ett regex med `\s`.
+- Diagram ritas i sitt slutläge, och animationen från noll körs ovanpå med Web Animations API. Inline-stilar
+  i SVG behövs därför inte, och CSP:n stoppar ingenting.
+
 ## Cloudflare och D1: gränser som har orsakat riktiga fel
 
 - **CPU-tid:** Workern får runt 10 ms CPU per anrop på gratisnivån. Gör dyra steg (normalisering av

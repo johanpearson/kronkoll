@@ -7,6 +7,8 @@ import { useState } from "react";
 import css from "../styles/tokens.css?raw";
 import { setTheme, storedTheme, type Theme } from "../theme.ts";
 import { Button, IconButton } from "../ui/Button.tsx";
+import { BarChart, LineChart, RingChart } from "../ui/charts/Charts.tsx";
+import { CountUp } from "../ui/charts/CountUp.tsx";
 import { AmountInput } from "../ui/AmountInput.tsx";
 import { Chip } from "../ui/Chip.tsx";
 import { List, ListRow } from "../ui/ListRow.tsx";
@@ -38,6 +40,15 @@ const PERIODS = [
   { value: "year", label: "År" },
   { value: "all", label: "Allt" },
 ] as const;
+
+const MONTHS = [
+  { label: "jun.", valueMinor: 2_150_000 },
+  { label: "jul.", valueMinor: 2_780_000 },
+  { label: "aug.", valueMinor: 1_940_000 },
+  { label: "sep.", valueMinor: 2_310_000 },
+  { label: "okt.", valueMinor: 2_520_000 },
+  { label: "nov.", valueMinor: 1_870_000 },
+];
 
 const SPACES = [1, 2, 3, 4, 5, 6, 7];
 const RADII = ["radius-xs", "radius-small", "radius", "radius-large", "radius-pill"];
@@ -149,6 +160,21 @@ export default function DesignPage() {
       >
         Transaktionerna behåller kategorierna de redan har.
       </Dialog>
+
+      <h2>Diagram</h2>
+      <Card title="Utgifter per månad">
+        <CountUp valueMinor={1_870_000} className="ui-display ui-amount" />
+        <BarChart label="Utgifter per månad" bars={MONTHS} />
+      </Card>
+      <Card title="Budget per kategori">
+        <div className="design-row">
+          <RingChart label="Mat" valueMinor={420_000} totalMinor={600_000} center="70 %" />
+          <RingChart label="Nöje" valueMinor={180_000} totalMinor={150_000} center="120 %" />
+        </div>
+      </Card>
+      <Card title="Saldo">
+        <LineChart label="Saldo över tid" points={MONTHS} />
+      </Card>
 
       <h2>Etiketter</h2>
       <section className="design-panel design-row">
