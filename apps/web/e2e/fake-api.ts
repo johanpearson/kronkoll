@@ -233,7 +233,13 @@ export async function useFakeApi(
       state.rules.push(rule);
       return [201, { rule, applied: 0, retroactive_candidates: 0, protected_manual: 0 }];
     }
-    if (path === "/api/rules") return [200, { items: state.rules }];
+    // Platsen i användarens ordning (KK-58-C): den senast skapade står först, som i det riktiga API:t.
+    if (path === "/api/rules") return [200, { items: state.rules.map((r, i) => ({ ...r, position: r.source === "learned" ? -i : null })) }];
+    if (path === "/api/rules/order" && method === "PUT") {
+      const order = Array.isArray(body["order"]) ? (body["order"] as string[]) : [];
+      state.rules.sort((a, b) => order.indexOf(b.id) - order.indexOf(a.id));
+      return [200, { updated: 0 }];
+    }
     if (path === "/api/categories/reset" && method === "POST") {
       if (body["preview"] === true) return [200, { categories: 37, rules: 14, transactions: 812, splits: 3, budget_lines: 9 }];
       state.categoryResets.push(body);
