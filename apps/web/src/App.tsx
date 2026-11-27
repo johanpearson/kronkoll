@@ -1,6 +1,7 @@
 // Appens skal (#30): sidorna och huvudmenyn. Service workern (sw/) ger offline-skal och senaste
 // översikten i högst 24 h.
 import { House, Landmark, PiggyBank, ReceiptText, Wallet } from "lucide-react";
+import { lazy, Suspense } from "react";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { PlannerView } from "./planner/PlannerView.tsx";
 import { IncomeView } from "./income/IncomeView.tsx";
@@ -59,6 +60,14 @@ const TABS = [
   { to: "/inkomst", label: "Inkomst", Icon: Wallet, owns: (path: string) => path === "/inkomst" || path.startsWith("/inkomst/") },
 ];
 
+/**
+ * Sidor som bara finns i utvecklingsläget (KK-65-E). I produktionsbygget är villkoret falskt redan när
+ * Vite bygger, så sidan och dess kod tas bort helt.
+ */
+const DEV_ROUTES: Record<string, React.LazyExoticComponent<() => React.JSX.Element>> = import.meta.env.DEV
+  ? { "/_design": lazy(() => import("./design/DesignPage.tsx")) }
+  : {};
+
 /** /transaktioner/{id}: detaljsidan för en transaktion. */
 const DETAIL = /^\/transaktioner\/([^/]+)$/u;
 /** /installningar/koppling/{id}: sidan om en bankkoppling. */
@@ -69,6 +78,14 @@ function page(path: string): React.JSX.Element {
   if (detailId !== undefined) return <TransactionDetail key={detailId} id={decodeURIComponent(detailId)} />;
   const connectionId = CONNECTION.exec(path)?.[1];
   if (connectionId !== undefined) return <ConnectionView key={connectionId} id={decodeURIComponent(connectionId)} />;
+  const DevPage = DEV_ROUTES[path];
+  if (DevPage !== undefined) {
+    return (
+      <Suspense fallback={null}>
+        <DevPage />
+      </Suspense>
+    );
+  }
   const Page = ROUTES[path] ?? NotFound;
   return <Page />;
 }

@@ -1,0 +1,79 @@
+/*
+ * Grunden i det nya designsystemet (KK-65, #244). Klasserna börjar med ui- och påverkar inte de gamla
+ * vyerna, som byts ut en i taget. Bara tokens används, så ljust och mörkt läge följer med.
+ */
+
+/* Typografi (KK-65-D): stort saldo, rubriker, brödtext och mindre etiketter. */
+.ui-display {
+  margin: 0;
+  color: var(--heading);
+  font-size: var(--text-display);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ui-title {
+  margin: 0;
+  color: var(--heading);
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+}
+
+.ui-heading {
+  margin: 0;
+  color: var(--heading);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-tight);
+}
+
+.ui-body {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading);
+}
+
+.ui-label {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+}
+
+.ui-caption {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+/* Belopp: siffror som står rakt under varandra och aldrig bryts. */
+.ui-amount {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.ui-amount-positive {
+  color: var(--success);
+}
+
+.ui-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Vyer och kort som kommer in: tonar in och glider upp (KK-65-B). Stängs av vid minskad rörelse i base.css. */
+@keyframes ui-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.ui-enter {
+  animation: ui-enter var(--duration-slow) var(--easing-out) backwards;
+}

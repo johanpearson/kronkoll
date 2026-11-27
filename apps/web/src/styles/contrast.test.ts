@@ -39,6 +39,18 @@ const PAIRS: [string, string, number][] = [
   ["warning", "surface", 4.5],
   ["danger", "surface", 4.5],
   ["info", "surface", 4.5],
+  // Upphöjda och nedsänkta ytor (ark, dialoger, segmentkontrollens spår och skelett) bär också text.
+  ["text", "surface-raised", 4.5],
+  ["muted", "surface-raised", 4.5],
+  ["text", "surface-sunken", 4.5],
+  ["muted", "surface-sunken", 4.5],
+  // Etiketter och meddelanden: färgad text på sin mjuka bakgrund, och text på fara-knappen.
+  ["primary", "primary-soft", 4.5],
+  ["success", "success-soft", 4.5],
+  ["warning", "warning-soft", 4.5],
+  ["danger", "danger-soft", 4.5],
+  ["on-danger", "danger", 4.5],
+  ["on-primary", "primary-hover", 4.5],
   ["focus", "background", 3],
   ["border-strong", "surface", 3],
   // Kategoriprickarna (KK-26-D) är grafik bredvid namnet: 3:1 mot ytan de står på.
