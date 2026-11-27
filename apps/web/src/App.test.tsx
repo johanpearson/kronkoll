@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { App } from "./App.tsx";
+import { startHistory } from "./router.tsx";
 
 afterEach(() => {
   cleanup();
@@ -10,6 +11,7 @@ afterEach(() => {
 
 function at(path: string) {
   window.history.replaceState(null, "", path);
+  startHistory();
   return render(<App />);
 }
 
@@ -20,12 +22,14 @@ describe("appskalet (#30, KK-4)", () => {
     expect(document.documentElement.lang === "" || document.documentElement.lang === "sv").toBe(true);
   });
 
-  it("visar en sida som inte finns, med väg tillbaka till start", () => {
+  it("visar en sida som inte finns, med väg tillbaka till start", async () => {
     at("/finns-inte");
     expect(screen.getByRole("heading", { name: "Sidan finns inte" })).toBeDefined();
     fireEvent.click(screen.getByRole("link", { name: "Till start" }));
+    await waitFor(() => {
+      expect(screen.queryByRole("heading", { name: "Sidan finns inte" })).toBeNull();
+    });
     expect(window.location.pathname).toBe("/");
-    expect(screen.queryByRole("heading", { name: "Sidan finns inte" })).toBeNull();
   });
 
   it("följer webbläsarens bakåt och framåt", () => {
