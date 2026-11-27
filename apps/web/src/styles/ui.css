@@ -23,12 +23,15 @@
   letter-spacing: -0.01em;
 }
 
+/* Står ofta på en h2, så de gamla vyernas stil för h2 (versaler, grå) nollställs. */
 .ui-heading {
   margin: 0;
   color: var(--heading);
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   line-height: var(--leading-tight);
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .ui-body {
@@ -420,4 +423,185 @@ a.ui-row:active {
   margin: 0;
   color: var(--danger);
   font-size: var(--text-sm);
+}
+
+.ui-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+  white-space: nowrap;
+}
+
+/* Kort: en del av en vy, med rubrik och en valfri åtgärd till höger. */
+.ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--tap);
+}
+
+/* Ark och dialog: modala <dialog> med mörk bakgrund bakom. */
+.ui-sheet,
+.ui-dialog {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+}
+
+.ui-sheet::backdrop,
+.ui-dialog::backdrop {
+  background: var(--scrim);
+  animation: ui-fade var(--duration) var(--easing-out);
+}
+
+.ui-sheet {
+  width: 100%;
+  max-width: 640px;
+  max-height: 90dvh;
+  margin: auto auto 0;
+}
+
+.ui-sheet-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 90dvh;
+  overflow-y: auto;
+  padding: var(--space-2) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom));
+  background: var(--surface-raised);
+  border-radius: var(--radius-large) var(--radius-large) 0 0;
+  box-shadow: var(--shadow-lg);
+  animation: ui-sheet-in var(--duration-slow) var(--easing-out);
+}
+
+.ui-sheet-handle {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+}
+
+.ui-sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.ui-dialog {
+  width: calc(100% - 2 * var(--space-5));
+  max-width: 400px;
+}
+
+.ui-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  background: var(--surface-raised);
+  border-radius: var(--radius-large);
+  box-shadow: var(--shadow-lg);
+  animation: ui-dialog-in var(--duration) var(--easing-out);
+}
+
+.ui-dialog-actions {
+  display: flex;
+  flex-wrap: wrap-reverse;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+@keyframes ui-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes ui-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes ui-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* Tom vy: centrerad, lugn och med nästa steg. */
+.ui-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.ui-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-2);
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.ui-empty .ui-body {
+  max-width: 32ch;
+  color: var(--muted);
+}
+
+/* Skelett: grå rader som skimrar lugnt. Vid minskad rörelse står de stilla (base.css). */
+.ui-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.ui-skeleton-line {
+  height: 14px;
+  border-radius: var(--radius-xs);
+  background: linear-gradient(90deg, var(--surface-sunken) 0%, var(--border) 50%, var(--surface-sunken) 100%);
+  background-size: 200% 100%;
+  animation: ui-shimmer 1.4s linear infinite;
+}
+
+.ui-skeleton-line:last-child:not(:first-child) {
+  width: 60%;
+}
+
+@keyframes ui-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -100% 0;
+  }
 }
