@@ -215,18 +215,18 @@ test("insikterna nås från översikten och visar avvikelse, återkommande dragn
   await expect(page).toHaveURL(/\/transaktioner\/t1$/u);
 });
 
-test("välj bort ett konto i Inställningar så att det inte räknas med (V-e2e-account-counted, KK-41-A)", async ({ page }) => {
+test("ge ett konto rollen Buffert i Inställningar (V-e2e-account-role, KK-53-A)", async ({ page }) => {
   const api = await useFakeApi(page);
   await page.goto("/installningar");
-  const sparkonto = page.getByRole("switch", { name: "Räknas med: Sparkonto ••5678" });
-  await expect(sparkonto).toBeChecked();
-  // Valet visas när servern har svarat, så läget kontrolleras efter klicket och inte av uncheck().
-  await sparkonto.click();
-  await expect(sparkonto).not.toBeChecked();
-  await expect(page.getByText("Syns inte någonstans. Överföringar dit räknas som utgifter och överföringar därifrån som inkomster.")).toBeVisible();
-  expect(api.accountPatches).toEqual([{ counted: false }]);
+  const role = page.getByRole("radiogroup", { name: "Roll för Sparkonto ••5678" });
+  await expect(role.getByRole("radio", { name: "Inkomst/Utgift" })).toHaveAttribute("aria-checked", "true");
+  await role.getByRole("radio", { name: "Buffert" }).click();
+  // Valet visas när servern har svarat.
+  await expect(role.getByRole("radio", { name: "Buffert" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("Sparande. Överföringar hit räknas som sparande och uttag härifrån som uttag från sparande.")).toBeVisible();
+  expect(api.accountPatches).toEqual([{ role: "buffer" }]);
   await page.reload();
-  await expect(page.getByRole("switch", { name: "Räknas med: Sparkonto ••5678" })).not.toBeChecked();
+  await expect(page.getByRole("radiogroup", { name: "Roll för Sparkonto ••5678" }).getByRole("radio", { name: "Buffert" })).toHaveAttribute("aria-checked", "true");
 });
 
 test("välj ett konto i Transaktioner och se vilket filter som gäller (V-e2e-account-filter, KK-41-C)", async ({ page }) => {

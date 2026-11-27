@@ -26,7 +26,10 @@ export function useAccountChoices(): readonly AccountChoice[] {
         items.flatMap((raw): AccountChoice[] => {
           const id = field(raw, "id");
           const name = field(raw, "name");
-          return typeof id === "string" && typeof name === "string" && field(raw, "counted") !== false ? [{ id, name }] : [];
+          // Ett uteslutet konto (KK-53) går inte att välja. Rollen gäller, och utan den det gamla fältet.
+          const role = field(raw, "role");
+          const excluded = typeof role === "string" ? role === "excluded" : field(raw, "counted") === false;
+          return typeof id === "string" && typeof name === "string" && !excluded ? [{ id, name }] : [];
         }),
       );
     });
