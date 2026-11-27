@@ -21,6 +21,20 @@ type State = { readonly kind: "idle" } | { readonly kind: "running" } | { readon
 const LABEL: Record<State["kind"], string> = { idle: "Synkstatus", running: "Synkar…", done: "Synken är klar", failed: "Synken misslyckades" };
 const ICON = { idle: RefreshCw, running: RefreshCw, done: Check, failed: TriangleAlert };
 
+/** Den som ber om en synk utan att trycka på ikonen, t.ex. dra för att synka (KK-63-D). */
+const requests = new Set<() => void>();
+
+export function requestSync(): void {
+  for (const listener of requests) listener();
+}
+
+export function onSyncRequest(listener: () => void): () => void {
+  requests.add(listener);
+  return () => {
+    requests.delete(listener);
+  };
+}
+
 const syncTime = new Intl.DateTimeFormat("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });
 
 const wait = (ms: number) =>
@@ -76,6 +90,17 @@ export function SyncStatus(props: { lastSyncAt?: string | null; onDone: () => vo
       setState({ kind: "failed", message: "Det gick inte att starta synken. Försök igen om en stund." });
     }
   };
+
+  // En begäran utifrån startar synken, men inte en till medan en pågår.
+  const latest = useRef({ running: false, start });
+  latest.current = { running: state.kind === "running", start };
+  useEffect(
+    () =>
+      onSyncRequest(() => {
+        if (!latest.current.running) void latest.current.start();
+      }),
+    [],
+  );
 
   const Icon = ICON[state.kind];
   const running = state.kind === "running";

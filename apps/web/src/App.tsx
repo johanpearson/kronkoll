@@ -1,13 +1,15 @@
 // Appens skal (#30): sidorna och huvudmenyn. Service workern (sw/) ger offline-skal och senaste
 // översikten i högst 24 h.
-import { ChevronLeft, House, Landmark, PiggyBank, ReceiptText, Wallet } from "lucide-react";
-import { lazy, Suspense } from "react";
+import { ChevronLeft, House, Landmark, PiggyBank, ReceiptText, RefreshCw, Wallet } from "lucide-react";
+import { lazy, Suspense, useEffect, type PointerEvent } from "react";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { PlannerView } from "./planner/PlannerView.tsx";
 import { IncomeView } from "./income/IncomeView.tsx";
 import { InsightsView } from "./insights/InsightsView.tsx";
 import { LoansView } from "./loans/LoansView.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
+import { PULL_TRIGGER_PX } from "./nav/gesture.ts";
+import { usePullToSync } from "./nav/usePullToSync.ts";
 import { useTabSwipe } from "./nav/useTabSwipe.ts";
 import { canGoBack, Link, navigationKind, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
@@ -96,15 +98,39 @@ function page(path: string): React.JSX.Element {
   return <Page />;
 }
 
+/** Vyerna där man kan dra nedåt för att synka (KK-63-D). */
+const PULL_VIEWS = new Set(["/", "/transaktioner"]);
+
+type Handlers = Record<"onPointerDown" | "onPointerMove" | "onPointerUp" | "onPointerCancel", (event: PointerEvent<HTMLElement>) => void>;
+
+/** Båda gesterna får varje pekhändelse och avgör själva om den gäller dem. */
+const both = (a: Handlers, b: Handlers): Handlers => ({
+  onPointerDown: (e) => { a.onPointerDown(e); b.onPointerDown(e); },
+  onPointerMove: (e) => { a.onPointerMove(e); b.onPointerMove(e); },
+  onPointerUp: (e) => { a.onPointerUp(e); b.onPointerUp(e); },
+  onPointerCancel: (e) => { a.onPointerCancel(e); b.onPointerCancel(e); },
+});
+
 export function App() {
   const path = usePath();
   const subview = canGoBack();
   // Svep byter flik på flikarnas huvudvyer, inte i undervyer (KK-63-A, B).
   const swipe = useTabSwipe(!subview);
+  const pullable = PULL_VIEWS.has(path);
+  const pull = usePullToSync(pullable);
+  // Webbläsarens egen "dra för att ladda om" stängs av där appen har sin egen (KK-63-E).
+  useEffect(() => {
+    document.documentElement.classList.toggle("ui-own-pull", pullable);
+  }, [pullable]);
   return (
     <ToastProvider>
       {/* En ny vy glider in från höger, bakåt från vänster och ett flikbyte tonar (KK-62-H). */}
-      <div key={path} className={`ui-view ui-view-${navigationKind()}${subview ? "" : " ui-view-swipe"}`} {...swipe}>
+      {pull.distance > 0 && (
+        <div className="ui-pull" aria-hidden="true" style={{ height: `${String(pull.distance)}px` }}>
+          <RefreshCw size={22} strokeWidth={2} className={pull.distance >= PULL_TRIGGER_PX ? "ui-pull-ready" : undefined} />
+        </div>
+      )}
+      <div key={path} className={`ui-view ui-view-${navigationKind()}${subview ? "" : " ui-view-swipe"}`} {...both(swipe, pull.handlers)}>
         {subview && (
           // iOS saknar bakåtknapp, så undervyer har en egen (KK-62-B). Den följer samma steg som telefonens.
           <nav className="ui-backbar" aria-label="Tillbaka">

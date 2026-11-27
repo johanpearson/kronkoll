@@ -128,6 +128,22 @@ describe("appskalet (#30, KK-4)", () => {
     });
   });
 
+  it("dra nedåt högst upp i Översikt visar en indikator, och webbläsarens egen omladdning är avstängd (KK-63-D, E)", () => {
+    const { container } = at("/");
+    expect(document.documentElement.classList.contains("ui-own-pull")).toBe(true);
+    const view = container.querySelector(".ui-view") as HTMLElement;
+    fireEvent.pointerDown(view, { pointerId: 1, clientX: 200, clientY: 100 });
+    fireEvent.pointerMove(view, { pointerId: 1, clientX: 200, clientY: 130 });
+    fireEvent.pointerMove(view, { pointerId: 1, clientX: 200, clientY: 420 });
+    expect(container.querySelector(".ui-pull")).not.toBeNull();
+    expect(container.querySelector(".ui-pull-ready")).not.toBeNull();
+    fireEvent.pointerCancel(view, { pointerId: 1 });
+    expect(container.querySelector(".ui-pull")).toBeNull();
+    cleanup();
+    at("/budget");
+    expect(document.documentElement.classList.contains("ui-own-pull")).toBe(false);
+  });
+
   it("en länk med modifierare öppnas som vanligt av webbläsaren", () => {
     at("/finns-inte");
     const link = screen.getByRole("link", { name: "Till start" });
