@@ -163,24 +163,6 @@ test("ta bort periodens budget efter en fråga (KK-40)", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Ta bort budget" })).toHaveCount(0);
 });
 
-test("planera föräldraledighet och se den under Inkomst (V-e2e-leave, KK-23)", async ({ page }) => {
-  await useFakeApi(page);
-  await page.goto("/");
-  await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Inkomst" }).click();
-  await page.getByRole("button", { name: "Planera ledighet" }).click();
-  const form = page.getByRole("form", { name: "Planera föräldraledighet" });
-  await form.getByLabel("Från").fill("2028-01-01");
-  await form.getByLabel("Till").fill("2028-06-30");
-  await form.getByLabel("Uttag").selectOption({ label: "3 dagar/vecka" });
-  await form.getByLabel("Årsinkomst för SGI (kr)").fill("540 000");
-  await form.getByLabel("Skattesats (%)").fill("31,5");
-  await form.getByRole("button", { name: "Spara" }).click();
-
-  await expect(page.getByRole("status")).toHaveText("Ledigheten är planerad.");
-  const rows = page.getByRole("list", { name: "Planerade perioder" }).getByRole("listitem");
-  await expect(rows).toHaveCount(2);
-  await expect(rows.nth(1)).toContainText("3 dagar/vecka");
-});
 test("se vilka inbetalningar som räknas som inkomst en månad och gå till dem (KK-46)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/inkomst");

@@ -3,7 +3,7 @@
 import { useState, type SyntheticEvent } from "react";
 import { deleteJson, putJson } from "../api.ts";
 import { parseKronor } from "../kronor.ts";
-import { parsePercent } from "../income/NewLeave.tsx";
+import { parsePercent } from "../percent.ts";
 import { useToast } from "../toast.tsx";
 import type { Loan } from "./loan.ts";
 

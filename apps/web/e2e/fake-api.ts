@@ -32,19 +32,6 @@ function transaction(id: string, date: string, amountMinor: number, counterparty
 /** Bankens inloggning i testerna. connect.spec.ts fångar adressen och skickar tillbaka till appen. */
 export const FAKE_BANK = "https://bank.example.test";
 
-/** Påhittad planerad ledighet i samma form som GET /api/leave-periods. */
-const LEAVE = {
-  id: "l1", from: "2027-03-01", to: "2027-08-31", days_per_week: 5, sgi_annual_minor: 54000000, employer_topup_pct: 10, tax_rate_pct: 31.5, override_net_monthly_minor: null,
-  estimate: {
-    disclaimer: "Uppskattning – inte ett besked från Försäkringskassan",
-    normal_net_monthly_minor: 3361000,
-    months: [{ period: "2027-03", leave_days: 23, withdrawal_days: 23, benefit_gross_minor: 2400000, topup_gross_minor: 450000, net_minor: 2014000, source: "estimate", params_year: 2027, params_fallback: false, income_minor: 2014000, delta_vs_normal_minor: -1347000 }],
-  },
-  impacts: [
-    { type: "budget", period: "2027-03", budget_minor: 3200000, income_minor: 2014000, shortfall_minor: 1186000 },
-  ],
-};
-
 const OVERVIEW = {
   period: NOVEMBER,
   balance_minor: 4831240,
@@ -131,7 +118,6 @@ export async function useFakeApi(
     amount_minor: 3361000, counterparty: "", counterparty_norm: "EXEMPELFÖRETAGET AB", description: "EXEMPELFÖRETAGET AB LÖN", category_id: null, category_source: "none",
     is_internal_transfer: false, manual_transfer: null, income_type: "other", income_source: "template", transfer_pair: null, splits: [],
   };
-  const leave: Record<string, unknown>[] = [LEAVE];
   /** Ett påhittat bolån vars bindningstid slutar om 41 dagar (KK-36-C). */
   const loans: Record<string, unknown>[] = [{
     id: "lan1", name: "Bolån del 1", lender: "Exempelbanken", balance_minor: 120000000, interest_rate_bp: 350, rate_fixed_until: "2026-12-15", amortization_minor: 200000,
@@ -240,12 +226,6 @@ export async function useFakeApi(
         { period: "2026-11", salary_minor: 3361000, parental_benefit_minor: 483000, other_minor: 281000 },
       ] }];
     }
-    if (path === "/api/leave-periods" && method === "POST") {
-      const period = { ...LEAVE, id: `l${String(leave.length + 1)}`, from: body["from"], to: body["to"], days_per_week: body["days_per_week"], employer_topup_pct: body["employer_topup_pct"] };
-      leave.push(period);
-      return [201, period];
-    }
-    if (path === "/api/leave-periods") return [200, { items: leave }];
     if (path === "/api/categories") return [200, { items: categoriesCleared ? [] : CATEGORIES }];
     if (path === "/api/rules" && method === "POST") {
       const text = String(body["pattern"]).trim().toUpperCase();

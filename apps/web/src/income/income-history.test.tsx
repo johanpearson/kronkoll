@@ -52,11 +52,11 @@ describe("Inkomst: historik (#40, KK-22-B)", () => {
     expect(screen.getByRole("main").textContent).toContain("Netto efter skatt, så som det kommer in på kontot.");
   });
 
-  it("säger till när inkomsterna inte går att hämta, men visar ändå ledigheten", async () => {
+  it("säger till när inkomsterna inte går att hämta", async () => {
     api([503, { error: "unavailable" }]);
     await open();
     expect(screen.getByRole("alert").textContent).toBe("Det gick inte att hämta inkomsterna. Försök igen om en stund.");
-    expect(screen.getByRole("heading", { name: "Planerad ledighet" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 1, name: "Inkomst" })).toBeTruthy();
   });
 
   it("tål svar med saknade eller felaktiga fält", () => {

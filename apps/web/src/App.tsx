@@ -6,7 +6,6 @@ import { PlannerView } from "./planner/PlannerView.tsx";
 import { IncomeView } from "./income/IncomeView.tsx";
 import { InsightsView } from "./insights/InsightsView.tsx";
 import { LoansView } from "./loans/LoansView.tsx";
-import { NewLeave } from "./income/NewLeave.tsx";
 import { OverviewView } from "./overview/OverviewView.tsx";
 import { Link, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
@@ -34,7 +33,6 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/budget": PlannerView,
   "/lan": LoansView,
   "/inkomst": IncomeView,
-  "/inkomst/ledighet": NewLeave,
   "/insikter": InsightsView,
   "/installningar": SettingsView,
   "/installningar/kategorier": CategoriesView,
