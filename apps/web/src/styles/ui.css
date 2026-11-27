@@ -786,6 +786,20 @@ a.ui-row:active {
   }
 }
 
+/* Åtgärderna i sidhuvudet, t.ex. synkstatus och kugghjulet (KK-64-A). */
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ui-sync-done {
+  color: var(--success);
+}
+
+.ui-sync-failed {
+  color: var(--warning);
+
 /* Ett fel där det uppstod, med Försök igen bredvid (KK-64-D). */
 .inline-error {
   display: flex;
