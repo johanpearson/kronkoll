@@ -23,6 +23,13 @@
   --danger: #b42323;
   --info: #1f4fbf;
   --focus: #1f4fbf;
+  --surface-raised: #ffffff;
+  --surface-sunken: #eceef2;
+  --primary-hover: #0b5852;
+  --success-soft: #eef8f1;
+  --warning-soft: #fcf3e6;
+  --danger-soft: #fbeaea;
+  --on-danger: #ffffff;
   /* Kategorifärger (KK-26-D): en prick per huvudkategori, minst 3:1 mot ytan. */
   --cat-blue: #2563c9;
   --cat-green: #2e7d32;
@@ -39,8 +46,25 @@
   --cat-lime: #4d8a00;
 
   --font: "Inter Variable", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  /* Typografi (KK-65-D): en skala från etikett till stort saldo. */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-display: 2.75rem;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --leading-tight: 1.2;
+  --leading: 1.5;
+
+  --radius-large: 24px;
   --radius: 16px;
   --radius-small: 10px;
+  --radius-xs: 6px;
   --radius-pill: 999px;
   --space-1: 4px;
   --space-2: 8px;
@@ -48,10 +72,21 @@
   --space-4: 16px;
   --space-5: 24px;
   --space-6: 32px;
+  --space-7: 48px;
+  /* Minsta träffyta för knappar och rader (KK-65). */
+  --tap: 44px;
   --tabbar-height: 64px;
+  /* Rörelse (KK-65-B): samma värden som design/motion.ts, vilket ett test kontrollerar. */
+  --duration-fast: 120ms;
   --duration: 200ms;
+  --duration-slow: 250ms;
   --easing: cubic-bezier(0.2, 0, 0, 1);
+  --easing-out: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --easing-in: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --scrim: rgb(11 18 32 / 45%);
+  --shadow-sm: 0 1px 2px rgb(11 18 32 / 8%);
   --shadow: 0 1px 2px rgb(11 18 32 / 6%), 0 4px 16px rgb(11 18 32 / 6%);
+  --shadow-lg: 0 8px 32px rgb(11 18 32 / 16%);
 }
 
 :root[data-theme="dark"] {
@@ -72,6 +107,13 @@
   --danger: #f07a7a;
   --info: #84a9ff;
   --focus: #84a9ff;
+  --surface-raised: #1e232c;
+  --surface-sunken: #0b0e12;
+  --primary-hover: #7fd8cc;
+  --success-soft: #11291b;
+  --warning-soft: #2e2210;
+  --danger-soft: #361616;
+  --on-danger: #2a0606;
   --cat-blue: #6ea0ff;
   --cat-green: #5fbf68;
   --cat-orange: #f0954a;
@@ -85,6 +127,10 @@
   --cat-slate: #94a3b8;
   --cat-grey: #a3a3a3;
   --cat-lime: #b5e061;
+  --scrim: rgb(0 0 0 / 60%);
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 16px rgb(0 0 0 / 30%);
+  --shadow-lg: 0 8px 32px rgb(0 0 0 / 50%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -106,6 +152,13 @@
     --danger: #f07a7a;
     --info: #84a9ff;
     --focus: #84a9ff;
+    --surface-raised: #1e232c;
+    --surface-sunken: #0b0e12;
+    --primary-hover: #7fd8cc;
+    --success-soft: #11291b;
+    --warning-soft: #2e2210;
+    --danger-soft: #361616;
+    --on-danger: #2a0606;
     --cat-blue: #6ea0ff;
     --cat-green: #5fbf68;
     --cat-orange: #f0954a;
@@ -119,5 +172,9 @@
     --cat-slate: #94a3b8;
     --cat-grey: #a3a3a3;
     --cat-lime: #b5e061;
+    --scrim: rgb(0 0 0 / 60%);
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+    --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 4px 16px rgb(0 0 0 / 30%);
+    --shadow-lg: 0 8px 32px rgb(0 0 0 / 50%);
   }
 }

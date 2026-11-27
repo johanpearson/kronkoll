@@ -4,6 +4,7 @@ import "@fontsource-variable/inter";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/components.css";
+import "./styles/ui.css";
 import { App } from "./App.tsx";
 import { registerServiceWorker } from "./pwa.ts";
 import { applyStoredTheme } from "./theme.ts";

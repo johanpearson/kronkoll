@@ -53,3 +53,10 @@ test.describe("Logga ut och rensa enheten (KK-35-A)", () => {
     expect(await page.evaluate(() => localStorage.length)).toBe(0);
   });
 });
+
+test("designsidan /_design finns inte i produktionsbygget (KK-65-E)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/_design");
+  await expect(page.getByRole("heading", { level: 1, name: "Sidan finns inte" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Designsystem" })).toHaveCount(0);
+});

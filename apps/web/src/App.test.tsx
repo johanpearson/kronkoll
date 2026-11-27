@@ -38,6 +38,12 @@ describe("appskalet (#30, KK-4)", () => {
     expect(screen.getByRole("heading", { name: "Sidan finns inte" })).toBeDefined();
   });
 
+  it("visar designsidan /_design i utvecklingsläget (KK-65-E)", async () => {
+    expect(import.meta.env.DEV).toBe(true);
+    at("/_design");
+    expect(await screen.findByRole("heading", { level: 1, name: "Designsystem" })).toBeDefined();
+  });
+
   it("en länk med modifierare öppnas som vanligt av webbläsaren", () => {
     at("/finns-inte");
     const link = screen.getByRole("link", { name: "Till start" });
