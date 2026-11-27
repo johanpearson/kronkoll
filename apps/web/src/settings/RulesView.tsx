@@ -11,7 +11,7 @@ import { Pencil, X } from "lucide-react";
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { deleteJson, field, getJson, patchJson, postJson, type ApiResult } from "../api.ts";
 import { Link } from "../router.tsx";
-import { SyncButton } from "../sync/SyncButton.tsx";
+import { SyncStatus } from "../sync/SyncStatus.tsx";
 import { IconButton } from "../icon-button.tsx";
 import { useToast } from "../toast.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "../transactions/TransactionsView.tsx";
@@ -262,7 +262,7 @@ export function RulesView() {
       {header}
       <p>En regel ger en kategori åt allt som börjar med eller innehåller en viss text, oavsett versaler. Den används vid varje synk. Manuellt valda kategorier ändras aldrig. En regel kan också göra att det den träffar inte räknas i budget och översikt.</p>
       <div className="sync">
-        <SyncButton onDone={() => { setReload((n) => n + 1); }} />
+        <SyncStatus onDone={() => { setReload((n) => n + 1); }} />
         <button type="button" onClick={() => void previewAll()}>
           Applicera alla regler
         </button>

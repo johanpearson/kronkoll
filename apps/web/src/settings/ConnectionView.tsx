@@ -5,7 +5,7 @@ import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
-import { SyncButton } from "../sync/SyncButton.tsx";
+import { SyncStatus } from "../sync/SyncStatus.tsx";
 import { DeleteConnection, type HistoryCounts } from "./DeleteConnection.tsx";
 import { RenewConnection } from "./RenewConnection.tsx";
 
@@ -142,7 +142,7 @@ export function ConnectionView({ id }: { id: string }) {
         {/* Förnya är framträdande när samtycket har 14 dagar eller mindre kvar, eller har gått ut (KK-8). */}
         <RenewConnection id={id} urgent={c.consentDaysLeft !== null && c.consentDaysLeft <= 14} />
         <div className="sync">
-          <SyncButton onDone={() => { setReload((n) => n + 1); }} />
+          <SyncStatus onDone={() => { setReload((n) => n + 1); }} />
         </div>
       </section>
       <h2>Konton</h2>
