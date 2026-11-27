@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { applyRules, categorize, orderRules, ruleReach, type CategorizableTransaction, type CategoryRule } from "./categorize.ts";
+import { applyRules, categorize, explainCategory, orderRules, ruleReach, type CategorizableTransaction, type CategoryRule } from "./categorize.ts";
 
 function tx(overrides: Partial<CategorizableTransaction> & { id: string }): CategorizableTransaction {
   return { counterpartyNorm: "ICA MAXI HOOR", description: "", categoryId: null, categorySource: "none", ...overrides };
@@ -136,5 +136,26 @@ describe("egenskaper för reglerna (KK-58-E)", () => {
         },
       ),
     );
+  });
+});
+
+describe("varför fick den här kategorin? (KK-58-D)", () => {
+  const rules = orderRules([ica, maxi, mall], ["maxi", "ica"]);
+
+  it("säger vilken regel som gav kategorin och vilka andra som också träffar, i den ordning de vinner", () => {
+    expect(explainCategory(tx({ id: "t", categoryId: "hushall", categorySource: "learned" }), rules)).toEqual({ source: "learned", ruleId: "maxi", alsoMatched: ["ica", "mall"] });
+    expect(explainCategory(tx({ id: "t", counterpartyNorm: "ICA MAXI HOOR", categoryId: "fika", categorySource: "template" }), [mall])).toEqual({ source: "template", ruleId: "mall", alsoMatched: [] });
+  });
+
+  it("en manuell kategori kommer inte från någon regel, men reglerna som träffar visas", () => {
+    expect(explainCategory(tx({ id: "t", categoryId: "fritid", categorySource: "manual" }), rules)).toEqual({ source: "manual", ruleId: null, alsoMatched: ["maxi", "ica", "mall"] });
+    // Även när det manuella valet råkar vara samma kategori som regeln ger.
+    expect(explainCategory(tx({ id: "t", categoryId: "hushall", categorySource: "manual" }), rules).ruleId).toBeNull();
+  });
+
+  it("utan kategori, eller när kategorin inte längre är den regeln ger, pekas ingen regel ut", () => {
+    expect(explainCategory(tx({ id: "t", counterpartyNorm: "SL" }), rules)).toEqual({ source: "none", ruleId: null, alsoMatched: [] });
+    // Kategorin kom från en regel som har tagits bort eller ändrats.
+    expect(explainCategory(tx({ id: "t", categoryId: "fritid", categorySource: "learned" }), rules)).toEqual({ source: "learned", ruleId: null, alsoMatched: ["maxi", "ica", "mall"] });
   });
 });

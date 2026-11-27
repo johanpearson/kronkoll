@@ -104,6 +104,27 @@ export function categorize(tx: CategorizableTransaction, rules: readonly Categor
   return rule ? { categoryId: rule.categoryId, source: rule.source, ruleId: rule.id } : null;
 }
 
+export interface CategoryExplanation {
+  /** Varifrån kategorin kommer: manuellt, en egen regel, en mallregel eller ingenstans. */
+  readonly source: CategorySource;
+  /** Regeln som ger kategorin, eller null om den är manuell, saknas eller inte längre är den regeln ger. */
+  readonly ruleId: string | null;
+  /** Andra regler som också träffar, i den ordning de skulle vinna. */
+  readonly alsoMatched: readonly string[];
+}
+
+/**
+ * Varför fick den här kategorin? (KK-58-D). Pekar bara ut en regel när den vinner nu och ger samma kategori som
+ * transaktionen har, så att svaret aldrig skyller på fel regel efter att en regel ändrats eller tagits bort.
+ */
+export function explainCategory(tx: CategorizableTransaction, rules: readonly CategoryRule[]): CategoryExplanation {
+  const text = matchText(tx);
+  const hits = rules.filter((r) => matches(r, text)).sort(byPriority);
+  const winner = hits[0];
+  const ruleId = tx.categorySource !== "manual" && winner?.categoryId === tx.categoryId ? winner.id : null;
+  return { source: tx.categorySource, ruleId, alsoMatched: hits.filter((r) => r.id !== ruleId).map((r) => r.id) };
+}
+
 /** Bara villkoret i en regel: vad den träffar, inte vad den gör. */
 export type RuleCondition = Pick<CategoryRule, "id" | "match" | "pattern">;
 

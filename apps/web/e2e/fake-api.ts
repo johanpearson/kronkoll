@@ -117,6 +117,8 @@ export async function useFakeApi(
     id: "lon1", account: { id: "acc_1", name: "Vardag", type: "checking" }, status: "booked", transaction_date: "2026-11-25", booking_date: "2026-11-25",
     amount_minor: 3361000, counterparty: "", counterparty_norm: "EXEMPELFÖRETAGET AB", description: "EXEMPELFÖRETAGET AB LÖN", category_id: null, category_source: "none",
     is_internal_transfer: false, manual_transfer: null, income_type: "other", income_source: "template", transfer_pair: null, splits: [],
+    // Varför fick den här kategorin? (KK-58-D). Ingen kategori, och ingen regel träffar.
+    category_reason: { source: "none", rule: null, also_matched: [] },
   };
   /** Ett påhittat bolån vars bindningstid slutar om 41 dagar (KK-36-C). */
   const loans: Record<string, unknown>[] = [{
