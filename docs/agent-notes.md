@@ -9,6 +9,8 @@ lätt att trampa fel på. Håll den kort och uppdatera den när något nytt lär
 - En liten PR i taget. Vänta på "den är mergad" innan nästa PR i samma kedja påbörjas. Ägaren mergar själv.
 - Titeln får vara högst 72 tecken **inklusive** kravid, t.ex. `… (KK-20)`. Räkna efter att kravid är tillagt.
 - Följ upp kravstatus i issue #43 när ett krav blir helt uppfyllt.
+- `pr-size` räknar både tillagda och borttagna rader. Att ta bort en funktion med tester blir därför snabbt
+  över 400. Dela upp efter lager (UI → API → adapter och migrering → domän), som för #243.
 - När ägaren säger "nästa issue" eller `/nasta-issue`: följ skillen `.claude/skills/nasta-issue/SKILL.md`. Den väljer
   nästa arbetspaket ur etappens checklista (i dag #241) och gör en PR i taget.
 - Nya önskemål som saknas i kraven läggs först in i `plans/kronkoll/requirements.json` (nästa lediga KK-nummer),
