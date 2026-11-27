@@ -15,7 +15,6 @@ import { deleteLoan, listLoans, putLoan } from "./loans.ts";
 import { getIncome, getIncomeMonth } from "./income.ts";
 import { getGuidelines, putGuidelines } from "./guidelines.ts";
 import { getInsights } from "./insights.ts";
-import { createLeavePeriod, deleteLeavePeriod, listLeavePeriods } from "./leave.ts";
 import { getOverview } from "./overview.ts";
 import { webPushFrom, type PushEnv } from "./notify.ts";
 import { getPushConfig, subscribe, unsubscribe } from "./push.ts";
@@ -193,18 +192,6 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/loans") {
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
     return listLoans(env, context.sync);
-  }
-
-
-  const leaveMatch = /^\/api\/leave-periods\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
-  if (leaveMatch?.[1]) {
-    if (request.method !== "DELETE") return json({ error: "method_not_allowed" }, 405, { allow: "DELETE" });
-    return deleteLeavePeriod(env, leaveMatch[1]);
-  }
-  if (pathname === "/api/leave-periods") {
-    if (request.method === "GET") return listLeavePeriods(env, context.sync);
-    if (request.method === "POST") return createLeavePeriod(request, env, context.sync);
-    return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
   }
 
   const budgetMatch = /^\/api\/budgets\/([A-Za-z0-9-]{1,16})$/u.exec(pathname);
