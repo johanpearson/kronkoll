@@ -11,6 +11,10 @@ lätt att trampa fel på. Håll den kort och uppdatera den när något nytt lär
 - Följ upp kravstatus i issue #43 när ett krav blir helt uppfyllt.
 - `pr-size` räknar både tillagda och borttagna rader. Att ta bort en funktion med tester blir därför snabbt
   över 400. Dela upp efter lager (UI → API → adapter och migrering → domän), som för #243.
+- PR-stackar (ägarens val 2026-11-27): varje PR grenas från den förra och har den som bas, med auto-merge
+  (squash) när basen blivit `main`. Efter en squash-merge ger `git merge origin/main` add/add-konflikter i
+  filerna som den mergade PR:en lade till. Kontrollera att `main` har samma innehåll som den mergade grenen
+  (`git diff origin/<gren> origin/main`), ta sedan grenens version (`git checkout --ours`) och för vidare uppåt.
 - När ägaren säger "nästa issue" eller `/nasta-issue`: följ skillen `.claude/skills/nasta-issue/SKILL.md`. Den väljer
   nästa arbetspaket ur etappens checklista (i dag #241) och gör en PR i taget.
 - Nya önskemål som saknas i kraven läggs först in i `plans/kronkoll/requirements.json` (nästa lediga KK-nummer),
@@ -97,6 +101,22 @@ pnpm --filter @kronkoll/<paket> test:coverage
   svarar även i offline-läge, så testet tar bort dem (`unrouteAll`) innan det går offline.
 - Manifestet länkas med `crossorigin="use-credentials"`, annars hämtas det utan Access-cookie och stoppas.
 - Ikonerna ritas från `public/icons/icon.svg` med `node scripts/icons.ts` i `apps/web`.
+
+## Designsystemet (M5, #244)
+
+- Nya komponenter finns i `apps/web/src/ui/` och stilen i `styles/ui.css`. Klasserna börjar med `ui-` och
+  påverkar inte de gamla vyerna. Färger och mått kommer bara från `tokens.css`, och nya färgpar läggs till i
+  `contrast.test.ts`.
+- `/_design` visar alla tokens och komponenter. Sidan finns bara i utvecklingsläget (`import.meta.env.DEV` i
+  `App.tsx`), och ett E2E-test kontrollerar att den saknas i produktionsbygget. Därför kör E2E inte axe på den.
+  Kör axe mot dev-servern med en tillfällig spec utanför git när komponenterna ändras.
+- De gamla vyernas regler för `main h2`, `main ul` och `button` slår igenom på nya element. Nollställ det som
+  behövs i `ui-`-klassen (se `.ui-heading` och `main ul.ui-list`).
+- jsdom saknar `HTMLDialogElement.showModal`, `IntersectionObserver`, `matchMedia` och `Element.animate`.
+  Testerna stubbar dem själva, och komponenterna fungerar utan dem.
+- `formatSek` använder hårda mellanslag. Jämför text med `.replace(/\s/gu, " ")` eller ett regex med `\s`.
+- Diagram ritas i sitt slutläge, och animationen från noll körs ovanpå med Web Animations API. Inline-stilar
+  i SVG behövs därför inte, och CSP:n stoppar ingenting.
 
 ## Cloudflare och D1: gränser som har orsakat riktiga fel
 
