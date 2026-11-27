@@ -17,9 +17,11 @@ export {
   type TransactionStatus,
 } from "./reconcile.ts";
 export {
+  accountRole,
   classifyTransfers,
   excludeRuleHits,
   TRANSFER_WINDOW_DAYS,
+  type AccountRole,
   type ClassifyTransfersInput,
   type ExcludeRule,
   type OwnAccount,
