@@ -1,7 +1,7 @@
 // Interna överföringar (KK-20-C). Omräkningen används både efter varje synk och när användaren
 // markerar en transaktion själv, så att en motpost alltid följer med åt rätt håll.
 import { ruleRepository, transactionRepository } from "@kronkoll/adapter-d1";
-import { classifyTransfers } from "@kronkoll/domain";
+import { classifyTransfers, savingKindOf } from "@kronkoll/domain";
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
@@ -9,7 +9,8 @@ function json(body: unknown, status: number): Response {
 
 /**
  * Räknar om vilka transaktioner som är interna överföringar och skriver bara det som ändras.
- * Användarens eget val vinner alltid, och regler med åtgärden Räkna inte (KK-39-C) tas med. Hela
+ * Användarens eget val vinner alltid, och regler med åtgärden Räkna inte (KK-39-C) tas med. Hur
+ * transaktionen rör en buffert (KK-55) sparas samtidigt. Hela
  * historiken räknas om, eftersom en ny transaktion kan ge en
  * gammal sin motpost. Ingen lista med kortfaktura-mottagare än: korten hör till vanliga konton.
  * Returnerar hur många som ändrades.
@@ -19,8 +20,11 @@ export async function recomputeTransfers(db: D1Database): Promise<number> {
   const current = await store.forTransfers();
   const now = new Map(current.map((t) => [t.id, t]));
   const changes = classifyTransfers({ transactions: current, accounts: await store.ownAccounts(), cardPaymentCounterparties: [], excludeRules: await ruleRepository(db).excludeRules() })
-    .filter((c) => now.get(c.id)?.internal !== c.internal || now.get(c.id)?.pairId !== c.pairId)
-    .map((c) => ({ id: c.id, internal: c.internal, pairId: c.pairId }));
+    .map((c) => ({ id: c.id, internal: c.internal, pairId: c.pairId, savingKind: savingKindOf(c.reason) }))
+    .filter((c) => {
+      const before = now.get(c.id);
+      return before?.internal !== c.internal || before.pairId !== c.pairId || before.savingKind !== c.savingKind;
+    });
   await store.setTransfers(changes);
   return changes.length;
 }
