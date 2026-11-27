@@ -155,6 +155,13 @@
       "when": 1795787561113,
       "tag": "0021_accounts_role",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1795788113097,
+      "tag": "0022_transactions_saving_kind",
+      "breakpoints": true
     }
   ]
 }

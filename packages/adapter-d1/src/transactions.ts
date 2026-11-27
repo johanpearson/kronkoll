@@ -17,6 +17,7 @@ import {
   type ReconcileResult,
   type StoredTransaction,
   type OwnAccount,
+  type SavingKind,
   type TransferInput,
 } from "@kronkoll/domain";
 import { and, desc, eq, gte, inArray, isNull, lt, max, ne, or, sql } from "drizzle-orm";
@@ -59,6 +60,8 @@ export interface TransactionListItem {
   readonly categoryId: string | null;
   readonly categorySource: Row["categorySource"];
   readonly isInternalTransfer: boolean;
+  /** Hur transaktionen rör en buffert (KK-55), t.ex. uttag från sparande. Null annars. */
+  readonly savingKind: SavingKind | null;
   /** Användarens eget val (KK-20-C, KK-39): true = räknas inte, false = räknas, null = automatiskt. */
   readonly manualTransfer: boolean | null;
   /** Transaktionen är uppdelad på flera kategorier (KK-19). */
@@ -84,6 +87,8 @@ export interface TransactionDetail {
   readonly categoryId: string | null;
   readonly categorySource: Row["categorySource"];
   readonly isInternalTransfer: boolean;
+  /** Hur transaktionen rör en buffert (KK-55). Null annars. */
+  readonly savingKind: SavingKind | null;
   readonly manualTransfer: boolean | null;
   /** Inkomsttyp för en inbetalning (KK-22), null om den inte är klassad. */
   readonly incomeType: "salary" | "parental_benefit" | "other" | null;
@@ -230,6 +235,7 @@ export function transactionRepository(d1: D1Database) {
           categoryId: transactions.categoryId,
           categorySource: transactions.categorySource,
           isInternalTransfer: transactions.isInternalTransfer,
+          savingKind: transactions.savingKind,
           manualTransfer: transactions.manualTransfer,
           hidden: transactions.hidden,
           // Tabellnamnet behövs: utan det betyder "id" uppdelningens id inne i underfrågan.
@@ -329,7 +335,7 @@ export function transactionRepository(d1: D1Database) {
      * Transaktioner i domänens form för att hitta interna överföringar (KK-20-C), med hur de är
      * markerade nu. Manuell markering finns inte i databasen än och är därför alltid null.
      */
-    async forTransfers(): Promise<(TransferInput & { internal: boolean; pairId: string | null })[]> {
+    async forTransfers(): Promise<(TransferInput & { internal: boolean; pairId: string | null; savingKind: SavingKind | null; categorySource: Row["categorySource"] })[]> {
       const rows = await db
         .select({
           id: transactions.id,
@@ -341,6 +347,8 @@ export function transactionRepository(d1: D1Database) {
           status: transactions.status,
           internal: transactions.isInternalTransfer,
           pairId: transactions.transferPairId,
+          savingKind: transactions.savingKind,
+          categorySource: transactions.categorySource,
           manualTransfer: transactions.manualTransfer,
           hidden: transactions.hidden,
         })
@@ -403,6 +411,7 @@ export function transactionRepository(d1: D1Database) {
           categoryId: transactions.categoryId,
           categorySource: transactions.categorySource,
           isInternalTransfer: transactions.isInternalTransfer,
+          savingKind: transactions.savingKind,
           manualTransfer: transactions.manualTransfer,
           incomeType: transactions.incomeType,
           incomeSource: transactions.incomeSource,
@@ -437,6 +446,7 @@ export function transactionRepository(d1: D1Database) {
         categoryId: row.categoryId,
         categorySource: row.categorySource,
         isInternalTransfer: row.isInternalTransfer,
+        savingKind: row.savingKind,
         manualTransfer: row.manualTransfer,
         incomeType: row.incomeType,
         incomeSource: row.incomeSource,
@@ -452,9 +462,12 @@ export function transactionRepository(d1: D1Database) {
     },
 
     /** Sparar vilka som är interna överföringar och deras motpost, i en batch. */
-    async setTransfers(changes: readonly { id: string; internal: boolean; pairId: string | null }[]): Promise<void> {
+    async setTransfers(changes: readonly { id: string; internal: boolean; pairId: string | null; savingKind: SavingKind | null }[]): Promise<void> {
       const statements = changes.map((change) =>
-        db.update(transactions).set({ isInternalTransfer: change.internal, transferPairId: change.pairId }).where(eq(transactions.id, change.id)),
+        db
+          .update(transactions)
+          .set({ isInternalTransfer: change.internal, transferPairId: change.pairId, savingKind: change.savingKind })
+          .where(eq(transactions.id, change.id)),
       );
       const [first, ...rest] = statements;
       if (first) await db.batch([first, ...rest]);
