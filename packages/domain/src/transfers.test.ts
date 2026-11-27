@@ -287,7 +287,7 @@ describe("egenskaper", () => {
 describe("konton som inte räknas med (KK-41)", () => {
   const WITH_PRIVATE_SAVINGS: OwnAccount[] = [
     { id: "gemensamt", type: "checking" },
-    { id: "sparande", type: "savings", counted: false },
+    { id: "sparande", type: "savings", role: "excluded" },
   ];
   const run = (transactions: TransferInput[], accounts = WITH_PRIVATE_SAVINGS) =>
     Object.fromEntries(classifyTransfers({ transactions, accounts, cardPaymentCounterparties: [], excludeRules: [] }).map((c) => [c.id, c]));
@@ -314,7 +314,7 @@ describe("konton som inte räknas med (KK-41)", () => {
     expect(result.kop).toEqual({ id: "kop", internal: true, pairId: null, reason: "account" });
   });
 
-  it("ett konto utan counted räknas med, som innan KK-41", () => {
+  it("ett konto utan roll räknas med, som Inkomst/Utgift", () => {
     const result = run([tx({ id: "ut", accountId: "gemensamt", amountMinor: -200000 })]);
     expect(result.ut?.internal).toBe(false);
   });
@@ -367,7 +367,7 @@ describe("dolda transaktioner (KK-49)", () => {
     const rules: ExcludeRule[] = [{ id: "r", match: "counterparty_prefix", pattern: "IKEA" }];
     const result = classifyTransfers({
       transactions: [tx({ id: "ikea", counterpartyNorm: "IKEA", hidden: true }), tx({ id: "privat-spar", accountId: "spar", hidden: true })],
-      accounts: [...ACCOUNTS.filter((a) => a.id !== "spar"), { id: "spar", type: "savings", counted: false }],
+      accounts: [...ACCOUNTS.filter((a) => a.id !== "spar"), { id: "spar", type: "savings", role: "excluded" }],
       cardPaymentCounterparties: [],
       excludeRules: rules,
     });
@@ -382,7 +382,7 @@ describe("dolda transaktioner (KK-49)", () => {
 describe("sparkonton (KK-52)", () => {
   const ACCOUNTS_WITH_BUFFER: OwnAccount[] = [
     { id: "gemensamt", type: "checking" },
-    { id: "buffert", type: "checking", saving: true },
+    { id: "buffert", type: "checking", role: "buffer" },
     { id: "kort", type: "credit_card" },
   ];
   const run = (transactions: TransferInput[]) =>
@@ -407,7 +407,7 @@ describe("sparkonton (KK-52)", () => {
   });
 
   it("mellan två sparkonton är det en vanlig intern överföring", () => {
-    const accounts: OwnAccount[] = [{ id: "a", type: "savings", saving: true }, { id: "b", type: "savings", saving: true }];
+    const accounts: OwnAccount[] = [{ id: "a", type: "savings", role: "buffer" }, { id: "b", type: "savings", role: "buffer" }];
     const result = Object.fromEntries(
       classifyTransfers({ transactions: [tx({ id: "ut", accountId: "a", amountMinor: -1000 }), tx({ id: "in", accountId: "b", amountMinor: 1000 })], accounts, cardPaymentCounterparties: [], excludeRules: [] }).map((c) => [c.id, c]),
     );
@@ -557,12 +557,9 @@ describe("kontoroller (KK-53, KK-55, V-u-roles)", () => {
     expect(result.in2).toMatchObject(external);
   });
 
-  it("KK-53-B: rollen följer de gamla brytarna när den saknas, och en roll vinner över dem", () => {
+  it("KK-53: ett konto utan roll är Inkomst/Utgift, annars gäller rollen", () => {
     expect(accountRole({ id: "a", type: "checking" })).toBe("spending");
-    expect(accountRole({ id: "a", type: "checking", saving: true })).toBe("buffer");
-    expect(accountRole({ id: "a", type: "checking", counted: false })).toBe("excluded");
-    expect(accountRole({ id: "a", type: "checking", counted: false, saving: true })).toBe("excluded");
-    expect(accountRole({ id: "a", type: "checking", counted: false, role: "buffer" })).toBe("buffer");
-    expect(accountRole({ id: "a", type: "checking", saving: true, role: "spending" })).toBe("spending");
+    expect(accountRole({ id: "a", type: "checking", role: "buffer" })).toBe("buffer");
+    expect(accountRole({ id: "a", type: "checking", role: "excluded" })).toBe("excluded");
   });
 });

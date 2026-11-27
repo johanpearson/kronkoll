@@ -6,9 +6,6 @@ import { recomputeTransfers } from "./transfers.ts";
 
 const ROLES: readonly string[] = ["spending", "buffer", "excluded"] satisfies AccountRole[];
 
-/** Rollen (KK-53) och de gamla valen Räknas med och Sparkonto, som Inställningar läser tills rollvalet finns. */
-const roleFields = (role: AccountRole) => ({ role, counted: role !== "excluded", saving: role === "buffer" });
-
 export const MAX_NICKNAME_LENGTH = 40;
 
 function json(body: unknown, status: number): Response {
@@ -19,7 +16,7 @@ export async function listAccounts(env: { DB: D1Database }): Promise<Response> {
   try {
     const rows = await accountNameRepository(env.DB).list();
     return json(
-      { items: rows.map((a) => ({ id: a.id, name: a.nickname ?? a.bankName, nickname: a.nickname, bank_name: a.bankName, bank: a.bank, type: a.type, ...roleFields(a.role) })) },
+      { items: rows.map((a) => ({ id: a.id, name: a.nickname ?? a.bankName, nickname: a.nickname, bank_name: a.bankName, bank: a.bank, type: a.type, role: a.role })) },
       200,
     );
   } catch {
@@ -30,12 +27,8 @@ export async function listAccounts(env: { DB: D1Database }): Promise<Response> {
 interface AccountChange {
   /** Det nya namnet: trimmat, null för tomt. Utelämnat betyder att namnet inte ändras. */
   readonly nickname?: string | null;
-  /** Kontots roll (KK-53). Utelämnat betyder att rollen inte ändras. Kan inte kombineras med de gamla valen. */
+  /** Kontots roll (KK-53). Utelämnat betyder att rollen inte ändras. */
   readonly role?: AccountRole;
-  /** Gammalt val: om kontot räknas med (KK-41-A). Översätts till en roll. Utelämnat betyder att valet inte ändras. */
-  readonly counted?: boolean;
-  /** Gammalt val: om kontot är ett sparkonto (KK-52). Översätts till en roll. Utelämnat betyder att valet inte ändras. */
-  readonly saving?: boolean;
 }
 
 /** Namnet ur en begäran: trimmat, null för tomt. Undefined om det är fel form, för långt eller har styrtecken. */
@@ -53,30 +46,12 @@ async function readChange(request: Request): Promise<AccountChange | undefined> 
   const body: unknown = await request.json().catch(() => null);
   if (typeof body !== "object" || body === null) return undefined;
   const hasNickname = "nickname" in body;
-  const hasCounted = "counted" in body;
-  const hasSaving = "saving" in body;
   const hasRole = "role" in body;
-  if (!hasNickname && !hasCounted && !hasSaving && !hasRole) return undefined;
-  if (hasRole && (hasCounted || hasSaving || typeof body.role !== "string" || !ROLES.includes(body.role))) return undefined;
-  if (hasSaving && typeof body.saving !== "boolean") return undefined;
+  if (!hasNickname && !hasRole) return undefined;
+  if (hasRole && (typeof body.role !== "string" || !ROLES.includes(body.role))) return undefined;
   const nickname = hasNickname ? parseNickname(body.nickname) : undefined;
   if (hasNickname && nickname === undefined) return undefined;
-  if (hasCounted && typeof body.counted !== "boolean") return undefined;
-  return { ...(hasNickname ? { nickname: nickname ?? null } : {}), ...(hasRole ? { role: body.role as AccountRole } : {}), ...(hasCounted ? { counted: body.counted as boolean } : {}), ...(hasSaving ? { saving: body.saving as boolean } : {}) };
-}
-
-/**
- * De gamla brytarna översatta till en roll, för Inställningar tills rollvalet finns (KK-53). Räknas inte med blir
- * Uteslutet och Sparkonto blir Buffert. Att slå på Räknas med eller slå av Sparkonto ger Inkomst/Utgift, men bara
- * från den roll som brytaren stängde av.
- */
-function legacyRole(current: AccountRole, change: AccountChange): AccountRole {
-  let role = current;
-  if (change.counted === false) role = "excluded";
-  if (change.counted === true && role === "excluded") role = "spending";
-  if (change.saving === true) role = "buffer";
-  if (change.saving === false && role === "buffer") role = "spending";
-  return role;
+  return { ...(hasNickname ? { nickname: nickname ?? null } : {}), ...(hasRole ? { role: body.role as AccountRole } : {}) };
 }
 
 export async function patchAccount(request: Request, env: { DB: D1Database }, id: string): Promise<Response> {
@@ -85,16 +60,15 @@ export async function patchAccount(request: Request, env: { DB: D1Database }, id
   try {
     const names = accountNameRepository(env.DB);
     if (change.nickname !== undefined && !(await names.set(id, change.nickname))) return json({ error: "not_found" }, 404);
-    if (change.role !== undefined || change.counted !== undefined || change.saving !== undefined) {
-      const current = (await names.list()).find((a) => a.id === id)?.role;
-      if (current === undefined) return json({ error: "not_found" }, 404);
-      await names.setRole(id, change.role ?? legacyRole(current, change));
+    if (change.role !== undefined) {
+      if (!(await names.list()).some((a) => a.id === id)) return json({ error: "not_found" }, 404);
+      await names.setRole(id, change.role);
       // Vad som är en intern överföring beror på kontonas roller, så hela historiken räknas om (KK-53-A).
       await recomputeTransfers(env.DB);
     }
     const account = (await names.list()).find((a) => a.id === id);
     if (account === undefined) return json({ error: "not_found" }, 404);
-    return json({ id, name: account.nickname ?? account.bankName, nickname: account.nickname, ...roleFields(account.role) }, 200);
+    return json({ id, name: account.nickname ?? account.bankName, nickname: account.nickname, role: account.role }, 200);
   } catch {
     return json({ error: "unavailable" }, 503);
   }
