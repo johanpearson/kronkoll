@@ -44,8 +44,8 @@ async function at(path: string) {
 }
 
 describe("Koppla bank (#26, F-koppla)", () => {
-  it("Inställningar leder till Koppla bank", async () => {
-    await at("/installningar");
+  it("Bank under Inställningar leder till Koppla bank", async () => {
+    await at("/installningar/bank");
     fireEvent.click(screen.getByRole("link", { name: "Koppla bank" }));
     expect(window.location.pathname).toBe("/koppla");
     expect(screen.getByRole("heading", { level: 1, name: "Koppla bank" })).toBeDefined();

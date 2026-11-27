@@ -48,8 +48,8 @@ describe("navigering (#30, KK-25)", () => {
     expect(within(nav()).getByRole("link", { name: "Översikt" }).getAttribute("aria-current")).toBe("page");
   });
 
-  it("Inställningar leder till Koppla bank", () => {
-    at("/installningar");
+  it("Bank under Inställningar leder till Koppla bank", () => {
+    at("/installningar/bank");
     fireEvent.click(screen.getByRole("link", { name: "Koppla bank" }));
     expect(window.location.pathname).toBe("/koppla");
   });

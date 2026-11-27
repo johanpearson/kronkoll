@@ -19,9 +19,11 @@ function parentOf(path: string): string | null {
   if (path === "/") return null;
   const tab = tabOf(path);
   if (tab !== "/") return path === tab ? "/" : tab;
+  // En bankkoppling hör till Bank under Inställningar (#259).
+  if (under(path, "/installningar/koppling")) return "/installningar/bank";
   if (under(path, "/installningar")) return path === "/installningar" ? "/" : "/installningar";
-  // Bankkopplingen startar från Inställningar. Klar-sidan leder inte tillbaka in i flödet.
-  if (path === "/koppla" || path === "/koppla/klar") return "/installningar";
+  // Bankkopplingen startar från Bank. Klar-sidan leder inte tillbaka in i flödet.
+  if (path === "/koppla" || path === "/koppla/klar") return "/installningar/bank";
   if (under(path, "/koppla")) return "/koppla";
   return "/";
 }

@@ -67,13 +67,20 @@ describe("inkomsttyp på transaktionens sida (#40, KK-22-A)", () => {
     expect(fact("Inkomsttyp")).toBe("Lön (vald av dig)");
   });
 
-  it("säger till när det inte går att spara, och valet går tillbaka", async () => {
-    api(tx({}), [503, { error: "unavailable" }]);
+  it("visar felet vid valet med Försök igen, och valet går tillbaka (KK-64-D)", async () => {
+    const patches = api(tx({}), [503, { error: "unavailable" }]);
     await open();
     fireEvent.click(screen.getByLabelText("Föräldrapenning"));
     await settle();
-    expect(screen.getByRole("alert").textContent).toBe("Det gick inte att spara inkomsttypen. Försök igen.");
+    const alert = screen.getByRole("alert");
+    expect(alert.closest("fieldset")?.querySelector("legend")?.textContent).toBe("Inkomsttyp");
+    expect(alert.querySelector("span")?.textContent).toBe("Det gick inte att spara inkomsttypen.");
     expect(screen.getByLabelText<HTMLInputElement>("Övrigt").checked).toBe(true);
+    // Ingen notis: felet hör till valet (KK-64-D).
+    expect(document.querySelector(".ui-toasts")?.children).toHaveLength(0);
+    fireEvent.click(screen.getByRole("button", { name: "Försök igen" }));
+    await settle();
+    expect(patches).toEqual([{ income_type: "parental_benefit" }, { income_type: "parental_benefit" }]);
   });
 
   it("visas inte för utbetalningar eller interna överföringar", async () => {

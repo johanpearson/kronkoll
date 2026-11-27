@@ -799,6 +799,19 @@ a.ui-row:active {
 
 .ui-sync-failed {
   color: var(--warning);
+
+/* Ett fel där det uppstod, med Försök igen bredvid (KK-64-D). */
+.inline-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+/* Flikarnas huvudvyer tar emot svep i sidled och låter webbläsaren sköta scrollningen (KK-63). */
+.ui-view-swipe {
+  touch-action: pan-y;
 }
 
 /* Flikarnas huvudvyer tar emot svep i sidled och låter webbläsaren sköta scrollningen (KK-63). */

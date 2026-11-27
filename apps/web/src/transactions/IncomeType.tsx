@@ -26,16 +26,19 @@ export function IncomeTypePicker(props: { transactionId: string; value: IncomeTy
   const [busy, setBusy] = useState(false);
   // Valet syns direkt och går tillbaka om det inte går att spara.
   const [selected, setSelected] = useState<IncomeType | null>(props.value);
+  // Ett fel visas vid valet och ligger kvar med Försök igen (KK-64-D).
+  const [failed, setFailed] = useState<IncomeType | null>(null);
 
   const choose = async (type: IncomeType) => {
     const before = selected;
     setSelected(type);
+    setFailed(null);
     setBusy(true);
     const { status, body } = await patchJson(`/api/transactions/${encodeURIComponent(props.transactionId)}`, { income_type: type });
     setBusy(false);
     if (status !== 200) {
       setSelected(before);
-      toast.problem("Det gick inte att spara inkomsttypen. Försök igen.");
+      setFailed(type);
       return;
     }
     const updated = field(body, "updated");
@@ -54,6 +57,14 @@ export function IncomeTypePicker(props: { transactionId: string; value: IncomeTy
         </label>
       ))}
       <small>Valet gäller även tidigare och kommande inbetalningar från samma avsändare.</small>
+      {failed !== null && (
+        <p role="alert" className="inline-error">
+          <span>Det gick inte att spara inkomsttypen.</span>
+          <button type="button" className="small" onClick={() => void choose(failed)}>
+            Försök igen
+          </button>
+        </p>
+      )}
     </fieldset>
   );
 }
