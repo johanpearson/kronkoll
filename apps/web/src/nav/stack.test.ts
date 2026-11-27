@@ -1,7 +1,7 @@
 // Historiken som i en app (KK-62): vilka steg bakåt som finns för en adress, och hur webbläsarens
 // historik ska ändras när man byter vy. Ren logik utan DOM, så att reglerna testas var för sig.
 import { describe, expect, it } from "vitest";
-import { canonicalStack, plan, tabOf } from "./stack.ts";
+import { canonicalStack, plan, tabOf, tabOfStack, tabTarget } from "./stack.ts";
 
 describe("tabOf", () => {
   it.each([
@@ -73,5 +73,35 @@ describe("plan: hur historiken ändras", () => {
     // Om historiken av någon anledning börjar på en annan sida än Översikt.
     expect(plan(["/budget"], ["/"])).toEqual({ back: 0, push: [], replace: "/" });
     expect(plan(["/budget"], ["/", "/lan"])).toEqual({ back: 0, push: ["/lan"], replace: "/" });
+  });
+});
+
+describe("tabTarget: vart ett tryck på en flik leder (KK-62-F)", () => {
+  it("en flik som inte besökts öppnas på sin startsida", () => {
+    expect(tabTarget(new Map(), ["/"], "/budget")).toEqual(["/", "/budget"]);
+  });
+
+  it("en flik som besökts öppnas på sin senaste undervy", () => {
+    const memory = new Map([["/transaktioner", ["/", "/transaktioner", "/transaktioner/t-1"]]]);
+    expect(tabTarget(memory, ["/", "/budget"], "/transaktioner")).toEqual(["/", "/transaktioner", "/transaktioner/t-1"]);
+  });
+
+  it("ett tryck på fliken man står på går till flikens startsida", () => {
+    const memory = new Map([["/transaktioner", ["/", "/transaktioner", "/transaktioner/t-1"]]]);
+    expect(tabTarget(memory, ["/", "/transaktioner", "/transaktioner/t-1"], "/transaktioner")).toEqual(["/", "/transaktioner"]);
+    expect(tabTarget(new Map(), ["/", "/installningar"], "/")).toEqual(["/"]);
+  });
+
+  it("en undervy under en annan flik hör till fliken den öppnades från", () => {
+    const fromIncome = ["/", "/inkomst", "/transaktioner/t-1"];
+    expect(tabOfStack(fromIncome)).toBe("/inkomst");
+    expect(tabTarget(new Map([["/inkomst", fromIncome]]), ["/", "/budget"], "/inkomst")).toEqual(fromIncome);
+    expect(tabTarget(new Map(), fromIncome, "/inkomst")).toEqual(["/", "/inkomst"]);
+    expect(tabOfStack(["/"])).toBe("/");
+  });
+
+  it("ett sparat steg som inte hör till fliken används inte", () => {
+    const memory = new Map([["/budget", ["/", "/lan"]]]);
+    expect(tabTarget(memory, ["/"], "/budget")).toEqual(["/", "/budget"]);
   });
 });

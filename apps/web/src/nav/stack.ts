@@ -49,3 +49,19 @@ export function plan(current: readonly string[], next: readonly string[]): Plan 
   const [first = "/", ...rest] = next;
   return { back: current.length - 1, push: rest, replace: first };
 }
+
+/** Fliken som en kedja hör till: fliken för steget ovanpå Översikt, även om sista vyn ligger under en annan flik. */
+export function tabOfStack(stack: readonly string[]): Tab {
+  const second = stack[1];
+  return second === undefined ? "/" : tabOf(second.split("?")[0] ?? second);
+}
+
+/**
+ * Stegen när man trycker på en flik i menyn (KK-62-F): fliken öppnas där man senast var i den, och ett
+ * tryck på fliken man redan står på går till flikens startsida, som i en app.
+ */
+export function tabTarget(memory: ReadonlyMap<string, readonly string[]>, current: readonly string[], tab: Tab): string[] {
+  const remembered = memory.get(tab);
+  if (tabOfStack(current) === tab || remembered === undefined || tabOfStack(remembered) !== tab) return canonicalStack(tab);
+  return [...remembered];
+}
