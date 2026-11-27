@@ -446,9 +446,9 @@ export function transactionRepository(d1: D1Database) {
 
     /** De egna kontona med typ, för att para ihop överföringar. Kräver inga nycklar. */
     async ownAccounts(): Promise<OwnAccount[]> {
-      const rows = await db.select({ id: accounts.id, type: accounts.type, counted: accounts.included }).from(accounts).all();
+      const rows = await db.select({ id: accounts.id, type: accounts.type, counted: accounts.included, saving: accounts.saving }).from(accounts).all();
       // Ett lånekonto paras som ett sparkonto: en amortering flyttar pengar mellan egna konton.
-      return rows.map((row) => ({ id: row.id, type: row.type === "loan" ? "savings" : row.type, counted: row.counted }));
+      return rows.map((row) => ({ id: row.id, type: row.type === "loan" ? "savings" : row.type, counted: row.counted, saving: row.saving }));
     },
 
     /** Sparar vilka som är interna överföringar och deras motpost, i en batch. */

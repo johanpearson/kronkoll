@@ -8,15 +8,16 @@
  * 2. Par: motsatta belopp på två olika egna konton inom ±3 dagar. Varje transaktion ingår i högst
  *    ett par, och närmast i datum vinner. Eftersom Visa-kortet är ett eget konto fångar detta även
  *    betalningen av kortfakturan.
+ *    Mellan ett sparkonto (KK-52) och ett annat konto räknas raden på det andra kontot: dit är det sparande,
+ *    därifrån en inkomst. Sparkontots egen rad räknas inte.
  * 3. Kortfaktura utan motpost: ett uttag från ett eget konto som inte är ett kortkonto, till en
  *    känd kortmottagare (t.ex. "skandia visa"). Listan är konfigurerbar (antagande A-6).
  * 4. Regler med åtgärden Räkna inte (KK-39-C): det användaren vill hålla utanför budget och översikt,
  *    t.ex. utlägg som betalas tillbaka. De är inte överföringar, men räknas inte på samma sätt.
  *
- * 5. Konton som inte räknas med (KK-41): deras transaktioner räknas inte, och syns inte i listan. En
- *    överföring dit är en vanlig utgift på det andra kontot. En insättning på ett konto som räknas med som
- *    motsvarar en dragning från ett konto som inte räknas med räknas inte som inkomst, eftersom det bara
- *    är egna pengar som flyttas (parets motpost hittas som vanligt, i båda riktningarna).
+ * 5. Konton som inte räknas med (KK-41): deras transaktioner räknas inte och syns inte i listan, och de
+ *    ingår aldrig i ett par. En överföring dit är därför en vanlig utgift på det andra kontot, och en
+ *    överföring därifrån en vanlig inkomst.
  *
  * En insättning på kortkontot utan motpost räknas inte som intern: det kan vara en återbetalning.
  */
@@ -31,6 +32,8 @@ export interface OwnAccount {
   readonly type: "checking" | "savings" | "credit_card" | "manual";
   /** Kontot räknas med (KK-41-A). Utelämnat betyder att det räknas med. */
   readonly counted?: boolean;
+  /** Ett sparkonto, t.ex. en buffert (KK-52). Utelämnat betyder att det inte är det. */
+  readonly saving?: boolean;
 }
 
 export interface TransferInput {
@@ -56,7 +59,7 @@ export interface TransferClassification {
   readonly internal: boolean;
   /** Den andra halvan av en överföring, om den finns. */
   readonly pairId: string | null;
-  readonly reason: "hidden" | "manual" | "pair" | "card_payment" | "rule" | "account" | "none";
+  readonly reason: "hidden" | "manual" | "pair" | "saving" | "card_payment" | "rule" | "account" | "none";
 }
 
 export interface ClassifyTransfersInput {
@@ -78,6 +81,7 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
   }
   const accountType = new Map(input.accounts.map((a) => [a.id, a.type]));
   const uncounted = new Set(input.accounts.filter((a) => a.counted === false).map((a) => a.id));
+  const savingAccounts = new Set(input.accounts.filter((a) => a.saving === true).map((a) => a.id));
   const cardPayees = new Set(input.cardPaymentCounterparties);
   const result = new Map<string, TransferClassification>();
 
@@ -92,7 +96,7 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
 
   // 2. Par mellan olika egna konton.
   const eligible = input.transactions
-    .filter((tx) => tx.hidden !== true && tx.manualTransfer === null && tx.status !== "removed" && accountType.has(tx.accountId))
+    .filter((tx) => tx.hidden !== true && tx.manualTransfer === null && tx.status !== "removed" && accountType.has(tx.accountId) && !uncounted.has(tx.accountId))
     .sort(byDateThenId);
   const paired = new Set<string>();
   for (const out of eligible.filter((tx) => tx.amountMinor < 0)) {
@@ -111,12 +115,12 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
       )[0];
     if (match) {
       paired.add(out.id).add(match.id);
-      const outUncounted = uncounted.has(out.accountId);
-      const inUncounted = uncounted.has(match.accountId);
-      // Ett par där bara ena sidan räknas med: pengar ut till ett konto som inte räknas med är en utgift, och
-      // pengar in därifrån räknas inte som inkomst (KK-41-B). Den sidan som inte räknas med avgörs i steg 5.
-      result.set(out.id, { id: out.id, internal: !outUncounted && inUncounted ? false : true, pairId: !outUncounted && inUncounted ? null : match.id, reason: !outUncounted && inUncounted ? "none" : "pair" });
-      result.set(match.id, { id: match.id, internal: true, pairId: out.id, reason: "pair" });
+      const toSaving = !savingAccounts.has(out.accountId) && savingAccounts.has(match.accountId);
+      const fromSaving = savingAccounts.has(out.accountId) && !savingAccounts.has(match.accountId);
+      // Till ett sparkonto är sparande och därifrån en inkomst, räknat på det andra kontot. Sparkontots egen
+      // rad räknas inte, så att samma pengar inte räknas två gånger (KK-52).
+      result.set(out.id, toSaving ? { id: out.id, internal: false, pairId: null, reason: "saving" } : { id: out.id, internal: true, pairId: match.id, reason: "pair" });
+      result.set(match.id, fromSaving ? { id: match.id, internal: false, pairId: null, reason: "saving" } : { id: match.id, internal: true, pairId: out.id, reason: "pair" });
     }
   }
 

@@ -299,35 +299,13 @@ describe("konton som inte räknas med (KK-41)", () => {
     expect(result.ut).toEqual({ id: "ut", internal: false, pairId: null, reason: "none" });
   });
 
-  it("en dragning från ett konto som inte räknas med och motsvarande insättning på Gemensamt: insättningen räknas inte som inkomst", () => {
+  it("KK-41-B: en överföring från ett konto som inte räknas med till Gemensamt är en vanlig inkomst", () => {
     const result = run([
       tx({ id: "ut", accountId: "sparande", amountMinor: -623300 }),
       tx({ id: "in", accountId: "gemensamt", amountMinor: 623300 }),
     ]);
-    expect(result.in).toEqual({ id: "in", internal: true, pairId: "ut", reason: "pair" });
+    expect(result.in).toEqual({ id: "in", internal: false, pairId: null, reason: "none" });
     expect(result.ut).toMatchObject({ internal: true, reason: "account" });
-  });
-
-  it("paret hittas inom tre dagar åt båda hållen, men en insättning utan motsvarande dragning är fortfarande inkomst", () => {
-    const near = run([
-      tx({ id: "ut", accountId: "sparande", amountMinor: -50000, transactionDate: "2026-11-27" }),
-      tx({ id: "in", accountId: "gemensamt", amountMinor: 50000, transactionDate: "2026-11-30" }),
-    ]);
-    expect(near.in).toMatchObject({ internal: true, reason: "pair" });
-    const far = run([
-      tx({ id: "ut", accountId: "sparande", amountMinor: -50000, transactionDate: "2026-11-20" }),
-      tx({ id: "in", accountId: "gemensamt", amountMinor: 50000, transactionDate: "2026-11-30" }),
-    ]);
-    expect(far.in).toEqual({ id: "in", internal: false, pairId: null, reason: "none" });
-    const alone = run([tx({ id: "lon", accountId: "gemensamt", amountMinor: 3_300_000 })]);
-    expect(alone.lon?.internal).toBe(false);
-  });
-
-  it("två konton som inte räknas med bildar ett par som inte räknas, och en Räkna inte-regel gäller dem inte dubbelt", () => {
-    const accounts: OwnAccount[] = [{ id: "gemensamt", type: "checking" }, { id: "a", type: "savings", counted: false }, { id: "b", type: "savings", counted: false }];
-    const result = run([tx({ id: "ut", accountId: "a", amountMinor: -1000 }), tx({ id: "in", accountId: "b", amountMinor: 1000 })], accounts);
-    expect(result.ut).toMatchObject({ internal: true, reason: "account" });
-    expect(result.in).toMatchObject({ internal: true, reason: "account" });
   });
 
   it("KK-41-A: en transaktion på ett konto som inte räknas med räknas inte, med orsaken account", () => {
@@ -397,5 +375,42 @@ describe("dolda transaktioner (KK-49)", () => {
 
   it("en borttagen dold transaktion behandlas som annan borttagen", () => {
     expect(classify([tx({ id: "a", hidden: true, status: "removed" })]).a).toMatchObject(internal(null, "hidden"));
+  });
+});
+
+describe("sparkonton (KK-52)", () => {
+  const ACCOUNTS_WITH_BUFFER: OwnAccount[] = [
+    { id: "gemensamt", type: "checking" },
+    { id: "buffert", type: "checking", saving: true },
+    { id: "kort", type: "credit_card" },
+  ];
+  const run = (transactions: TransferInput[]) =>
+    Object.fromEntries(classifyTransfers({ transactions, accounts: ACCOUNTS_WITH_BUFFER, cardPaymentCounterparties: [], excludeRules: [] }).map((c) => [c.id, c]));
+
+  it("Gemensamt → Buffert är sparande på Gemensamt, och Buffertens rad räknas inte", () => {
+    const result = run([tx({ id: "ut", accountId: "gemensamt", amountMinor: -200000 }), tx({ id: "in", accountId: "buffert", amountMinor: 200000 })]);
+    expect(result.ut).toEqual({ id: "ut", internal: false, pairId: null, reason: "saving" });
+    expect(result.in).toEqual({ id: "in", internal: true, pairId: "ut", reason: "pair" });
+  });
+
+  it("Buffert → Gemensamt är en inkomst på Gemensamt, och Buffertens rad räknas inte", () => {
+    const result = run([tx({ id: "ut", accountId: "buffert", amountMinor: -100000 }), tx({ id: "in", accountId: "gemensamt", amountMinor: 100000 })]);
+    expect(result.in).toEqual({ id: "in", internal: false, pairId: null, reason: "saving" });
+    expect(result.ut).toEqual({ id: "ut", internal: true, pairId: "in", reason: "pair" });
+  });
+
+  it("en betalning från Gemensamt till kortkontot är fortfarande en intern överföring", () => {
+    const result = run([tx({ id: "ut", accountId: "gemensamt", amountMinor: -50000 }), tx({ id: "in", accountId: "kort", amountMinor: 50000 })]);
+    expect(result.ut).toMatchObject(internal("in", "pair"));
+    expect(result.in).toMatchObject(internal("ut", "pair"));
+  });
+
+  it("mellan två sparkonton är det en vanlig intern överföring", () => {
+    const accounts: OwnAccount[] = [{ id: "a", type: "savings", saving: true }, { id: "b", type: "savings", saving: true }];
+    const result = Object.fromEntries(
+      classifyTransfers({ transactions: [tx({ id: "ut", accountId: "a", amountMinor: -1000 }), tx({ id: "in", accountId: "b", amountMinor: 1000 })], accounts, cardPaymentCounterparties: [], excludeRules: [] }).map((c) => [c.id, c]),
+    );
+    expect(result.ut).toMatchObject(internal("in", "pair"));
+    expect(result.in).toMatchObject(internal("ut", "pair"));
   });
 });
