@@ -99,7 +99,7 @@ export function App() {
         <ul>
           {TABS.map((tab) => (
             <li key={tab.to}>
-              <Link to={tab.to} current={tab.owns(path)}>
+              <Link to={tab.to} current={tab.owns(path)} tab>
                 <tab.Icon aria-hidden="true" size={22} strokeWidth={1.75} />
                 {tab.label}
               </Link>

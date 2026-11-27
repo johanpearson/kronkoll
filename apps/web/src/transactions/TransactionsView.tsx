@@ -8,7 +8,7 @@ import { Pencil, Search, Split } from "lucide-react";
 import { useCallback, useEffect, useState, type SyntheticEvent } from "react";
 import { AccountFilter, accountParams, useAccountChoices } from "../accounts/account-filter.tsx";
 import { field, getJson, postJson } from "../api.ts";
-import { Link } from "../router.tsx";
+import { Link, replaceUrl } from "../router.tsx";
 import { CategoryDot } from "../category-color.tsx";
 import { IconButton, PeriodNav } from "../icon-button.tsx";
 import { useToast } from "../toast.tsx";
@@ -347,7 +347,7 @@ export function TransactionsView() {
             type="button"
             className="small"
             onClick={() => {
-              window.history.replaceState(null, "", "/transaktioner");
+              replaceUrl("/transaktioner");
               setFilters({ ...filters, period: period?.key ?? filters.period, categoryId: null });
             }}
           >
