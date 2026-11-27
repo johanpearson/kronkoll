@@ -785,3 +785,18 @@ a.ui-row:active {
     transform: translateY(-12px);
   }
 }
+
+/* Åtgärderna i sidhuvudet, t.ex. synkstatus och kugghjulet (KK-64-A). */
+.page-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ui-sync-done {
+  color: var(--success);
+}
+
+.ui-sync-failed {
+  color: var(--warning);
+}
