@@ -44,6 +44,9 @@ const PAIRS: [string, string, number][] = [
   ["muted", "surface-raised", 4.5],
   ["text", "surface-sunken", 4.5],
   ["muted", "surface-sunken", 4.5],
+  // Inmatningsfält: texten och enheten (t.ex. kr) i fältet.
+  ["text", "input", 4.5],
+  ["muted", "input", 4.5],
   // Etiketter och meddelanden: färgad text på sin mjuka bakgrund, och text på fara-knappen.
   ["primary", "primary-soft", 4.5],
   ["success", "success-soft", 4.5],

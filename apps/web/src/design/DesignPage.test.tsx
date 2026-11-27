@@ -28,7 +28,7 @@ describe("designsidan (KK-65-E)", () => {
 
   it("visar typografi, avstånd, radier, skuggor och rörelse", () => {
     render(<DesignPage />);
-    for (const name of ["Knappar", "Etiketter", "Listrader", "Färger", "Typografi", "Avstånd", "Radier", "Skuggor", "Rörelse"]) {
+    for (const name of ["Knappar", "Formulär", "Etiketter", "Listrader", "Färger", "Typografi", "Avstånd", "Radier", "Skuggor", "Rörelse"]) {
       expect(screen.getByRole("heading", { level: 2, name })).toBeDefined();
     }
     // Stort saldo med tabellsiffror (KK-65-D).
@@ -44,6 +44,16 @@ describe("designsidan (KK-65-E)", () => {
     expect(document.documentElement.dataset.theme).toBe("light");
     fireEvent.click(screen.getByRole("button", { name: "System" }));
     expect(document.documentElement.dataset.theme).toBeUndefined();
+  });
+
+  it("formulärdelarna går att använda", () => {
+    render(<DesignPage />);
+    fireEvent.click(screen.getByRole("radio", { name: "År" }));
+    expect(screen.getByRole("radio", { name: "År" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(screen.getByRole("switch", { name: "Notiser om stora köp" }));
+    expect(screen.getByRole("switch", { name: "Notiser om stora köp" }).getAttribute("aria-checked")).toBe("false");
+    fireEvent.change(screen.getByLabelText("Budget för Mat"), { target: { value: "300" } });
+    expect(screen.getByLabelText<HTMLInputElement>("Budget för Mat").value).toBe("300");
   });
 
   it("spelar upp inträdet igen", () => {
