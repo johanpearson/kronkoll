@@ -7,8 +7,11 @@ import { useState } from "react";
 import css from "../styles/tokens.css?raw";
 import { setTheme, storedTheme, type Theme } from "../theme.ts";
 import { Button, IconButton } from "../ui/Button.tsx";
+import { AmountInput } from "../ui/AmountInput.tsx";
 import { Chip } from "../ui/Chip.tsx";
 import { List, ListRow } from "../ui/ListRow.tsx";
+import { SegmentedControl } from "../ui/SegmentedControl.tsx";
+import { Switch } from "../ui/Switch.tsx";
 import "./design.css";
 
 const LIGHT = css.slice(css.indexOf(":root {"), css.indexOf("}"));
@@ -28,6 +31,12 @@ const TYPE: readonly [string, string][] = [
   ["ui-caption", "Liten text, t.ex. datum"],
 ];
 
+const PERIODS = [
+  { value: "month", label: "Månad" },
+  { value: "year", label: "År" },
+  { value: "all", label: "Allt" },
+] as const;
+
 const SPACES = [1, 2, 3, 4, 5, 6, 7];
 const RADII = ["radius-xs", "radius-small", "radius", "radius-large", "radius-pill"];
 const SHADOWS = ["shadow-sm", "shadow", "shadow-lg"];
@@ -35,6 +44,9 @@ const SHADOWS = ["shadow-sm", "shadow", "shadow-lg"];
 export default function DesignPage() {
   const [theme, setChosen] = useState(storedTheme);
   const [replay, setReplay] = useState(0);
+  const [notify, setNotify] = useState(true);
+  const [period, setPeriod] = useState<(typeof PERIODS)[number]["value"]>("month");
+  const [budget, setBudget] = useState("1 250,50");
   const choose = (next: Theme) => {
     setTheme(next);
     setChosen(next);
@@ -67,6 +79,16 @@ export default function DesignPage() {
           <IconButton label="Lägg till" icon={Plus} />
           <IconButton label="Ta bort" icon={Trash2} danger />
         </div>
+      </section>
+
+      <h2>Formulär</h2>
+      <section className="design-panel ui-stack">
+        <SegmentedControl label="Period" options={PERIODS} value={period} onChange={setPeriod} />
+        <Switch checked={notify} onChange={setNotify}>
+          Notiser om stora köp
+        </Switch>
+        <AmountInput label="Budget för Mat" value={budget} hint="Lämna tomt för ingen budget." onChange={setBudget} />
+        <AmountInput label="Ett felaktigt belopp" value="tolv" onChange={() => undefined} />
       </section>
 
       <h2>Etiketter</h2>
