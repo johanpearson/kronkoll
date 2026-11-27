@@ -15,11 +15,11 @@ function View(props: { enabled?: boolean }) {
   );
 }
 
-let requested: ReturnType<typeof vi.fn>;
+let requested: ReturnType<typeof vi.fn<() => void>>;
 let stop: () => void;
 
 beforeEach(() => {
-  requested = vi.fn();
+  requested = vi.fn<() => void>();
   stop = onSyncRequest(requested);
   Object.defineProperty(window, "scrollY", { value: 0, configurable: true });
 });
