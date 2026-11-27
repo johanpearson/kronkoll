@@ -185,6 +185,18 @@ describe("byta kategori (KK-18-B, KK-18-C, #32)", () => {
     expect(screen.queryByText(/Regeln matchar/u)).toBeNull();
   });
 
+  it("säger hur många tidigare som fick kategorin när API:t redan har tillämpat regeln, utan att fråga (KK-58-A)", async () => {
+    const calls = api({ patch: [200, { transaction: { id: "t1", category_id: "hushall-forbrukning", category_source: "manual" }, rule: RULE, applied: 4, retroactive_candidates: 0, protected_manual: 1 }] });
+    await openEditor();
+    fireEvent.change(screen.getByRole("combobox", { name: "Kategori" }), { target: { value: "hushall-forbrukning" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Gör alltid så för ICA Nära Sofo" }));
+    fireEvent.click(screen.getByRole("button", { name: "Spara" }));
+    await settle();
+    expect(calls.some((c) => c.path.endsWith("/apply"))).toBe(false);
+    expect(screen.queryByText(/Regeln matchar/u)).toBeNull();
+    expect(screen.getByText("4 transaktioner fick den nya kategorin.")).toBeDefined();
+  });
+
   it("frågar inte när regeln inte matchar något tidigare", async () => {
     api({ patch: saved(RULE, 0, 0) });
     await openEditor();

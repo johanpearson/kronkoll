@@ -1,7 +1,7 @@
 // Regler (#34, KK-18-B, KK-18-C): alla kategoriseringsregler, med hur många transaktioner varje regel
 // träffar. Lägg till en regel direkt ("allt som börjar med IKEA → Hushåll", eller "allt som innehåller amazon"
-// oavsett versaler, KK-47), ändra eller ta bort. En ny
-// eller ändrad regel gäller nya transaktioner direkt; för tidigare frågar vyn först. Manuellt valda
+// oavsett versaler, KK-47), ändra eller ta bort. En ny eller ändrad regel tillämpas direkt av API:t, även på
+// tidigare transaktioner (KK-58-A), och vyn säger hur många. Frågan finns kvar för ett äldre API. Manuellt valda
 // ändras aldrig. En regel vars kategori är arkiverad markeras med text. "Visa träffar" och frågan efter
 // att en regel sparats visar vilka transaktioner den gäller. "Applicera alla regler" kör alla regler över
 // historiken efter en fråga, och Synka nu hämtar nytt från banken och kategoriserar.
@@ -61,19 +61,23 @@ async function fetchRules(): Promise<Rule[] | null> {
 
 type Ask = { readonly ruleId: string; readonly candidates: number; readonly protectedManual: number };
 
-/** Svaret på en sparad regel: frågan om tidigare transaktioner, null om det inte finns några, eller ett fel. */
-function outcome({ status, body }: ApiResult): Ask | null | string {
+/**
+ * Svaret på en sparad regel: frågan om tidigare transaktioner (äldre API), annars hur många tidigare som API:t
+ * redan gav kategorin (KK-58-A), eller ett fel som text.
+ */
+function outcome({ status, body }: ApiResult): Ask | number | string {
   if (status === 400) return field(body, "error") === "unknown_category" ? "Välj en kategori som finns." : "Skriv en text, till exempel IKEA.";
   if (status !== 200 && status !== 201) return "Det gick inte att spara regeln. Försök igen.";
   const ruleId = field(field(body, "rule"), "id");
   const candidates = field(body, "retroactive_candidates");
   const manual = field(body, "protected_manual");
-  if (typeof ruleId !== "string" || typeof candidates !== "number" || candidates === 0) return null;
+  const applied = field(body, "applied");
+  if (typeof ruleId !== "string" || typeof candidates !== "number" || candidates === 0) return typeof applied === "number" ? applied : 0;
   return { ruleId, candidates, protectedManual: typeof manual === "number" ? manual : 0 };
 }
 
 /** Mönster och kategori (eller Räkna inte), för en ny regel eller en som ändras. */
-function RuleForm(props: { title: string; rule?: Rule; categories: Categories; onSaved: (ask: Ask | null) => void; onExcluded: (matches: number) => void; onClose: () => void }) {
+function RuleForm(props: { title: string; rule?: Rule; categories: Categories; onSaved: (ask: Ask | number) => void; onExcluded: (matches: number) => void; onClose: () => void }) {
   const [pattern, setPattern] = useState(props.rule?.pattern ?? "");
   const [match, setMatch] = useState<"prefix" | "contains">(props.rule?.contains ? "contains" : "prefix");
   const [categoryId, setCategoryId] = useState(props.rule?.exclude ? EXCLUDE : (props.rule?.categoryId ?? ""));
@@ -204,8 +208,9 @@ export function RulesView() {
     setMode(null);
     setReload((n) => n + 1);
   };
-  const saved = (ask: Ask | null) => {
-    if (ask) setMode({ kind: "ask", ask });
+  const saved = (ask: Ask | number) => {
+    if (typeof ask !== "number") setMode({ kind: "ask", ask });
+    else if (ask > 0) refresh(true, `Regeln är sparad. ${String(ask)} tidigare transaktioner fick kategorin.`);
     else refresh(true, "Regeln är sparad och gäller nya transaktioner.");
   };
   const excluded = (matches: number) => {

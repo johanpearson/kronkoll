@@ -75,22 +75,24 @@ describe("PATCH /api/transactions/{id} (KK-18-B, KK-18-C)", () => {
     expect(await res.json()).toEqual({
       transaction: { id: "t1", category_id: "hushall-forbrukning", category_source: "manual" },
       rule: null,
+      applied: 0,
       retroactive_candidates: 0,
       protected_manual: 0,
     });
     expect(await category("t1")).toEqual({ c: "hushall-forbrukning", s: "manual" });
   });
 
-  it("\"Gör alltid så\" lär in en regel på hela motparten och säger vad den skulle ändra bakåt, utan att ändra något än", async () => {
+  it("\"Gör alltid så\" lär in en regel på hela motparten och tillämpar den direkt på tidigare transaktioner (KK-58-A)", async () => {
     const res = await call("PATCH", "/api/transactions/t1", { category_id: "hushall-forbrukning", learn_rule: true });
     const body = await res.json<{ rule: { id: string } }>();
     expect(body).toEqual({
       transaction: { id: "t1", category_id: "hushall-forbrukning", category_source: "manual" },
       rule: { id: body.rule.id, match: "counterparty_prefix", pattern: "ICA NARA SOFO", category_id: "hushall-forbrukning" },
-      retroactive_candidates: 1,
+      applied: 1,
+      retroactive_candidates: 0,
       protected_manual: 1,
     });
-    expect(await category("t2")).toEqual({ c: "mat-livsmedel", s: "template" });
+    expect(await category("t2")).toEqual({ c: "hushall-forbrukning", s: "learned" });
   });
 
   it("samma motpart igen uppdaterar den inlärda regeln i stället för att skapa en ny", async () => {
@@ -158,11 +160,12 @@ describe("PATCH /api/transactions/{id} (KK-18-B, KK-18-C)", () => {
 });
 
 describe("POST /api/rules/{id}/apply (KK-18-C)", () => {
-  it("applicerar regeln bakåt men rör aldrig manuella transaktioner", async () => {
+  it("applicerar regeln bakåt men rör aldrig manuella transaktioner, och efter Gör alltid så finns inget mer att göra", async () => {
     const { rule } = await (await call("PATCH", "/api/transactions/t1", { category_id: "hushall-forbrukning", learn_rule: true })).json<{ rule: { id: string } }>();
+    // Regeln är redan tillämpad (KK-58-A), så en äldre app som frågar och applicerar ändrar inget mer.
     const res = await call("POST", `/api/rules/${rule.id}/apply`);
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ updated: 1, skipped_manual: 2 });
+    expect(await res.json()).toEqual({ updated: 0, skipped_manual: 2 });
     expect(await category("t2")).toEqual({ c: "hushall-forbrukning", s: "learned" });
     expect(await category("t3")).toEqual({ c: "barn-mat-blojor", s: "manual" });
     expect(await category("t1")).toEqual({ c: "hushall-forbrukning", s: "manual" });

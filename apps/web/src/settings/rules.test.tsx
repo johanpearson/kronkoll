@@ -157,6 +157,14 @@ describe("regler i Inställningar (#34, KK-18-B, KK-18-C)", () => {
     expect(screen.getByRole("status").textContent).toBe("Regeln är sparad och gäller nya transaktioner.");
   });
 
+  it("säger hur många tidigare transaktioner som fick kategorin när API:t redan har tillämpat regeln (KK-58-A)", async () => {
+    const calls = api({ save: [201, { rule: { id: "r-ny" }, applied: 7, retroactive_candidates: 0, protected_manual: 1 }] });
+    await open();
+    await fillNewRule("ikea", "hushall");
+    expect(changes(calls).filter((c) => c.path.endsWith("/apply"))).toEqual([]);
+    expect(screen.getByRole("status").textContent).toBe("Regeln är sparad. 7 tidigare transaktioner fick kategorin.");
+  });
+
   it("ändrar namn och kategori på en regel", async () => {
     const calls = api({ save: [200, { rule: { id: "r-ica" }, retroactive_candidates: 0, protected_manual: 0 }] });
     await open();
