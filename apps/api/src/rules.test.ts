@@ -79,7 +79,7 @@ describe("GET /api/rules (KK-18)", () => {
   it("listar reglerna sorterade på mönster, med träffar och om kategorin är arkiverad", async () => {
     await db.prepare(`UPDATE categories SET archived = 1 WHERE id = 'abonnemang-streaming'`).run();
     const all = await items();
-    expect(all.find((r) => r.id === "mall-ica")).toEqual({ id: "mall-ica", match: "counterparty_prefix", pattern: "ICA", category_id: "mat-livsmedel", source: "template", action: "categorize", hits: 1, category_archived: false });
+    expect(all.find((r) => r.id === "mall-ica")).toEqual({ id: "mall-ica", match: "counterparty_prefix", pattern: "ICA", category_id: "mat-livsmedel", source: "template", action: "categorize", position: null, hits: 1, category_archived: false });
     expect(all.find((r) => r.id === "mall-spotify")).toMatchObject({ hits: 0, category_archived: true });
     expect(all.map((r) => r.pattern)).toEqual([...all.map((r) => r.pattern)].sort((a, b) => a.localeCompare(b, "sv")));
   });
@@ -191,7 +191,7 @@ describe("regler med åtgärden Räkna inte (KK-39-C)", () => {
     const created = await res.json<{ rule: { id: string } }>();
     expect(created).toEqual({ rule: { id: created.rule.id, match: "counterparty_prefix", pattern: "IKEA", category_id: null, source: "learned", action: "exclude" }, matches: 3 });
     expect(await notCounted()).toEqual(["k1", "k2"]);
-    expect((await items()).find((r) => r.id === created.rule.id)).toEqual({ ...created.rule, hits: 3, category_archived: false });
+    expect((await items()).find((r) => r.id === created.rule.id)).toEqual({ ...created.rule, position: null, hits: 3, category_archived: false });
     // Samma mönster igen ger samma regel, inte en till.
     const again = await create({ pattern: "IKEA" });
     expect(again.status).toBe(200);
@@ -406,5 +406,80 @@ describe("POST /api/rules/reset (KK-51)", () => {
       expect(res.status).toBe(503);
       expect(await res.json()).toEqual({ error: "unavailable" });
     }
+  });
+});
+
+describe("ordning och överskrivning av manuella (KK-58-B, KK-58-C)", () => {
+  const categoryOf = async (id: string) => (await db.prepare(`SELECT category_id AS c, category_source AS s FROM transactions WHERE id = ?`).bind(id).first()) as { c: string | null; s: string };
+  const create = async (body: Record<string, unknown>) => (await (await call("POST", undefined, body)).json<{ rule: { id: string } }>()).rule.id;
+
+  it("en ny regel står först och vinner, och en ny ordning tillämpas direkt på historiken", async () => {
+    const ikea = await create({ pattern: "IKEA", category_id: "hushall-forbrukning" });
+    const karlstad = await create({ pattern: "karlstad", match: "contains", category_id: "fritid-hobby" });
+    // Den nya Innehåller-regeln står först och vinner över den äldre prefixregeln.
+    expect(await categoryOf("k1")).toEqual({ c: "fritid-hobby", s: "learned" });
+    await db.prepare(`INSERT OR IGNORE INTO category_rules (id, match, pattern, category_id, source) VALUES ('mall-test', 'counterparty_prefix', 'COOP', 'mat-livsmedel', 'template')`).run();
+    const listed = await (await call("GET")).json<{ items: { id: string; position: number | null }[] }>();
+    expect(listed.items.find((r) => r.id === karlstad)?.position).toBeLessThan(listed.items.find((r) => r.id === ikea)?.position ?? -Infinity);
+    // En mallregel har ingen plats.
+    expect(listed.items.find((r) => r.id === "mall-test")?.position).toBeNull();
+    await db.prepare(`DELETE FROM category_rules WHERE id = 'mall-test'`).run();
+
+    const res = await call("PUT", "/api/rules/order", { order: [ikea, karlstad] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ updated: 1 });
+    expect(await categoryOf("k1")).toEqual({ c: "hushall-forbrukning", s: "learned" });
+    // En manuellt vald ändras inte av en ny ordning.
+    expect(await categoryOf("k3")).toEqual({ c: "fritid-hobby", s: "manual" });
+  });
+
+  it.each([
+    ["en egen regel saknas", (ids: string[]) => ({ order: ids.slice(1) }), "invalid_order"],
+    ["en mallregel är med", (ids: string[]) => ({ order: [...ids, "mall-ica"] }), "invalid_order"],
+    ["ordningen är ingen lista", () => ({ order: "a,b" }), "invalid_request"],
+    ["ett id är inget id", (ids: string[]) => ({ order: [...ids, 7] }), "invalid_request"],
+  ])("ger 400 när %s, och ändrar inget", async (_, body, error) => {
+    const ids = [await create({ pattern: "IKEA", category_id: "hushall-forbrukning" }), await create({ pattern: "ICA", category_id: "mat-livsmedel" })];
+    const res = await call("PUT", "/api/rules/order", body(ids));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error });
+  });
+
+  it("andra metoder ger 405 och en trasig databas 503", async () => {
+    const res = await call("POST", "/api/rules/order", { order: [] });
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("PUT");
+    expect((await call("PUT", "/api/rules/order", { order: [] }, { DB: broken })).status).toBe(503);
+  });
+
+  it("räknar först hur många manuella som skrivs över, utan att spara något (KK-58-B)", async () => {
+    const res = await call("POST", undefined, { pattern: "IKEA", category_id: "hushall-forbrukning", override_manual: true, preview: true });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ applied: 3, protected_manual: 0, overridden_manual: 1 });
+    expect((await items()).some((r) => r.pattern === "IKEA")).toBe(false);
+    expect(await categoryOf("k1")).toEqual({ c: null, s: "none" });
+  });
+
+  it("skriver över även manuellt kategoriserade när valet är gjort, och sedan skyddas nya manuella val", async () => {
+    const res = await call("POST", undefined, { pattern: "IKEA", category_id: "hushall-forbrukning", override_manual: true });
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ applied: 3, protected_manual: 0 });
+    expect(await categoryOf("k3")).toEqual({ c: "hushall-forbrukning", s: "learned" });
+    // Ändras regeln utan valet skyddas k3 när den är manuell igen.
+    await db.prepare(`UPDATE transactions SET category_id = 'fritid-hobby', category_source = 'manual' WHERE id = 'k3'`).run();
+    const { rule } = await (await call("POST", undefined, { pattern: "IKEA", category_id: "boende" })).json<{ rule: { id: string } }>();
+    expect(rule.id).toBeTruthy();
+    expect(await categoryOf("k3")).toEqual({ c: "fritid-hobby", s: "manual" });
+    // Valet finns också när en regel ändras.
+    const patched = await call("PATCH", `/api/rules/${rule.id}`, { category_id: "hushall-forbrukning", override_manual: true });
+    expect(await patched.json()).toMatchObject({ applied: 3, protected_manual: 0 });
+    expect(await categoryOf("k3")).toEqual({ c: "hushall-forbrukning", s: "learned" });
+  });
+
+  it.each([
+    ["override_manual som text", { pattern: "IKEA", category_id: "boende", override_manual: "ja" }],
+    ["preview som text", { pattern: "IKEA", category_id: "boende", preview: 1 }],
+  ])("%s ger 400", async (_, body) => {
+    expect((await call("POST", undefined, body)).status).toBe(400);
   });
 });
