@@ -239,22 +239,24 @@ export async function applyAll(request: Request, env: { DB: D1Database }): Promi
 
 /**
  * POST /api/rules/reset (KK-51): ta bort alla regler och börja om. `{ preview: true }` räknar bara. `{ confirm: true }`
- * tar bort alla kategoriserande regler, mallens och egna, och alla Räkna inte-regler. Transaktionerna behåller sin
- * kategori, och det som en Räkna inte-regel höll utanför räknas igen. Regler som bara sätter inkomsttyp rörs inte.
+ * tar bort alla kategoriserande regler, mallens och egna, och alla Räkna inte-regler. Med `uncategorize` "rules"
+ * tappar transaktionerna kategorin som en regel satt, med "all" även egna val; standard är att de behåller den.
+ * Det som en Räkna inte-regel höll utanför räknas igen. Regler som bara sätter inkomsttyp rörs inte.
  */
 export async function resetRules(request: Request, env: { DB: D1Database }): Promise<Response> {
   const input = await body(request);
   if (input === null) return invalid();
-  const { preview, confirm } = input;
+  const { preview, confirm, uncategorize = "none" } = input;
   const valid = (v: unknown) => v === undefined || typeof v === "boolean";
   if (!valid(preview) || !valid(confirm) || (preview === true) === (confirm === true)) return invalid();
+  if (uncategorize !== "none" && uncategorize !== "rules" && uncategorize !== "all") return invalid();
   try {
     const repo = ruleRepository(env.DB);
     if (preview === true) {
-      const { categorize, exclude } = await repo.countAll();
-      return json({ rules: categorize, exclude_rules: exclude }, 200);
+      const { categorize, exclude, byRules, all } = await repo.countAll();
+      return json({ rules: categorize, exclude_rules: exclude, categorized_by_rules: byRules, categorized: all }, 200);
     }
-    await repo.removeAll();
+    await repo.removeAll(uncategorize);
     await recomputeTransfers(env.DB);
     return json({ reset: true }, 200);
   } catch {

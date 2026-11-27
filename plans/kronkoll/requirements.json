@@ -1014,6 +1014,10 @@
         {
           "id": "KK-51-B",
           "text": "Efter borttagningen är reglerna borta, transaktionerna behåller sina kategorier, det som en Räkna inte-regel höll utanför räknas igen, och regler som bara sätter inkomsttyp ligger kvar."
+        },
+        {
+          "id": "KK-51-C",
+          "text": "I bekräftelsen väljer användaren om transaktionerna ska tappa kategorin som regler har satt (standard), tappa alla kategorier, även egna val, eller behålla dem. Antalet transaktioner som berörs visas. (Ägarens önskemål 2026-11-27.)"
         }
       ]
     },

@@ -25,7 +25,7 @@ function api(options: { preview?: [number, unknown]; reset?: number } = {}) {
       const json = (status: number, payload: unknown) => Promise.resolve(new Response(JSON.stringify(payload), { status }));
       if (url.pathname === "/api/categories") return json(200, { items: [{ id: "mat", parent_id: null, name: "Mat", kind: "expense", archived: false }] });
       if (url.pathname === "/api/rules/reset") {
-        if ((body as { preview?: boolean }).preview === true) return json(...(options.preview ?? [200, { rules: 14, exclude_rules: 2 }]));
+        if ((body as { preview?: boolean }).preview === true) return json(...(options.preview ?? [200, { rules: 14, exclude_rules: 2, categorized_by_rules: 120, categorized: 130 }]));
         if ((options.reset ?? 200) === 200) cleared = true;
         return json(options.reset ?? 200, { reset: true });
       }
@@ -64,7 +64,9 @@ describe("ta bort alla regler (KK-51)", () => {
     await open();
     await click("Ta bort alla regler");
     expect(dialog().textContent).toContain("14 regler som ger en kategori och 2 regler som gör att något inte räknas tas bort.");
-    expect(dialog().textContent).toContain("Transaktionerna behåller sin kategori");
+    expect(dialog().textContent).toContain("Det som reglerna höll utanför räknas igen.");
+    expect(screen.getByRole<HTMLInputElement>("radio", { name: "Ta även bort kategorin som regler har satt (120 transaktioner)" }).checked).toBe(true);
+    expect(screen.getByRole("radio", { name: "Ta bort alla kategorier på transaktionerna, även de du valt själv (130)" })).toBeTruthy();
     await click("Avbryt", dialog());
     expect(screen.queryByRole("region", { name: "Ta bort alla regler?" })).toBeNull();
     expect(calls.filter((c) => c.method === "POST")).toEqual([{ method: "POST", path: "/api/rules/reset", body: { preview: true } }]);
@@ -76,9 +78,33 @@ describe("ta bort alla regler (KK-51)", () => {
     expect(screen.getByRole("link", { name: "Rensa alla kategorier" }).getAttribute("href")).toBe("/installningar/kategorier");
     await click("Ta bort alla regler");
     await click("Ta bort alla regler", dialog());
-    expect(calls.find((c) => (c.body as { confirm?: boolean } | null)?.confirm === true)).toEqual({ method: "POST", path: "/api/rules/reset", body: { confirm: true } });
-    expect(screen.getByRole("status").textContent).toBe("Alla regler är borttagna.");
+    expect(calls.find((c) => (c.body as { confirm?: boolean } | null)?.confirm === true)).toEqual({ method: "POST", path: "/api/rules/reset", body: { confirm: true, uncategorize: "rules" } });
+    expect(screen.getByRole("status").textContent).toBe("Alla regler är borttagna och transaktionerna är okategoriserade.");
     expect(screen.getByText("Inga regler matchar.")).toBeTruthy();
+  });
+
+  it("går att välja att ta bort alla kategorier eller att behålla dem", async () => {
+    const calls = api();
+    await open();
+    await click("Ta bort alla regler");
+    fireEvent.click(screen.getByRole("radio", { name: /Ta bort alla kategorier på transaktionerna/u }));
+    await click("Ta bort alla regler", dialog());
+    expect(calls.find((c) => (c.body as { confirm?: boolean } | null)?.confirm === true)?.body).toEqual({ confirm: true, uncategorize: "all" });
+    cleanup();
+    const keep = api();
+    await open();
+    await click("Ta bort alla regler");
+    fireEvent.click(screen.getByRole("radio", { name: "Låt transaktionerna behålla sina kategorier" }));
+    await click("Ta bort alla regler", dialog());
+    expect(keep.find((c) => (c.body as { confirm?: boolean } | null)?.confirm === true)?.body).toEqual({ confirm: true, uncategorize: "none" });
+    expect(screen.getByRole("status").textContent).toBe("Alla regler är borttagna.");
+  });
+
+  it("utan antal kategoriserade visas noll", async () => {
+    api({ preview: [200, { rules: 0, exclude_rules: 0 }] });
+    await open();
+    await click("Ta bort alla regler");
+    expect(screen.getByRole("radio", { name: "Ta även bort kategorin som regler har satt (0 transaktioner)" })).toBeTruthy();
   });
 
   it("säger till när räkningen eller borttagningen inte går, och ingenting ändras", async () => {

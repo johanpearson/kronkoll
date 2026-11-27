@@ -96,8 +96,31 @@ describe("ta bort alla regler (KK-51)", () => {
     expect(counts.exclude).toBeGreaterThanOrEqual(1);
     expect(counts.categorize).toBeGreaterThan(1);
     await repo.removeAll();
-    expect(await repo.countAll()).toEqual({ categorize: 0, exclude: 0 });
+    expect(await repo.countAll()).toMatchObject({ categorize: 0, exclude: 0 });
     expect((await db.prepare(`SELECT id FROM category_rules WHERE id = 'r-inkomst'`).first())?.["id"]).toBe("r-inkomst");
     await db.prepare(`DELETE FROM category_rules WHERE id = 'r-inkomst'`).run();
+  });
+});
+
+describe("ta bort alla regler och kategorierna de satt (KK-51-C)", () => {
+  it("rules tömmer det regler satt men inte egna val, och all tömmer allt", async () => {
+    await db.batch([
+      db.prepare(`INSERT INTO bank_connections (id, provider, status) VALUES ('c-regler', 'enablebanking', 'active')`),
+      db.prepare(`INSERT INTO accounts (id, connection_id, display_name, type) VALUES ('a-regler', 'c-regler', 'Privatkonto', 'checking')`),
+      db.prepare(
+        `INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor, category_id, category_source)
+         VALUES ('r-mall', 'a-regler', 'fp', 'booked', '2026-11-02', '2026-11-02', -100, 'mat-livsmedel', 'template'),
+                ('r-egen', 'a-regler', 'fp', 'booked', '2026-11-02', '2026-11-02', -100, 'mat-livsmedel', 'learned'),
+                ('r-manuell', 'a-regler', 'fp', 'booked', '2026-11-02', '2026-11-02', -100, 'mat-livsmedel', 'manual')`,
+      ),
+    ]);
+    const repo = ruleRepository(db);
+    expect(await repo.countAll()).toMatchObject({ byRules: 2, all: 3 });
+    const categorized = async () => (await db.prepare(`SELECT id FROM transactions WHERE category_id IS NOT NULL AND account_id = 'a-regler' ORDER BY id`).all<{ id: string }>()).results.map((r) => r.id);
+    await repo.removeAll("rules");
+    expect(await categorized()).toEqual(["r-manuell"]);
+    await repo.removeAll("all");
+    expect(await categorized()).toEqual([]);
+    await db.prepare(`DELETE FROM bank_connections WHERE id = 'c-regler'`).run();
   });
 });

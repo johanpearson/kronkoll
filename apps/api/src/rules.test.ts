@@ -357,7 +357,7 @@ describe("POST /api/rules/reset (KK-51)", () => {
     const before = await count(`SELECT count(*) AS n FROM category_rules WHERE action = 'categorize' AND category_id IS NOT NULL`);
     const preview = await reset({ preview: true });
     expect(preview.status).toBe(200);
-    expect(await preview.json()).toEqual({ rules: before, exclude_rules: 1 });
+    expect(await preview.json()).toEqual({ rules: before, exclude_rules: 1, categorized_by_rules: 1, categorized: 2 });
     expect(await count(`SELECT count(*) AS n FROM category_rules`)).toBeGreaterThan(before);
     expect(await count(`SELECT count(*) AS n FROM transactions WHERE is_internal_transfer = 1`)).toBe(3);
 
@@ -374,7 +374,19 @@ describe("POST /api/rules/reset (KK-51)", () => {
   });
 
   it.each([
+    ["rules", ["k3"]],
+    ["all", []],
+  ] as const)("med uncategorize %s tappar transaktionerna kategorin som reglerna satt, och med all även egna val", async (uncategorize, kept) => {
+    const res = await reset({ confirm: true, uncategorize });
+    expect(res.status).toBe(200);
+    const left = (await db.prepare(`SELECT id FROM transactions WHERE category_id IS NOT NULL ORDER BY id`).all<{ id: string }>()).results.map((r) => r.id);
+    expect(left).toEqual(kept);
+    expect(await count(`SELECT count(*) AS n FROM transactions WHERE category_id IS NULL AND category_source <> 'none'`)).toBe(0);
+  });
+
+  it.each([
     ["ingen åtgärd", {}],
+    ["ett okänt val för kategorierna", { confirm: true, uncategorize: "alla" }],
     ["både förhandsvisning och bekräftelse", { preview: true, confirm: true }],
     ["en bekräftelse som inte är sant eller falskt", { confirm: "ja" }],
     ["kroppen är inte ett objekt", "[]"],

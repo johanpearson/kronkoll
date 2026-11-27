@@ -43,13 +43,30 @@ export function ruleRepository(d1: D1Database) {
     },
 
     /** Hur många regler "Ta bort alla regler" tar bort (KK-51): kategoriserande och Räkna inte. Inkomstregler ingår inte. */
-    async countAll(): Promise<{ categorize: number; exclude: number }> {
-      const count = async (where: string) => (await d1.prepare(`SELECT count(*) AS n FROM category_rules WHERE ${where}`).first<{ n: number }>())?.n ?? 0;
-      return { categorize: await count(`action = 'categorize' AND category_id IS NOT NULL`), exclude: await count(`action = 'exclude'`) };
+    async countAll(): Promise<{ categorize: number; exclude: number; byRules: number; all: number }> {
+      const count = async (sql: string) => (await d1.prepare(sql).first<{ n: number }>())?.n ?? 0;
+      return {
+        categorize: await count(`SELECT count(*) AS n FROM category_rules WHERE action = 'categorize' AND category_id IS NOT NULL`),
+        exclude: await count(`SELECT count(*) AS n FROM category_rules WHERE action = 'exclude'`),
+        byRules: await count(`SELECT count(*) AS n FROM transactions WHERE category_id IS NOT NULL AND category_source IN ('template', 'learned')`),
+        all: await count(`SELECT count(*) AS n FROM transactions WHERE category_id IS NOT NULL`),
+      };
     },
-    /** Tar bort alla kategoriserande regler och alla Räkna inte-regler. Transaktionerna behåller sin kategori. */
-    async removeAll(): Promise<void> {
-      await d1.prepare(`DELETE FROM category_rules WHERE (action = 'categorize' AND category_id IS NOT NULL) OR action = 'exclude'`).run();
+    /**
+     * Tar bort alla kategoriserande regler och alla Räkna inte-regler i en batch. `uncategorize` väljer om
+     * transaktionerna behåller sin kategori ("none"), tappar den som en regel satt ("rules") eller tappar alla,
+     * även egna val ("all"). Uppdelningar rörs inte.
+     */
+    async removeAll(uncategorize: "none" | "rules" | "all" = "none"): Promise<void> {
+      const clear =
+        uncategorize === "none"
+          ? []
+          : [
+              d1.prepare(
+                `UPDATE transactions SET category_id = NULL, category_source = 'none' WHERE category_id IS NOT NULL${uncategorize === "rules" ? ` AND category_source IN ('template', 'learned')` : ""}`,
+              ),
+            ];
+      await d1.batch([d1.prepare(`DELETE FROM category_rules WHERE (action = 'categorize' AND category_id IS NOT NULL) OR action = 'exclude'`), ...clear]);
     },
 
     /** Regler med åtgärden Räkna inte (KK-39-C), i domänens form. */
