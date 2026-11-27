@@ -53,8 +53,13 @@ export function CategoryEditor(props: {
     const ruleId = field(field(body, "rule"), "id");
     const candidates = field(body, "retroactive_candidates");
     const protectedManual = field(body, "protected_manual");
+    const applied = field(body, "applied");
     if (typeof ruleId === "string" && typeof candidates === "number" && candidates > 0) {
+      // Ett äldre API tillämpar inte regeln själv, så vyn frågar först.
       setStep({ kind: "ask", ruleId, candidates, protectedManual: typeof protectedManual === "number" ? protectedManual : 0 });
+    } else if (typeof applied === "number" && applied > 0) {
+      // API:t har redan gett tidigare transaktioner kategorin (KK-58-A).
+      props.onApplied(applied);
     } else {
       props.onClose();
     }

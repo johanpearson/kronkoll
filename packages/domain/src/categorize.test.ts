@@ -89,6 +89,16 @@ describe("kategorisering med regler (KK-18)", () => {
     expect(learnFromManualChoice({ transaction, categoryId: "hushall", alwaysDoThis: false, contains: "amazon", rules: [], newId: counter() }).rule).toBeNull();
   });
 
+  it("mellanrum i bankens text spelar ingen roll för en regel som innehåller en text (KK-58-A)", () => {
+    // Mönstret sparas med ett mellanslag mellan orden, men banken kan skicka flera, eller en tabb.
+    const hyra: CategoryRule = { id: "r-hyra", match: "description_contains", pattern: "HYRA NOVEMBER", categoryId: "boende", source: "learned" };
+    expect(categorize(tx({ id: "t1", counterpartyNorm: "", description: "Hyra  november" }), [hyra])?.categoryId).toBe("boende");
+    expect(categorize(tx({ id: "t2", counterpartyNorm: "", description: "Hyra\tnovember" }), [hyra])?.categoryId).toBe("boende");
+    // Det går också att lära in regeln från en sådan transaktion.
+    const transaction = tx({ id: "t3", counterpartyNorm: "", description: "Hyra  november" });
+    expect(learnFromManualChoice({ transaction, categoryId: "boende", alwaysDoThis: true, contains: "hyra november", rules: [], newId: counter() }).rule?.pattern).toBe("HYRA NOVEMBER");
+  });
+
   it("en text som inte finns i transaktionen, eller är tom, avvisas (KK-47)", () => {
     const transaction = tx({ id: "t1", counterpartyNorm: "ICA", description: "Kortköp" });
     const learn = (contains: string) => learnFromManualChoice({ transaction, categoryId: "mat", alwaysDoThis: true, contains, rules: [], newId: counter() });
