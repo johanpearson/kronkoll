@@ -30,6 +30,9 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Täckningskravet är 90 % per paket, även grenar. `adapter-d1` ligger nära gränsen för grenar.
 - Planen kontrolleras och byggs med reqplan: `check`, `build` och `build --mode prototype` på
   `plans/kronkoll/plan.json`. HTML-filerna räknas inte i PR-storleken.
+- `requirements.json` går att skriva om med `json.dumps(..., ensure_ascii=False, indent=2)` utan diffbrus, men
+  `plan.json` är handformaterad. Redigera den som text, annars ändras tusentals rader. En post i `verification`
+  med `satisfies` räknas som täckning i `check`.
 - gitleaks (`secret-scan`) regel `generic-api-key` slår till på fältnamn som `auth`, `key`, `secret` och
   `token` följt av en slumpig sträng, även för publicerade exempelvärden i tester (RFC-vektorer). Döp om fältet
   i stället för att lägga till rader i `.gitleaksignore`. Lokalt: `gitleaks git --log-opts="origin/main..HEAD"`.
