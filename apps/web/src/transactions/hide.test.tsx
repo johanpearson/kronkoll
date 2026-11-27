@@ -177,13 +177,19 @@ describe("välj flera och dölj transaktioner (KK-49)", () => {
     expect(screen.getByText("Dold butik")).toBeTruthy();
   });
 
-  it("säger till när det inte gick, och urvalet finns kvar", async () => {
-    api({ hide: [503, { error: "unavailable" }] });
+  it("visar felet i urvalet med Försök igen, och urvalet finns kvar (KK-64-D)", async () => {
+    const calls = api({ hide: [503, { error: "unavailable" }] });
     await open();
     await click("Välj flera");
     fireEvent.click(screen.getByRole("checkbox", { name: "Välj Kaffebaren" }));
     await click("Dölj");
-    expect(screen.getByRole("alert").textContent).toContain("Det gick inte att ändra. Ingenting är ändrat. Försök igen.");
+    const region = screen.getByRole("region", { name: "Valda transaktioner" });
+    expect(within(region).getByRole("alert").querySelector("span")?.textContent).toBe("Det gick inte att ändra. Ingenting är ändrat.");
     expect(screen.getByText("1 valda")).toBeTruthy();
+    await click("Försök igen");
+    expect(hideCalls(calls)).toEqual([
+      { ids: ["a"], hidden: true },
+      { ids: ["a"], hidden: true },
+    ]);
   });
 });
