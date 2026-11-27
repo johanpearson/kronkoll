@@ -94,11 +94,40 @@ describe("välj flera och dölj transaktioner (KK-49)", () => {
     const before = calls.filter((c) => c.url.pathname === "/api/transactions").length;
     await click("Dölj");
     expect(hideCalls(calls)).toEqual([{ ids: ["a", "b"], hidden: true }]);
-    expect(screen.getByRole("status").textContent).toBe("2 transaktioner är dolda. De finns under Visa dolda.");
+    expect(screen.getByRole("status").querySelector("p")?.textContent).toBe("2 transaktioner är dolda. De finns under Visa dolda.");
     expect(calls.filter((c) => c.url.pathname === "/api/transactions").length).toBe(before + 1);
     // Urvalet är avslutat.
     expect(screen.queryByRole("region", { name: "Valda transaktioner" })).toBeNull();
     expect(screen.getByRole("button", { name: "Välj flera" })).toBeTruthy();
+  });
+
+  it("Ångra i notisen visar de dolda igen och hämtar om listan (KK-64-F)", async () => {
+    const calls = api();
+    await open();
+    await click("Välj flera");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Välj Kaffebaren" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Välj Påhittade Möbler AB" }));
+    await click("Dölj");
+    const before = calls.filter((c) => c.url.pathname === "/api/transactions").length;
+    await click("Ångra");
+    expect(hideCalls(calls)).toEqual([
+      { ids: ["a", "b"], hidden: true },
+      { ids: ["a", "b"], hidden: false },
+    ]);
+    expect(calls.filter((c) => c.url.pathname === "/api/transactions").length).toBe(before + 1);
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("säger till om det inte gick att ångra", async () => {
+    const calls = api();
+    await open();
+    await click("Välj flera");
+    fireEvent.click(screen.getByRole("checkbox", { name: "Välj Kaffebaren" }));
+    await click("Dölj");
+    vi.mocked(fetch).mockImplementationOnce(() => Promise.resolve(new Response(JSON.stringify({ error: "unavailable" }), { status: 503 })));
+    await click("Ångra");
+    expect(screen.getByRole("alert").querySelector("p")?.textContent).toBe("Det gick inte att ångra. Försök igen.");
+    expect(hideCalls(calls)).toHaveLength(1);
   });
 
   it("en transaktion i singular, och bankens text i namnet visas som text (KK-30)", async () => {
@@ -108,7 +137,7 @@ describe("välj flera och dölj transaktioner (KK-49)", () => {
     expect(screen.getByRole("checkbox", { name: "Välj <b>Fet</b> butik" })).toBeTruthy();
     fireEvent.click(screen.getByRole("checkbox", { name: "Välj Kaffebaren" }));
     await click("Dölj");
-    expect(screen.getByRole("status").textContent).toBe("1 transaktion är dold. De finns under Visa dolda.");
+    expect(screen.getByRole("status").querySelector("p")?.textContent).toBe("1 transaktion är dold. De finns under Visa dolda.");
   });
 
   it("Avbryt avslutar urvalet utan att skicka något", async () => {
@@ -135,7 +164,7 @@ describe("välj flera och dölj transaktioner (KK-49)", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: "Välj Dold butik" }));
     await click("Visa igen");
     expect(hideCalls(calls)).toEqual([{ ids: ["d"], hidden: false }]);
-    expect(screen.getByRole("status").textContent).toBe("1 transaktion visas igen.");
+    expect(screen.getByRole("status").querySelector("p")?.textContent).toBe("1 transaktion visas igen.");
   });
 
   it("att byta till dolda avslutar ett pågående urval", async () => {
