@@ -797,7 +797,7 @@
       "acceptance_criteria": [
         {
           "id": "KK-41-A",
-          "text": "Under Inställningar har varje konto en brytare Räknas med (standard på). Är den av ingår kontot inte i budget, översikt, insikter, inkomst eller totalsaldot, men transaktionerna syns nedtonade i Transaktioner med texten Räknas inte (inte bara färg)."
+          "text": "Under Inställningar har varje konto en brytare Räknas med (standard på). Är den av ingår kontot inte i budget, översikt, insikter, inkomst eller totalsaldot, och transaktionerna syns inte heller i Transaktioner. Överföringar dit räknas som utgifter (KK-41-B), och en insättning på ett konto som räknas med som motsvarar en dragning från ett konto som inte räknas med räknas inte som inkomst (ändrat 2026-11-27 efter ägarens besked)."
         },
         {
           "id": "KK-41-B",
@@ -938,6 +938,10 @@
         {
           "id": "KK-47-B",
           "text": "Regelformuläret har ett val Börjar med eller Innehåller. Före sparande visas hur många transaktioner regeln träffar. Befintliga regler fortsätter som Börjar med."
+        },
+        {
+          "id": "KK-47-C",
+          "text": "När en kategori väljs på en transaktion med Gör alltid så går det att välja Allt som innehåller och skriva en text som finns i transaktionen, i stället för en början av namnet."
         }
       ]
     },
@@ -993,6 +997,23 @@
         {
           "id": "KK-50-B",
           "text": "En överföring till ett konto som inte är kopplat räknas som en utgift och går att kategorisera med en regel på kontots namn eller nummer (KK-47)."
+        }
+      ]
+    },
+    {
+      "id": "KK-51",
+      "title": "Ta bort alla regler",
+      "normative_strength": "should",
+      "statement": "Användaren kan ta bort alla kategoriserande regler och Räkna inte-regler på en gång och börja om, från Regler. Kategorierna går att rensa från Kategorier (KK-48) och Regler länkar dit. (Ägarens önskemål 2026-11-27.)",
+      "verification_note": "API-test mot lokal D1 att reglerna tas bort men inte inkomstregler eller transaktioner; komponenttest av bekräftelsen.",
+      "acceptance_criteria": [
+        {
+          "id": "KK-51-A",
+          "text": "Under Regler finns Ta bort alla regler. Appen visar hur många regler som berörs och kräver en bekräftelse."
+        },
+        {
+          "id": "KK-51-B",
+          "text": "Efter borttagningen är reglerna borta, transaktionerna behåller sina kategorier, det som en Räkna inte-regel höll utanför räknas igen, och regler som bara sätter inkomsttyp ligger kvar."
         }
       ]
     }

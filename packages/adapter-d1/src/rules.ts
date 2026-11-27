@@ -42,6 +42,16 @@ export function ruleRepository(d1: D1Database) {
       return (await db.delete(categoryRules).where(eq(categoryRules.id, id)).returning({ id: categoryRules.id }).all()).length > 0;
     },
 
+    /** Hur många regler "Ta bort alla regler" tar bort (KK-51): kategoriserande och Räkna inte. Inkomstregler ingår inte. */
+    async countAll(): Promise<{ categorize: number; exclude: number }> {
+      const count = async (where: string) => (await d1.prepare(`SELECT count(*) AS n FROM category_rules WHERE ${where}`).first<{ n: number }>())?.n ?? 0;
+      return { categorize: await count(`action = 'categorize' AND category_id IS NOT NULL`), exclude: await count(`action = 'exclude'`) };
+    },
+    /** Tar bort alla kategoriserande regler och alla Räkna inte-regler. Transaktionerna behåller sin kategori. */
+    async removeAll(): Promise<void> {
+      await d1.prepare(`DELETE FROM category_rules WHERE (action = 'categorize' AND category_id IS NOT NULL) OR action = 'exclude'`).run();
+    },
+
     /** Regler med åtgärden Räkna inte (KK-39-C), i domänens form. */
     async excludeRules(): Promise<ExcludeRule[]> {
       const rows = await db

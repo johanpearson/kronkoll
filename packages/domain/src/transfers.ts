@@ -13,8 +13,10 @@
  * 4. Regler med åtgärden Räkna inte (KK-39-C): det användaren vill hålla utanför budget och översikt,
  *    t.ex. utlägg som betalas tillbaka. De är inte överföringar, men räknas inte på samma sätt.
  *
- * 5. Konton som inte räknas med (KK-41): deras transaktioner räknas inte, och ett konto som inte räknas
- *    med ingår aldrig i ett par. En överföring dit blir därför en vanlig utgift på det andra kontot.
+ * 5. Konton som inte räknas med (KK-41): deras transaktioner räknas inte, och syns inte i listan. En
+ *    överföring dit är en vanlig utgift på det andra kontot. En insättning på ett konto som räknas med som
+ *    motsvarar en dragning från ett konto som inte räknas med räknas inte som inkomst, eftersom det bara
+ *    är egna pengar som flyttas (parets motpost hittas som vanligt, i båda riktningarna).
  *
  * En insättning på kortkontot utan motpost räknas inte som intern: det kan vara en återbetalning.
  */
@@ -90,7 +92,7 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
 
   // 2. Par mellan olika egna konton.
   const eligible = input.transactions
-    .filter((tx) => tx.hidden !== true && tx.manualTransfer === null && tx.status !== "removed" && accountType.has(tx.accountId) && !uncounted.has(tx.accountId))
+    .filter((tx) => tx.hidden !== true && tx.manualTransfer === null && tx.status !== "removed" && accountType.has(tx.accountId))
     .sort(byDateThenId);
   const paired = new Set<string>();
   for (const out of eligible.filter((tx) => tx.amountMinor < 0)) {
@@ -109,7 +111,11 @@ export function classifyTransfers(input: ClassifyTransfersInput): TransferClassi
       )[0];
     if (match) {
       paired.add(out.id).add(match.id);
-      result.set(out.id, { id: out.id, internal: true, pairId: match.id, reason: "pair" });
+      const outUncounted = uncounted.has(out.accountId);
+      const inUncounted = uncounted.has(match.accountId);
+      // Ett par där bara ena sidan räknas med: pengar ut till ett konto som inte räknas med är en utgift, och
+      // pengar in därifrån räknas inte som inkomst (KK-41-B). Den sidan som inte räknas med avgörs i steg 5.
+      result.set(out.id, { id: out.id, internal: !outUncounted && inUncounted ? false : true, pairId: !outUncounted && inUncounted ? null : match.id, reason: !outUncounted && inUncounted ? "none" : "pair" });
       result.set(match.id, { id: match.id, internal: true, pairId: out.id, reason: "pair" });
     }
   }

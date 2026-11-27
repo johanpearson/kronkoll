@@ -64,7 +64,7 @@ describe("Räknas med per konto i Inställningar (KK-41-A)", () => {
     api();
     await open();
     expect([toggle("Gemensamt").checked, toggle("Privat sparande").checked, toggle("Kort").checked]).toEqual([true, false, true]);
-    expect(rows().map((r) => within(r).queryByText("Räknas inte i budget, översikt eller insikter") !== null)).toEqual([false, true, false]);
+    expect(rows().map((r) => within(r).queryByText("Syns inte någonstans. Överföringar dit räknas som utgifter, och överföringar därifrån räknas inte som inkomst.") !== null)).toEqual([false, true, false]);
   });
 
   it("sparar valet med CSRF-skydd och visar det direkt", async () => {
@@ -74,7 +74,7 @@ describe("Räknas med per konto i Inställningar (KK-41-A)", () => {
     await settle();
     expect(patches).toEqual([{ path: "/api/accounts/acc_1", body: { counted: false }, csrf: "1" }]);
     expect(toggle("Gemensamt").checked).toBe(false);
-    expect(within(rows()[0] as HTMLElement).getByText("Räknas inte i budget, översikt eller insikter")).toBeTruthy();
+    expect(within(rows()[0] as HTMLElement).getByText("Syns inte någonstans. Överföringar dit räknas som utgifter, och överföringar därifrån räknas inte som inkomst.")).toBeTruthy();
     fireEvent.click(toggle("Privat sparande"));
     await settle();
     expect(patches[1]).toMatchObject({ path: "/api/accounts/acc_2", body: { counted: true } });

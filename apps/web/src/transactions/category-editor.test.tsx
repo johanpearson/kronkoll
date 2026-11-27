@@ -134,11 +134,43 @@ describe("byta kategori (KK-18-B, KK-18-C, #32)", () => {
       "Allt som börjar med ICA NÄRA SOFO",
       "Allt som börjar med ICA NÄRA",
       "Allt som börjar med ICA",
+      "Allt som innehåller",
     ]);
     fireEvent.click(screen.getByRole("radio", { name: "Allt som börjar med ICA" }));
     fireEvent.click(screen.getByRole("button", { name: "Spara" }));
     await settle();
     expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ category_id: "mat-livsmedel", learn_rule: true, rule_pattern: "ICA" });
+  });
+
+  it("med Gör alltid så går det att välja att namnet innehåller en text, oavsett versaler (KK-47)", async () => {
+    const calls = api({ patch: saved({ ...RULE, match: "description_contains", pattern: "NÄRA" }, 0, 0) });
+    await openEditor();
+    fireEvent.change(screen.getByRole("combobox", { name: "Kategori" }), { target: { value: "mat-livsmedel" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Gör alltid så för ICA Nära Sofo" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Allt som innehåller" }));
+    const text = screen.getByLabelText<HTMLInputElement>("Text");
+    expect(text.value).toBe("ica");
+    expect(screen.getByText("Versaler och gemener spelar ingen roll.")).toBeTruthy();
+    fireEvent.change(text, { target: { value: "Nära" } });
+    fireEvent.click(screen.getByRole("button", { name: "Spara" }));
+    await settle();
+    expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ category_id: "mat-livsmedel", learn_rule: true, rule_contains: "Nära" });
+  });
+
+  it("en tom text går inte att spara, och servern kan neka en text som inte finns i transaktionen (KK-47)", async () => {
+    api({ patch: [400, { error: "invalid_pattern" }] });
+    await openEditor();
+    fireEvent.change(screen.getByRole("combobox", { name: "Kategori" }), { target: { value: "mat-livsmedel" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Gör alltid så för ICA Nära Sofo" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Allt som innehåller" }));
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: " " } });
+    expect(screen.getByRole<HTMLButtonElement>("button", { name: "Spara" }).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "amazon" } });
+    fireEvent.click(screen.getByRole("button", { name: "Spara" }));
+    await settle();
+    expect(screen.getByRole("alert").textContent).toBe("Skriv en text som finns i transaktionen.");
+    fireEvent.click(screen.getByRole("radio", { name: "Allt som börjar med ICA" }));
+    expect(screen.queryByLabelText("Text")).toBeNull();
   });
 
   it("\"Inte nu\" stänger frågan utan att ändra historiken", async () => {

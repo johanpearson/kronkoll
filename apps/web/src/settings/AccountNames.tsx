@@ -143,7 +143,7 @@ export function AccountNames() {
               onChange={(e) => void setCounted(a.id, e.target.checked)}
             />
           </label>
-          {!a.counted && <small className="tx-notes">Räknas inte i budget, översikt eller insikter</small>}
+          {!a.counted && <small className="tx-notes">Syns inte någonstans. Överföringar dit räknas som utgifter, och överföringar därifrån räknas inte som inkomst.</small>}
           {editing === a.id && <NameForm account={a} onSaved={(nickname) => { saved(a.id, nickname); }} onClose={() => { setEditing(null); }} />}
         </li>
         );

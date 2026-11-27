@@ -199,6 +199,8 @@ export function transactionRepository(d1: D1Database) {
       const conditions = [
         ne(transactions.status, "removed"),
         eq(transactions.hidden, query.hidden === true),
+        // Konton som inte räknas med syns inte i listan (KK-41-A), bara överföringar dit som utgifter.
+        sql`${transactions.accountId} IN (SELECT id FROM accounts WHERE included = 1)`,
         // Perioden räknas som i budgeten: bokföringsdagen, annars köpdagen (KK-20, KK-34).
         sql`coalesce(${transactions.bookingDate}, ${transactions.transactionDate}) BETWEEN ${query.from} AND ${query.to}`,
         query.uncategorized ? isNull(transactions.categoryId) : undefined,

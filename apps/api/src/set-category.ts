@@ -11,17 +11,19 @@ function json(body: unknown, status: number): Response {
 
 /**
  * Kategorin, om en regel ska läras in, och hur mycket av namnet regeln gäller (`rule_pattern`, valfritt,
- * bara med `learn_rule`). Null om formen är fel. Att mönstret är en början av namnet avgör domänen.
+ * bara med `learn_rule`), eller en text som transaktionen ska innehålla (`rule_contains`, KK-47). Null om formen är fel. Att mönstret är en början av namnet avgör domänen.
  */
-async function readBody(request: Request): Promise<{ categoryId: string; learn: boolean; pattern: string | undefined } | null> {
+async function readBody(request: Request): Promise<{ categoryId: string; learn: boolean; pattern: string | undefined; contains: string | undefined } | null> {
   const body: unknown = await request.json().catch(() => null);
   if (typeof body !== "object" || body === null || !("category_id" in body)) return null;
   const { category_id: categoryId } = body;
   const learn = "learn_rule" in body ? body.learn_rule : false;
   const pattern = "rule_pattern" in body ? body.rule_pattern : undefined;
+  const contains = "rule_contains" in body ? body.rule_contains : undefined;
+  if (contains !== undefined && (typeof contains !== "string" || !learn || pattern !== undefined || contains.length > 60 || /\p{Cc}/u.test(contains))) return null;
   if (typeof categoryId !== "string" || categoryId === "" || typeof learn !== "boolean") return null;
   if (pattern !== undefined && (typeof pattern !== "string" || !learn)) return null;
-  return { categoryId, learn, pattern };
+  return { categoryId, learn, pattern, contains };
 }
 
 export async function setCategory(request: Request, env: { DB: D1Database }, sync: SyncDeps, id: string): Promise<Response> {
@@ -41,6 +43,7 @@ export async function setCategory(request: Request, env: { DB: D1Database }, syn
         categoryId: input.categoryId,
         alwaysDoThis: input.learn,
         ...(input.pattern === undefined ? {} : { pattern: input.pattern }),
+        ...(input.contains === undefined ? {} : { contains: input.contains }),
         rules,
         newId: sync.newId,
       }));

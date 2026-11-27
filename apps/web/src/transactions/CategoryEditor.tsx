@@ -1,7 +1,8 @@
 // Byta kategori på en transaktion (#32, KK-18-B, KK-18-C). Valet blir manuellt och rörs sedan aldrig
 // av regler. Med "Gör alltid så" lärs en regel in, och om den matchar tidigare transaktioner frågar
 // vyn om den ska gälla dem också. Manuellt valda ändras aldrig. Har namnet flera ord kan regeln gälla en
-// kortare början, t.ex. "IKEA" för alla varuhus i kedjan. Standard är hela namnet.
+// kortare början, t.ex. "IKEA" för alla varuhus i kedjan, eller en text som namnet bara ska innehålla,
+// t.ex. "amazon", oavsett versaler (KK-47). Standard är hela namnet.
 import { normalizeCounterparty, patternChoices } from "@kronkoll/domain";
 import { useState } from "react";
 import { field, patchJson, postJson } from "../api.ts";
@@ -33,15 +34,19 @@ export function CategoryEditor(props: {
   const [step, setStep] = useState<Step>({ kind: "choose" });
   const choices = patternChoices({ counterpartyNorm: normalizeCounterparty(props.counterparty), description: props.description });
   const [pattern, setPattern] = useState(choices[0] ?? "");
+  /** Börjar med ett av valen, eller innehåller en text som användaren skriver. */
+  const [kind, setKind] = useState<"prefix" | "contains">("prefix");
+  const [contains, setContains] = useState(choices.at(-1)?.toLocaleLowerCase("sv-SE") ?? "");
 
   const save = async () => {
     setBusy(true);
     setError(null);
-    const request = { category_id: categoryId, learn_rule: learn, ...(learn && choices.length > 1 ? { rule_pattern: pattern } : {}) };
+    const rule = !learn ? {} : kind === "contains" ? { rule_contains: contains } : choices.length > 1 ? { rule_pattern: pattern } : {};
+    const request = { category_id: categoryId, learn_rule: learn, ...rule };
     const { status, body } = await patchJson(`/api/transactions/${encodeURIComponent(props.transactionId)}`, request);
     setBusy(false);
     if (status !== 200) {
-      setError("Det gick inte att spara kategorin. Försök igen.");
+      setError(field(body, "error") === "invalid_pattern" ? "Skriv en text som finns i transaktionen." : "Det gick inte att spara kategorin. Försök igen.");
       return;
     }
     props.onSaved(categoryId);
@@ -102,20 +107,34 @@ export function CategoryEditor(props: {
       <label>
         <input type="checkbox" checked={learn} onChange={(e) => { setLearn(e.target.checked); }} /> Gör alltid så för {props.name}
       </label>
-      {learn && choices.length > 1 && (
+      {learn && (
         <fieldset className="choices">
           <legend>Gäller</legend>
-          {choices.map((c) => (
-            <label key={c}>
-              <input type="radio" name={`pattern-${props.transactionId}`} value={c} checked={pattern === c} onChange={() => { setPattern(c); }} />
-              Allt som börjar med {c}
-            </label>
-          ))}
+          {choices.length > 1 &&
+            choices.map((c) => (
+              <label key={c}>
+                <input type="radio" name={`pattern-${props.transactionId}`} value={c} checked={kind === "prefix" && pattern === c} onChange={() => { setKind("prefix"); setPattern(c); }} />
+                Allt som börjar med {c}
+              </label>
+            ))}
+          <label>
+            <input type="radio" name={`pattern-${props.transactionId}`} value="contains" checked={kind === "contains"} onChange={() => { setKind("contains"); }} />
+            Allt som innehåller
+          </label>
+          {kind === "contains" && (
+            <>
+              <label>
+                Text
+                <input value={contains} maxLength={60} aria-describedby={`contains-hint-${props.transactionId}`} onChange={(e) => { setContains(e.target.value); }} />
+              </label>
+              <small id={`contains-hint-${props.transactionId}`}>Versaler och gemener spelar ingen roll.</small>
+            </>
+          )}
         </fieldset>
       )}
       {error && <p role="alert">{error}</p>}
       <p>
-        <button type="button" className="primary" disabled={busy || categoryId === ""} onClick={() => void save()}>
+        <button type="button" className="primary" disabled={busy || categoryId === "" || (learn && kind === "contains" && contains.trim() === "")} onClick={() => void save()}>
           Spara
         </button>{" "}
         <button type="button" onClick={props.onClose}>

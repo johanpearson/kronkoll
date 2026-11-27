@@ -20,7 +20,7 @@ import { getOverview } from "./overview.ts";
 import { webPushFrom, type PushEnv } from "./notify.ts";
 import { getPushConfig, subscribe, unsubscribe } from "./push.ts";
 import { getSettings, patchSettings } from "./settings.ts";
-import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule } from "./rules.ts";
+import { applyAll, createRule, deleteRule, getRuleMatches, listRules, patchRule, resetRules } from "./rules.ts";
 import { applyRule, setCategory } from "./set-category.ts";
 import { isIncomeTypeRequest, setIncomeType } from "./set-income-type.ts";
 import { getSplits, putSplits } from "./splits.ts";
@@ -152,6 +152,11 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     if (request.method === "GET") return listRules(env);
     if (request.method === "POST") return createRule(request, env, context.sync);
     return json({ error: "method_not_allowed" }, 405, { allow: "GET, POST" });
+  }
+
+  if (pathname === "/api/rules/reset") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return resetRules(request, env);
   }
 
   if (pathname === "/api/rules/apply-all") {

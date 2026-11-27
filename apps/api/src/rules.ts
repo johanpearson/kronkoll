@@ -7,6 +7,7 @@
 //   DELETE /api/rules/{id}
 //   GET    /api/rules/{id}/matches  förhandsvisning: transaktionerna regeln gäller och vad som händer
 //   POST   /api/rules/apply-all     alla regler över hela historiken ({ preview: true } räknar bara)
+//   POST   /api/rules/reset         { preview: true } hur många regler som tas bort, { confirm: true } tar bort alla (KK-51)
 // En ny eller ändrad regel gäller direkt för nya transaktioner (synken kategoriserar med den). Svaret
 // säger hur många tidigare den skulle ändra; appen frågar och använder POST /api/rules/{id}/apply.
 // Manuellt valda rörs aldrig.
@@ -231,6 +232,31 @@ export async function applyAll(request: Request, env: { DB: D1Database }): Promi
     if (input.preview === true) return json({ would_update: changes.length }, 200);
     await store.setCategories(changes);
     return json({ updated: changes.length }, 200);
+  } catch {
+    return json({ error: "unavailable" }, 503);
+  }
+}
+
+/**
+ * POST /api/rules/reset (KK-51): ta bort alla regler och börja om. `{ preview: true }` räknar bara. `{ confirm: true }`
+ * tar bort alla kategoriserande regler, mallens och egna, och alla Räkna inte-regler. Transaktionerna behåller sin
+ * kategori, och det som en Räkna inte-regel höll utanför räknas igen. Regler som bara sätter inkomsttyp rörs inte.
+ */
+export async function resetRules(request: Request, env: { DB: D1Database }): Promise<Response> {
+  const input = await body(request);
+  if (input === null) return invalid();
+  const { preview, confirm } = input;
+  const valid = (v: unknown) => v === undefined || typeof v === "boolean";
+  if (!valid(preview) || !valid(confirm) || (preview === true) === (confirm === true)) return invalid();
+  try {
+    const repo = ruleRepository(env.DB);
+    if (preview === true) {
+      const { categorize, exclude } = await repo.countAll();
+      return json({ rules: categorize, exclude_rules: exclude }, 200);
+    }
+    await repo.removeAll();
+    await recomputeTransfers(env.DB);
+    return json({ reset: true }, 200);
   } catch {
     return json({ error: "unavailable" }, 503);
   }

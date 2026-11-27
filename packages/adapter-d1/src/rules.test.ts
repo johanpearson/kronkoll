@@ -85,3 +85,19 @@ describe("regler med åtgärden Räkna inte i D1 (KK-39-C)", () => {
     await expect(insert("hide", null)).rejects.toThrow();
   });
 });
+
+describe("ta bort alla regler (KK-51)", () => {
+  it("räknar kategoriserande regler och Räkna inte-regler, och tar bort dem men inte inkomstregler", async () => {
+    const repo = ruleRepository(db);
+    await repo.save({ id: "r-egen", match: "counterparty_prefix", pattern: "IKEA", categoryId: "hushall-forbrukning", source: "learned" });
+    await repo.saveExclude({ id: "r-exkl", match: "counterparty_prefix", pattern: "PANTEN" });
+    await db.prepare(`INSERT INTO category_rules (id, match, pattern, category_id, income_type, source) VALUES ('r-inkomst', 'description_contains', 'BONUS', NULL, 'salary', 'learned')`).run();
+    const counts = await repo.countAll();
+    expect(counts.exclude).toBeGreaterThanOrEqual(1);
+    expect(counts.categorize).toBeGreaterThan(1);
+    await repo.removeAll();
+    expect(await repo.countAll()).toEqual({ categorize: 0, exclude: 0 });
+    expect((await db.prepare(`SELECT id FROM category_rules WHERE id = 'r-inkomst'`).first())?.["id"]).toBe("r-inkomst");
+    await db.prepare(`DELETE FROM category_rules WHERE id = 'r-inkomst'`).run();
+  });
+});

@@ -299,6 +299,37 @@ describe("konton som inte räknas med (KK-41)", () => {
     expect(result.ut).toEqual({ id: "ut", internal: false, pairId: null, reason: "none" });
   });
 
+  it("en dragning från ett konto som inte räknas med och motsvarande insättning på Gemensamt: insättningen räknas inte som inkomst", () => {
+    const result = run([
+      tx({ id: "ut", accountId: "sparande", amountMinor: -623300 }),
+      tx({ id: "in", accountId: "gemensamt", amountMinor: 623300 }),
+    ]);
+    expect(result.in).toEqual({ id: "in", internal: true, pairId: "ut", reason: "pair" });
+    expect(result.ut).toMatchObject({ internal: true, reason: "account" });
+  });
+
+  it("paret hittas inom tre dagar åt båda hållen, men en insättning utan motsvarande dragning är fortfarande inkomst", () => {
+    const near = run([
+      tx({ id: "ut", accountId: "sparande", amountMinor: -50000, transactionDate: "2026-11-27" }),
+      tx({ id: "in", accountId: "gemensamt", amountMinor: 50000, transactionDate: "2026-11-30" }),
+    ]);
+    expect(near.in).toMatchObject({ internal: true, reason: "pair" });
+    const far = run([
+      tx({ id: "ut", accountId: "sparande", amountMinor: -50000, transactionDate: "2026-11-20" }),
+      tx({ id: "in", accountId: "gemensamt", amountMinor: 50000, transactionDate: "2026-11-30" }),
+    ]);
+    expect(far.in).toEqual({ id: "in", internal: false, pairId: null, reason: "none" });
+    const alone = run([tx({ id: "lon", accountId: "gemensamt", amountMinor: 3_300_000 })]);
+    expect(alone.lon?.internal).toBe(false);
+  });
+
+  it("två konton som inte räknas med bildar ett par som inte räknas, och en Räkna inte-regel gäller dem inte dubbelt", () => {
+    const accounts: OwnAccount[] = [{ id: "gemensamt", type: "checking" }, { id: "a", type: "savings", counted: false }, { id: "b", type: "savings", counted: false }];
+    const result = run([tx({ id: "ut", accountId: "a", amountMinor: -1000 }), tx({ id: "in", accountId: "b", amountMinor: 1000 })], accounts);
+    expect(result.ut).toMatchObject({ internal: true, reason: "account" });
+    expect(result.in).toMatchObject({ internal: true, reason: "account" });
+  });
+
   it("KK-41-A: en transaktion på ett konto som inte räknas med räknas inte, med orsaken account", () => {
     const result = run([tx({ id: "kop", accountId: "sparande", amountMinor: -12900 })]);
     expect(result.kop).toEqual({ id: "kop", internal: true, pairId: null, reason: "account" });
