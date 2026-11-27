@@ -156,6 +156,19 @@ describe("PATCH /api/accounts/{id} role (KK-53, V-i-roles)", () => {
     expect(await db.prepare(`SELECT count(*) AS n FROM transactions WHERE saving_kind IS NOT NULL`).first("n")).toBe(0);
   });
 
+  it("sparande till bufferten får kategorin Sparande, men ett eget val eller en kategori som redan finns rörs inte (KK-53)", async () => {
+    await insertTx("spar", "acc_1", "2026-11-03", -200000);
+    await insertTx("spar-in", "acc_2", "2026-11-03", 200000);
+    await insertTx("eget", "acc_1", "2026-11-20", -10000);
+    await insertTx("eget-in", "acc_2", "2026-11-20", 10000);
+    await db.prepare(`UPDATE transactions SET category_id = 'mat-livsmedel', category_source = 'manual' WHERE id = 'eget'`).run();
+    await call("PATCH", "/api/accounts/acc_2", { role: "buffer" });
+    const category = async (id: string) => db.prepare(`SELECT category_id AS c, category_source AS s FROM transactions WHERE id = ?`).bind(id).first();
+    expect(await category("spar")).toEqual({ c: "sparande-overforingar-sparande", s: "template" });
+    expect(await category("eget")).toEqual({ c: "mat-livsmedel", s: "manual" });
+    expect(await category("spar-in")).toEqual({ c: null, s: "none" });
+  });
+
   it("de gamla valen översätts till en roll tills Inställningar använder rollen", async () => {
     const role = async () => (await items())[1]?.["role"];
     await call("PATCH", "/api/accounts/acc_2", { saving: true });

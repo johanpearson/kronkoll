@@ -1,7 +1,7 @@
 // Interna överföringar (KK-20-C). Omräkningen används både efter varje synk och när användaren
 // markerar en transaktion själv, så att en motpost alltid följer med åt rätt håll.
-import { ruleRepository, transactionRepository } from "@kronkoll/adapter-d1";
-import { classifyTransfers, savingKindOf } from "@kronkoll/domain";
+import { categoryRepository, ruleRepository, transactionRepository } from "@kronkoll/adapter-d1";
+import { classifyTransfers, savingCategoryChanges, savingCategoryId, savingKindOf } from "@kronkoll/domain";
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json; charset=utf-8" } });
@@ -19,13 +19,18 @@ export async function recomputeTransfers(db: D1Database): Promise<number> {
   const store = transactionRepository(db);
   const current = await store.forTransfers();
   const now = new Map(current.map((t) => [t.id, t]));
-  const changes = classifyTransfers({ transactions: current, accounts: await store.ownAccounts(), cardPaymentCounterparties: [], excludeRules: await ruleRepository(db).excludeRules() })
-    .map((c) => ({ id: c.id, internal: c.internal, pairId: c.pairId, savingKind: savingKindOf(c.reason) }))
+  const classified = classifyTransfers({ transactions: current, accounts: await store.ownAccounts(), cardPaymentCounterparties: [], excludeRules: await ruleRepository(db).excludeRules() }).map(
+    (c) => ({ id: c.id, internal: c.internal, pairId: c.pairId, savingKind: savingKindOf(c.reason) }),
+  );
+  const changes = classified
     .filter((c) => {
       const before = now.get(c.id);
       return before?.internal !== c.internal || before.pairId !== c.pairId || before.savingKind !== c.savingKind;
     });
   await store.setTransfers(changes);
+  // Sparande till en buffert får kategorin Sparande när det saknar kategori (KK-53). Ett eget val eller en regel vinner.
+  const sparande = savingCategoryId(await categoryRepository(db).list());
+  await store.setCategories(savingCategoryChanges(classified.map((c) => ({ ...c, categorySource: now.get(c.id)?.categorySource ?? "none" })), sparande));
   return changes.length;
 }
 

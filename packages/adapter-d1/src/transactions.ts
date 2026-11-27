@@ -335,7 +335,7 @@ export function transactionRepository(d1: D1Database) {
      * Transaktioner i domänens form för att hitta interna överföringar (KK-20-C), med hur de är
      * markerade nu. Manuell markering finns inte i databasen än och är därför alltid null.
      */
-    async forTransfers(): Promise<(TransferInput & { internal: boolean; pairId: string | null; savingKind: SavingKind | null })[]> {
+    async forTransfers(): Promise<(TransferInput & { internal: boolean; pairId: string | null; savingKind: SavingKind | null; categorySource: Row["categorySource"] })[]> {
       const rows = await db
         .select({
           id: transactions.id,
@@ -348,6 +348,7 @@ export function transactionRepository(d1: D1Database) {
           internal: transactions.isInternalTransfer,
           pairId: transactions.transferPairId,
           savingKind: transactions.savingKind,
+          categorySource: transactions.categorySource,
           manualTransfer: transactions.manualTransfer,
           hidden: transactions.hidden,
         })

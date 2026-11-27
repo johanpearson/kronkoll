@@ -9,6 +9,7 @@
  */
 import { sumMinor } from "./money.ts";
 import type { BudgetPeriod } from "./period.ts";
+import type { CategoryChange, CategorySource } from "./categorize.ts";
 import type { TransferClassification } from "./transfers.ts";
 
 /** Hur en transaktion rör bufferten. Sparas per transaktion när överföringarna räknas om. */
@@ -49,4 +50,36 @@ export function bufferTotals(transactions: readonly BufferTransaction[], period:
 /** Bufferten för flera perioder, i samma ordning, för trenden på kortet (KK-55-A). */
 export function bufferTrend(transactions: readonly BufferTransaction[], periods: readonly BudgetPeriod[]): BufferTotals[] {
   return periods.map((period) => bufferTotals(transactions, period));
+}
+
+/** Huvudkategorin och underkategorin i mallen som sparande till en buffert får (KK-53). */
+const SAVING_PARENT = "Sparande & överföringar";
+const SAVING_NAME = "Sparande";
+
+interface NamedCategory {
+  readonly id: string;
+  readonly parentId: string | null;
+  readonly name: string;
+  readonly archived: boolean;
+}
+
+/** Underkategorin Sparande under Sparande & överföringar, eller null om den inte finns, är arkiverad eller omdöpt. */
+export function savingCategoryId(categories: readonly NamedCategory[]): string | null {
+  const parent = categories.find((c) => c.parentId === null && c.name === SAVING_PARENT && !c.archived);
+  if (parent === undefined) return null;
+  return categories.find((c) => c.parentId === parent.id && c.name === SAVING_NAME && !c.archived)?.id ?? null;
+}
+
+/**
+ * Sparande från ett Inkomst/Utgift-konto till en buffert får kategorin Sparande (KK-53), men bara när transaktionen
+ * saknar kategori. Ett eget val eller en regel vinner alltid, och kategorin går att ändra som vilken annan som helst.
+ */
+export function savingCategoryChanges(
+  transactions: readonly { readonly id: string; readonly savingKind: SavingKind | null; readonly categorySource: CategorySource }[],
+  categoryId: string | null,
+): CategoryChange[] {
+  if (categoryId === null) return [];
+  return transactions
+    .filter((tx) => tx.savingKind === "saving" && tx.categorySource === "none")
+    .map((tx) => ({ id: tx.id, categoryId, categorySource: "template" }));
 }

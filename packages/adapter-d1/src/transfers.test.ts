@@ -57,6 +57,7 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
       hidden: false,
       internal: false,
       savingKind: null,
+      categorySource: "none",
       pairId: null,
     });
   });

@@ -28,7 +28,7 @@ export {
   type TransferClassification,
   type TransferInput,
 } from "./transfers.ts";
-export { bufferTotals, bufferTrend, savingKindOf, type BufferTotals, type BufferTransaction, type SavingKind } from "./buffer.ts";
+export { bufferTotals, bufferTrend, savingCategoryChanges, savingCategoryId, savingKindOf, type BufferTotals, type BufferTransaction, type SavingKind } from "./buffer.ts";
 export { learnPattern, matchesWordPrefix, normalizeCounterparty } from "./normalize.ts";
 export {
   applyAllRules,
