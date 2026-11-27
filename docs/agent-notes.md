@@ -114,6 +114,9 @@ pnpm --filter @kronkoll/<paket> test:coverage
   Kör axe mot dev-servern med en tillfällig spec utanför git när komponenterna ändras.
 - De gamla vyernas regler för `main h2`, `main ul` och `button` slår igenom på nya element. Nollställ det som
   behövs i `ui-`-klassen (se `.ui-heading` och `main ul.ui-list`).
+- Notiser (`toast.tsx`, KK-64) visas upptill. En bekräftelse kan ha knappen Ångra, så läs meddelandet med
+  `getByRole("status").querySelector("p")` (enhetstest) eller `.locator("p")` (E2E), inte hela notisens text.
+  a11y-testet kräver att ingen `role="alert"` syns, så fel som hör till en vy visas där och inte som notis.
 - jsdom saknar `HTMLDialogElement.showModal`, `IntersectionObserver`, `matchMedia` och `Element.animate`.
   Testerna stubbar dem själva, och komponenterna fungerar utan dem.
 - `formatSek` använder hårda mellanslag. Jämför text med `.replace(/\s/gu, " ")` eller ett regex med `\s`.
@@ -161,6 +164,8 @@ pnpm --filter @kronkoll/<paket> test:coverage
 
 - Heredocs och `sed` med backslash eller `'` i SQL har gått sönder flera gånger, bland annat ett regex som
   tappade sina `\d`. Använd redigeringsverktyget för kod med backslash, och läs tillbaka raden efteråt.
+- En del filer har CRLF (t.ex. `apps/web/src/toast.tsx`). Skript som skriver om en fil med LF gör hela filen till en
+  ändring i diffen och i `pr-size`. Kontrollera med `git diff --stat --ignore-cr-at-eol` och behåll filens radslut.
 - Windows PowerShell 5: `Get-Content`/`Set-Content` utan `-Encoding` förstör å, ä och ö i UTF-8-filer, och
   `-Encoding utf8` lägger till BOM. Använd redigeringsverktyget.
 - PR-text till `gh pr create --body-file`: skriv filen utan BOM, t.ex. `[IO.File]::WriteAllText($p, $text,

@@ -58,7 +58,11 @@ test("välj flera transaktioner, dölj dem och visa dem igen (V-e2e-hide, KK-49)
   await page.getByRole("checkbox", { name: "Välj Påhittade Möbler AB" }).check();
   await expect(page.getByText("1 valda")).toBeVisible();
   await page.getByRole("button", { name: "Dölj" }).click();
-  await expect(page.getByRole("status")).toHaveText("1 transaktion är dold. De finns under Visa dolda.");
+  await expect(page.getByRole("status").locator("p")).toHaveText("1 transaktion är dold. De finns under Visa dolda.");
+  // Notisen syns upptill, aldrig över flikmenyn, och har Ångra (KK-64-B, F).
+  const box = await page.getByRole("status").boundingBox();
+  expect(box?.y ?? 999).toBeLessThan(100);
+  await expect(page.getByRole("status").getByRole("button", { name: "Ångra" })).toBeVisible();
   await expect(row("Påhittade Möbler AB")).toHaveCount(0);
 
   await page.getByRole("checkbox", { name: "Visa dolda" }).check();
@@ -66,7 +70,7 @@ test("välj flera transaktioner, dölj dem och visa dem igen (V-e2e-hide, KK-49)
   await page.getByRole("button", { name: "Välj flera" }).click();
   await page.getByRole("checkbox", { name: "Välj Påhittade Möbler AB" }).check();
   await page.getByRole("button", { name: "Visa igen" }).click();
-  await expect(page.getByRole("status")).toHaveText("1 transaktion visas igen.");
+  await expect(page.getByRole("status").locator("p")).toHaveText("1 transaktion visas igen.");
   await page.getByRole("checkbox", { name: "Visa dolda" }).uncheck();
   await expect(row("Påhittade Möbler AB")).toHaveCount(1);
 });

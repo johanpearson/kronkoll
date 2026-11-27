@@ -716,3 +716,72 @@ a.ui-row:active {
 .ui-backbar + main {
   padding-top: var(--space-2);
 }
+
+/* Notiser upptill (KK-64-B): under sidans överkant, aldrig över flikmenyn. Kan sveps bort. */
+.ui-toasts {
+  position: fixed;
+  inset: calc(env(safe-area-inset-top) + var(--space-3)) 0 auto;
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  padding: 0 var(--space-4);
+  pointer-events: none;
+}
+
+.ui-toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 608px;
+  min-height: var(--tap);
+  margin: 0;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--success);
+  border-radius: var(--radius-small);
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  touch-action: pan-y;
+  animation: ui-toast-in var(--duration-slow) var(--easing-out);
+}
+
+.ui-toast-problem {
+  border-left-color: var(--danger);
+}
+
+.ui-toast p {
+  flex: 1;
+  margin: 0;
+}
+
+.ui-toast-action,
+.ui-toast-close {
+  flex: none;
+  min-width: var(--tap);
+  min-height: var(--tap);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: var(--radius-small);
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+}
+
+.ui-toast-close {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: var(--text);
+}
+
+@keyframes ui-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+}
