@@ -5,7 +5,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../toast.tsx";
-import { DONE_MS, MAX_WAIT_MS, POLL_MS, SyncStatus } from "./SyncStatus.tsx";
+import { DONE_MS, MAX_WAIT_MS, POLL_MS, SyncStatus, requestSync } from "./SyncStatus.tsx";
 
 const STARTED = "2026-11-15T06:00:00.000Z";
 
@@ -113,6 +113,23 @@ describe("synkstatus (KK-64-A)", () => {
     fireEvent.click(icon("Synken misslyckades"));
     expect(screen.getByRole("dialog").textContent).toContain(message);
     expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("en dragning nedåt startar synken utan arket, men inte en till medan den pågår (KK-63-D)", async () => {
+    const calls = api({ progress: () => [200, { done: false }] });
+    setup();
+    act(() => {
+      requestSync();
+    });
+    await settle();
+    expect(calls.filter((c) => c === "POST /api/sync")).toHaveLength(1);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(icon("Synkar…")).toBeTruthy();
+    act(() => {
+      requestSync();
+    });
+    await settle();
+    expect(calls.filter((c) => c === "POST /api/sync")).toHaveLength(1);
   });
 
   it("säger Inte synkad än när ingen synk har gått", () => {

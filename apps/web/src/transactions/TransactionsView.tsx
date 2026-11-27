@@ -11,6 +11,7 @@ import { field, getJson, postJson } from "../api.ts";
 import { Link, replaceUrl } from "../router.tsx";
 import { CategoryDot } from "../category-color.tsx";
 import { IconButton, PeriodNav } from "../icon-button.tsx";
+import { SyncStatus } from "../sync/SyncStatus.tsx";
 import { useToast } from "../toast.tsx";
 import { CategoryEditor, type CategoryOption } from "./CategoryEditor.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
@@ -352,7 +353,11 @@ export function TransactionsView() {
 
   return (
     <main>
-      <h1>Transaktioner</h1>
+      <div className="page-header">
+        <h1>Transaktioner</h1>
+        {/* Synkstatus här också, så att dra för att synka syns (KK-63-D, KK-64-A). */}
+        <SyncStatus onDone={() => { setFilters((current) => ({ ...current })); }} />
+      </div>
       {filters.categoryId && (
         <p className="note" role="note">
           Visar {categories.names.get(filters.categoryId) ?? filters.categoryId} med underkategorier.{" "}

@@ -92,3 +92,21 @@ test("ett svep i sidled byter flik i menyns ordning, utan nytt steg bakåt (KK-6
   await page.goBack();
   await expect(page).toHaveURL(/\/$/u);
 });
+
+test("dra nedåt högst upp i Översikt startar en synk, som syns i synkikonen (KK-63-D)", async ({ page }) => {
+  await useFakeApi(page);
+  const syncs: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname === "/api/sync") syncs.push(request.url());
+  });
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: "Översikt" })).toBeVisible();
+  const view = page.locator(".ui-view");
+  const init = { pointerId: 1, pointerType: "touch", isPrimary: true, bubbles: true, clientX: 200 };
+  await view.dispatchEvent("pointerdown", { ...init, clientY: 150 });
+  for (const y of [180, 300, 450]) await view.dispatchEvent("pointermove", { ...init, clientY: y });
+  await expect(page.locator(".ui-pull-ready")).toBeVisible();
+  await view.dispatchEvent("pointerup", { ...init, clientY: 450 });
+  await expect.poll(() => syncs.length).toBe(1);
+  await expect(page.locator(".ui-pull")).toHaveCount(0);
+});
