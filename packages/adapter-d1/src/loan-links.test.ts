@@ -85,6 +85,7 @@ describe("kopplingar i D1 (KK-59-B)", () => {
     await loanLinkRepository(db).setMatching("lan1", ["9020-12 345 67"], category);
     expect((await link()).map((c) => c.id).sort()).toEqual(["bet-nov", "bet-okt"]);
     expect(await row("bet-nov")).toEqual({ loan: "lan1", source: "auto", category, cs: "learned" });
+    expect((await transactionRepository(db).detail("bet-nov"))?.loan).toEqual({ id: "lan1", name: "Bolån", source: "auto" });
     expect(await row("insattning")).toEqual({ loan: null, source: null, category: null, cs: "none" });
     expect(await row("borta")).toMatchObject({ loan: null });
     // En andra körning ändrar ingenting.
@@ -151,5 +152,47 @@ describe("kopplingar i D1 (KK-59-B)", () => {
     expect((await store.categorizable()).map((t) => t.id).sort()).toEqual(["ica", "insattning"]);
     expect(await loanRepository(db).remove("lan1")).toBe(true);
     expect(await row("bet-nov")).toMatchObject({ loan: null });
+  });
+});
+
+describe("koppla för hand (KK-59-B)", () => {
+  it("kopplar en betalning till ett lån som manuell, med lånets kategori, och en ny synk rör den inte", async () => {
+    const repo = loanLinkRepository(db);
+    await repo.setMatching("lan1", [], category);
+    expect(await repo.setManual("ica", "lan1")).toBe(true);
+    expect(await row("ica")).toEqual({ loan: "lan1", source: "manual", category, cs: "learned" });
+    // Detaljen visar "Lån: <namn>" och att kopplingen är gjord för hand.
+    expect((await transactionRepository(db).detail("ica"))?.loan).toEqual({ id: "lan1", name: "Bolån", source: "manual" });
+    await repo.setMatching("lan1", ["9020-12 345 67"], category);
+    await link();
+    expect(await row("ica")).toMatchObject({ loan: "lan1", source: "manual" });
+  });
+
+  it("tar bort en koppling för hand: lånets kategori släpps, och matchningen kopplar den inte igen", async () => {
+    const repo = loanLinkRepository(db);
+    await repo.setMatching("lan1", ["9020-12 345 67"], category);
+    await link();
+    expect(await repo.setManual("bet-nov", null)).toBe(true);
+    expect(await row("bet-nov")).toEqual({ loan: null, source: "manual", category: null, cs: "none" });
+    await link();
+    expect(await row("bet-nov")).toMatchObject({ loan: null, source: "manual" });
+  });
+
+  it("en manuell kategori ligger kvar både när betalningen kopplas och när kopplingen tas bort", async () => {
+    await db.prepare(`UPDATE transactions SET category_id = 'mat-livsmedel', category_source = 'manual' WHERE id = 'ica'`).run();
+    const repo = loanLinkRepository(db);
+    await repo.setMatching("lan1", [], category);
+    await repo.setManual("ica", "lan1");
+    expect(await row("ica")).toMatchObject({ category: "mat-livsmedel", cs: "manual" });
+    await repo.setManual("ica", null);
+    expect(await row("ica")).toEqual({ loan: null, source: "manual", category: "mat-livsmedel", cs: "manual" });
+  });
+
+  it("ett lån eller en transaktion som inte finns, eller en borttagen transaktion, ger falskt och ändrar inget", async () => {
+    const repo = loanLinkRepository(db);
+    expect(await repo.setManual("ica", "saknas")).toBe(false);
+    expect(await repo.setManual("saknas", "lan1")).toBe(false);
+    expect(await repo.setManual("borta", "lan1")).toBe(false);
+    expect(await row("ica")).toEqual({ loan: null, source: null, category: null, cs: "none" });
   });
 });

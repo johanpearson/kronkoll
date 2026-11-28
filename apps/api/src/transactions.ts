@@ -153,6 +153,8 @@ export async function getTransaction(env: { DB: D1Database }, id: string): Promi
         manual_transfer: detail.manualTransfer,
         income_type: detail.incomeType,
         income_source: detail.incomeSource,
+        // "Lån: <namn>" i transaktionen (KK-59-B). Namnet är användarens och renderas som text (KK-30).
+        loan: detail.loan,
         transfer_pair: detail.transferPair && {
           id: detail.transferPair.id,
           account_name: detail.transferPair.accountName,
