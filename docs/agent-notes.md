@@ -153,9 +153,9 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Alla fyra konton har typen `checking`; två av dem hör till kort. Samtycket går ut 2027-05-01.
 - Skandia skickar preliminära (PDNG) och sätter `booking_date` även på dem. Status är det enda som skiljer.
 - Saldotypen (#252, KK-56-F): adaptern väljer bokfört före tillgängligt (`BALANCE_PREFERENCE`) och sparar typen i
-  `accounts.balance_type` sedan 0025. Vilken typ Skandia skickar är **inte bekräftat än**. Ägaren kör efter en synk
-  `SELECT balance_type, COUNT(*) FROM accounts GROUP BY balance_type`. `accountBalances` räknar XPCD, ITAV och CLAV som
-  att de preliminära redan är inräknade, och allt annat (även null) som bokfört.
+  `accounts.balance_type` sedan 0025. **Skandia skickar CLBD för alla fyra kontona** (bekräftat av ägaren 2026-11-28),
+  alltså bokfört saldo utan de preliminära. Disponibelt räknas därför som bokfört plus kontots preliminära.
+  `accountBalances` räknar XPCD, ITAV och CLAV som att de preliminära redan är inräknade, och allt annat (även null) som bokfört.
 - Första synken skickar `strategy=longest` på `GET /accounts/{id}/transactions` för längsta möjliga historik
   (KK-5-C). Ger det FAILED eller fler sidor än gränsen hämtas 90 dagar (`FIRST_SYNC_DAYS`) i stället.
 - En hel synk tar runt 100 ms CPU (mätt med `wrangler tail kronkoll-api --format json`, fältet `cpuTime`),
