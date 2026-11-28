@@ -25,6 +25,8 @@ for (const colorScheme of ["light", "dark"] as const) {
       await expect(page.getByText("Laddar")).toHaveCount(0);
       // Vyn ska visa innehåll från det påhittade API:t, inte ett felmeddelande.
       await expect(page.getByRole("alert")).toHaveCount(0);
+      // Kort tonar in (KK-65-B). axe ska mäta kontrasten när de syns helt, inte mitt i animationen.
+      await page.evaluate(() => Promise.all(document.getAnimations().filter((a) => a.effect?.getTiming().iterations !== Infinity).map((a) => a.finished)));
       const results = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"]).analyze();
       expect(results.violations.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(" ")).join(", ")}`)).toEqual([]);
     });

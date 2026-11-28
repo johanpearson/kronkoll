@@ -851,3 +851,46 @@ main ul.account-list .ui-card {
 a.ui-button {
   text-decoration: none;
 }
+
+/* Lån i ny design (#257): totalerna bredvid varandra och månadskostnaden större än resten av kortet. */
+.loan-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-3);
+}
+
+.loan-totals dd {
+  margin: 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+}
+
+.loan-cost {
+  margin: var(--space-1) 0;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+}
+
+.loan-paid {
+  margin: var(--space-2) 0 0;
+}
+
+/* Kontouppgifter på ett lån (#257): flera rader text och förhandsvisningen av träffarna. */
+textarea.ui-input {
+  padding: var(--space-2) var(--space-4);
+  resize: vertical;
+}
+
+.loan-preview {
+  margin-top: var(--space-2);
+}
+
+main ul.loan-preview-list,
+ul.loan-preview-list {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  border: 0;
+  box-shadow: none;
+}

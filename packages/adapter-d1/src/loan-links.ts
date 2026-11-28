@@ -97,6 +97,35 @@ export function loanLinkRepository(d1: D1Database) {
      * Skriver kopplingarna från `linkLoans`. En ny koppling ger lånets kategori om lånet har en och kategorin inte är
      * manuell. En borttagen automatisk koppling släpper kategorin från lånet. Manuella kopplingar rörs aldrig.
      */
+    /**
+     * Kopplar en betalning till ett lån för hand, eller tar bort kopplingen med null (KK-59-B). Kopplingen blir
+     * manuell, så att matchningen aldrig ändrar den. Lånets kategori sätts eller släpps som när matchningen gör det,
+     * men en manuell kategori rörs aldrig. Falskt om transaktionen eller lånet inte finns.
+     */
+    async setManual(transactionId: string, loanId: string | null): Promise<boolean> {
+      const [tx] = await db
+        .select({ loanId: transactions.loanId })
+        .from(transactions)
+        .where(and(eq(transactions.id, transactionId), ne(transactions.status, "removed")))
+        .all();
+      const [loan] = loanId === null ? [] : await db.select({ categoryId: loans.categoryId }).from(loans).where(eq(loans.id, loanId)).all();
+      if (!tx || (loanId !== null && !loan)) return false;
+      const row = eq(transactions.id, transactionId);
+      const notManualCategory = and(row, ne(transactions.categorySource, "manual"));
+      const categoryId = loan?.categoryId ?? null;
+      const category =
+        loanId === null
+          ? tx.loanId === null
+            ? []
+            : [db.update(transactions).set({ categoryId: null, categorySource: "none" }).where(notManualCategory)]
+          : categoryId === null
+            ? []
+            : [db.update(transactions).set({ categoryId, categorySource: "learned" }).where(notManualCategory)];
+      // Kategorin beror bara på kopplingen före ändringen, som lästes ovan, så ordningen spelar ingen roll.
+      await db.batch([db.update(transactions).set({ loanId, loanSource: "manual" }).where(row), ...category]);
+      return true;
+    },
+
     async apply(changes: readonly LoanLinkChange[], matching: readonly LoanMatching[]): Promise<void> {
       const categoryOf = new Map(matching.map((m) => [m.loanId, m.categoryId]));
       const notManualLink = or(sql`${transactions.loanSource} IS NULL`, eq(transactions.loanSource, "auto"));
