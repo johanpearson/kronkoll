@@ -1,7 +1,7 @@
 // Inställningar (#259, KK-62-B, KK-65-A): grupperade listrader med ikon och chevron som leder till varsin
 // undervy, utseendet direkt på sidan och Logga ut som en tydlig knapp längst ned (KK-35-A). Undervyerna har
 // sina egna sidor nedan, så att bakåt går tillbaka hit.
-import { Bell, CalendarDays, Landmark, ListChecks, Tag, Wallet } from "lucide-react";
+import { Bell, CalendarDays, Info, Landmark, ListChecks, Tag, Wallet } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { browser } from "../browser.ts";
 import { setTheme, storedTheme, type Theme } from "../theme.ts";
@@ -52,6 +52,7 @@ export function SettingsView() {
       </List>
       <List label="Appen">
         <ListRow icon={Bell} label="Notiser" to="/installningar/notiser" />
+        <ListRow icon={Info} label="Om appen" detail="Version och integritet" to="/installningar/om" />
       </List>
       <Card title="Utseende">
         <SegmentedControl label="Utseende" options={THEMES} value={theme} onChange={choose} />
@@ -110,6 +111,32 @@ export function NotificationSettings() {
     <Page title="Notiser">
       <Card>
         <Notifications />
+      </Card>
+    </Page>
+  );
+}
+
+/** Versionen: commit som bygget gjordes från, satt av vite.config.ts. Lokalt finns ingen. */
+const VERSION: string = typeof import.meta.env.VITE_COMMIT === "string" && import.meta.env.VITE_COMMIT !== "" ? import.meta.env.VITE_COMMIT.slice(0, 7) : "Utvecklingsversion";
+
+/** /installningar/om: version, integritet och villkor (#259). */
+export function AboutSettings() {
+  return (
+    <Page title="Om appen">
+      <Card title="Version">
+        <p className="ui-body">{VERSION}</p>
+      </Card>
+      <Card title="Integritet">
+        <ul className="ui-body ui-stack">
+          <li>Kronkoll har bara läsbehörighet hos banken. Appen kan inte göra betalningar eller ändra något hos banken.</li>
+          <li>Bankdata hämtas via Enable Banking och sparas i appens egen databas hos Cloudflare. Den delas inte med någon annan.</li>
+          <li>Appen går bara att nå för inbjudna, efter inloggning med Cloudflare Access.</li>
+          <li>Loggarna innehåller aldrig bankens texter, bara status, antal och felkoder.</li>
+          <li>En bankkoppling kan raderas med sin historik under Bank.</li>
+        </ul>
+      </Card>
+      <Card title="Villkor">
+        <p className="ui-body">Kronkoll är en personlig app. Det finns inga villkor utöver det samtycke du ger banken när du kopplar den.</p>
       </Card>
     </Page>
   );
