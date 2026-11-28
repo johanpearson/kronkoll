@@ -284,7 +284,8 @@ export function transactionRepository(d1: D1Database) {
           categorySource: transactions.categorySource,
         })
         .from(transactions)
-        .where(and(eq(transactions.categorySource, "none"), ne(transactions.status, "removed")))
+        // En betalning som är kopplad till ett lån har lånets kategori, och den vinner över reglerna (KK-59-B).
+        .where(and(eq(transactions.categorySource, "none"), ne(transactions.status, "removed"), isNull(transactions.loanId)))
         .all();
     },
 
@@ -315,7 +316,8 @@ export function transactionRepository(d1: D1Database) {
           categorySource: transactions.categorySource,
         })
         .from(transactions)
-        .where(ne(transactions.status, "removed"))
+        // Lånets kategori vinner över reglerna, så kopplade betalningar räknas inte om (KK-59-B).
+        .where(and(ne(transactions.status, "removed"), isNull(transactions.loanId)))
         .all();
     },
 

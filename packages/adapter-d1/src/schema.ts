@@ -190,6 +190,13 @@ export const transactions = sqliteTable(
      * uteslutet konto. Null annars. Skrivs när överföringarna räknas om. Ingen CHECK, av samma skäl som income_source.
      */
     savingKind: text("saving_kind", { enum: SAVING_KINDS }),
+    /** Lånet som betalningen hör till (KK-59-B). Tas lånet bort blir den null. */
+    loanId: text("loan_id").references((): AnySQLiteColumn => loans.id, { onDelete: "set null" }),
+    /**
+     * Hur kopplingen kom till: "auto" av lånets matchningstexter, "manual" av användaren. "manual" med loan_id null
+     * betyder att användaren har tagit bort kopplingen. Ingen CHECK, av samma skäl som income_source.
+     */
+    loanSource: text("loan_source", { enum: ["auto", "manual"] }),
   },
   (t) => [
     check("transactions_status", oneOf("status", ["pending", "booked", "removed"])),
@@ -311,6 +318,10 @@ export const loans = sqliteTable(
     /** Sista dagen med bunden ränta, null för rörlig ränta. */
     rateFixedUntil: text("rate_fixed_until"),
     amortizationMinor: integer("amortization_minor").notNull(),
+    /** Användarens matchningstexter som JSON-lista, t.ex. lånets kontonummer (KK-59-A). Renderas som text (KK-30). */
+    matchPatterns: text("match_patterns").notNull().default("[]"),
+    /** Kategorin som kopplade betalningar får (KK-59-B), eller null för att bara koppla. */
+    categoryId: text("category_id").references(() => categories.id),
     createdAt: createdAt(),
   },
   () => [
