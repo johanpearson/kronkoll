@@ -57,21 +57,21 @@ export function PeriodStart() {
   };
 
   return (
-    <div className="period-start">
-      <label>
+    <div className="ui-field">
+      <label className="ui-label" htmlFor="period-start">
         Budgetperioden börjar
-        <select value={state.day} disabled={state.saving} onChange={(e) => void choose(Number(e.target.value))}>
-          {DAYS.map((d) => (
-            <option key={d} value={d}>
-              {label(d)}
-            </option>
-          ))}
-        </select>
       </label>
-      <small>
+      <select id="period-start" className="ui-input" value={state.day} disabled={state.saving} onChange={(e) => void choose(Number(e.target.value))}>
+        {DAYS.map((d) => (
+          <option key={d} value={d}>
+            {label(d)}
+          </option>
+        ))}
+      </select>
+      <p className="ui-caption">
         Pågående period: {formatDateShort(state.period.start)} – {formatDateShort(state.period.end)}. Infaller dagen på en helg börjar perioden
         bankdagen före.
-      </small>
+      </p>
       {state.message && <p role={state.message === "Sparat." ? "status" : "alert"}>{state.message}</p>}
     </div>
   );

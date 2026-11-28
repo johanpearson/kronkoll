@@ -59,8 +59,8 @@ async function settle() {
   });
 }
 
-const box = (name: RegExp) => screen.getByRole<HTMLInputElement>("switch", { name });
-const states = () => screen.getAllByRole<HTMLInputElement>("switch").map((c) => c.checked);
+const box = (name: RegExp) => screen.getByRole<HTMLButtonElement>("switch", { name });
+const states = () => screen.getAllByRole("switch").map((c) => c.getAttribute("aria-checked") === "true");
 const saveButton = () => screen.getByRole<HTMLButtonElement>("button", { name: "Spara" });
 
 async function show(device: PushDevice) {
@@ -153,7 +153,7 @@ describe("notisinställningar (KK-27)", () => {
     fireEvent.click(saveButton());
     await settle();
     expect(screen.getByRole("alert").textContent).toMatch(/blockerade/u);
-    expect(box(/Synken/u).checked).toBe(true);
+    expect(box(/Synken/u).getAttribute("aria-checked")).toBe("true");
     expect(saveButton().disabled).toBe(false);
     expect(calls).toEqual([]);
     fireEvent.click(box(/Samtycket/u));
