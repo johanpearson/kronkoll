@@ -33,10 +33,14 @@ export {
   knownAccountFor,
   knownAccountHits,
   knownAccountRules,
+  linkKnownAccounts,
   normalizeKnownPattern,
   validateKnownAccount,
   type KnownAccount,
+  type KnownAccountLinkChange,
+  type KnownAccountLinkSource,
   type KnownAccountTransaction,
+  type LinkableTransaction,
 } from "./known-accounts.ts";
 export { learnPattern, matchesWordPrefix, normalizeCounterparty } from "./normalize.ts";
 export {

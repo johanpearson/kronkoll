@@ -110,6 +110,7 @@ export function categoryRepository(d1: D1Database) {
         move("transactions"),
         move("transaction_splits"),
         move("category_rules"),
+        move("known_accounts"),
         d1
           .prepare(
             `UPDATE budget_lines SET amount_minor = amount_minor + (SELECT b.amount_minor FROM budget_lines b WHERE b.period = budget_lines.period AND b.category_id = ?1)
