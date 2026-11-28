@@ -1,7 +1,7 @@
-// Gesterna som rena beslut (KK-63): när ett svep byter flik och när en dragning nedåt startar en synk.
+// Gesterna som rena beslut (KK-63): när ett svep byter flik.
 // Allt mäts i pixlar och millisekunder, så att reglerna kan testas utan pekskärm.
 import { describe, expect, it } from "vitest";
-import { EDGE_PX, PULL_TRIGGER_PX, neighbourTab, pullDistance, pullTriggers, swipeAxis, swipeDecision } from "./gesture.ts";
+import { EDGE_PX, neighbourTab, swipeAxis, swipeDecision } from "./gesture.ts";
 
 const WIDTH = 400;
 
@@ -52,17 +52,3 @@ describe("neighbourTab: menyns ordning (KK-63-A)", () => {
   });
 });
 
-describe("dra för att synka (KK-63-D)", () => {
-  it("indikatorn följer fingret men allt trögare, och aldrig uppåt", () => {
-    expect(pullDistance(-30)).toBe(0);
-    expect(pullDistance(0)).toBe(0);
-    expect(pullDistance(100)).toBe(50);
-    expect(pullDistance(400)).toBeLessThan(150);
-    expect(pullDistance(400)).toBeGreaterThan(pullDistance(300));
-  });
-
-  it("startar en synk när den dragits förbi gränsen, och bara då", () => {
-    expect(pullTriggers(PULL_TRIGGER_PX)).toBe(true);
-    expect(pullTriggers(PULL_TRIGGER_PX - 1)).toBe(false);
-  });
-});

@@ -357,7 +357,7 @@ export function TransactionsView() {
     <main>
       <div className="page-header">
         <h1>Transaktioner</h1>
-        {/* Synkstatus här också, så att dra för att synka syns (KK-63-D, KK-64-A). */}
+        {/* Synkstatus här också, så att det går att synka härifrån (KK-64-A). */}
         <SyncStatus onDone={() => { setFilters((current) => ({ ...current })); }} />
       </div>
       {filters.categoryId && (
