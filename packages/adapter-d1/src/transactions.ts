@@ -70,6 +70,8 @@ export interface TransactionListItem {
   readonly split: boolean;
   /** Dold av användaren (KK-49). */
   readonly hidden: boolean;
+  /** Namnet på det kända konto överföringen är kopplad till (KK-54-B), eller null. Användarens text, renderas som text. */
+  readonly knownAccountName: string | null;
 }
 
 export interface TransactionDetail {
@@ -257,6 +259,7 @@ export function transactionRepository(d1: D1Database) {
           savingKind: transactions.savingKind,
           manualTransfer: transactions.manualTransfer,
           hidden: transactions.hidden,
+          knownAccountName: sql<string | null>`(SELECT k.name FROM known_accounts k WHERE k.id = "transactions"."known_account_id")`,
           // Tabellnamnet behövs: utan det betyder "id" uppdelningens id inne i underfrågan.
           split: sql<number>`EXISTS (SELECT 1 FROM transaction_splits s WHERE s.transaction_id = "transactions"."id")`,
         })

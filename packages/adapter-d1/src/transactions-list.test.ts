@@ -70,6 +70,7 @@ describe("lista transaktioner (KK-9, KK-18, #32)", () => {
       manualTransfer: null,
       split: false,
       hidden: false,
+      knownAccountName: null,
     });
     expect(items.find((t) => t.id === "t04")).toMatchObject({ isInternalTransfer: true });
     expect(items.find((t) => t.id === "t03")).toMatchObject({ split: true });

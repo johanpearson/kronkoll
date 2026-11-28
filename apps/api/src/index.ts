@@ -11,6 +11,7 @@ import { deleteBudget, getBudget, putBudget } from "./budget.ts";
 import { createCategory, listCategories, mergeCategory, moveCategoryTo, patchCategory, resetCategories } from "./categories.ts";
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
+import { deleteKnownAccount, listKnownAccounts, previewKnownAccount, putKnownAccount } from "./known-accounts.ts";
 import { deleteLoan, listLoans, previewLoanMatch, putLoan, putLoanMatching } from "./loans.ts";
 import { getIncome, getIncomeMonth } from "./income.ts";
 import { getGuidelines, putGuidelines } from "./guidelines.ts";
@@ -27,6 +28,7 @@ import { putTransfer } from "./transfers.ts";
 import { completeConnection, renewConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
 import { getTransaction, hideTransactions, listPending, listTransactions } from "./transactions.ts";
+import { putTransactionKnownAccount } from "./transaction-known-account.ts";
 import { putTransactionLoan } from "./transaction-loan.ts";
 
 export interface Env extends AccessEnv, SyncEnv, ConnectEnv, PushEnv {
@@ -143,6 +145,12 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     return putTransactionLoan(request, env, txLoanMatch[1]);
   }
 
+  const txKnownMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})\/known-account$/u.exec(pathname);
+  if (txKnownMatch?.[1]) {
+    if (request.method !== "PUT") return json({ error: "method_not_allowed" }, 405, { allow: "PUT" });
+    return putTransactionKnownAccount(request, env, txKnownMatch[1]);
+  }
+
   const splitMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})\/splits$/u.exec(pathname);
   if (splitMatch?.[1]) {
     if (request.method === "GET") return getSplits(env, splitMatch[1]);
@@ -198,6 +206,24 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (ruleMatch?.[1]) {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     return applyRule(env, ruleMatch[1]);
+  }
+
+  // Före /api/known-accounts/{id}, som annars tolkar "preview" som ett id.
+  if (pathname === "/api/known-accounts/preview") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return previewKnownAccount(request, env);
+  }
+
+  const knownMatch = /^\/api\/known-accounts\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
+  if (knownMatch?.[1]) {
+    if (request.method === "PUT") return putKnownAccount(request, env, knownMatch[1]);
+    if (request.method === "DELETE") return deleteKnownAccount(env, knownMatch[1]);
+    return json({ error: "method_not_allowed" }, 405, { allow: "PUT, DELETE" });
+  }
+
+  if (pathname === "/api/known-accounts") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return listKnownAccounts(env);
   }
 
   // Före /api/loans/{id}, som annars tolkar "preview" som ett id.
