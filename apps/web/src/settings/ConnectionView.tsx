@@ -4,8 +4,10 @@
 import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
-import { Link } from "../router.tsx";
 import { SyncStatus } from "../sync/SyncStatus.tsx";
+import { Chip, type Tone } from "../ui/Chip.tsx";
+import { List, ListRow } from "../ui/ListRow.tsx";
+import { Card, Skeleton } from "../ui/Surface.tsx";
 import { DeleteConnection, type HistoryCounts } from "./DeleteConnection.tsx";
 import { RenewConnection } from "./RenewConnection.tsx";
 
@@ -35,11 +37,11 @@ interface Connection {
 }
 
 const KIND: Record<string, string> = { cron: "Schemalagd", manual: "Manuell", initial: "Första hämtningen", daily: "Daglig" };
-const STATUS: Record<string, { text: string; tone: "ok" | "warn" | "bad" }> = {
-  ok: { text: "Klar", tone: "ok" },
-  partial: { text: "Delvis", tone: "warn" },
-  failed: { text: "Misslyckades", tone: "bad" },
-  running: { text: "Pågår", tone: "warn" },
+const STATUS: Record<string, { text: string; tone: Tone }> = {
+  ok: { text: "Klar", tone: "success" },
+  partial: { text: "Delvis", tone: "warning" },
+  failed: { text: "Misslyckades", tone: "danger" },
+  running: { text: "Pågår", tone: "warning" },
 };
 /** Felkoderna från synken (domain/bank) i klartext. */
 const ERROR: Record<string, string> = {
@@ -106,34 +108,31 @@ export function ConnectionView({ id }: { id: string }) {
     };
   }, [id, reload]);
 
-  const back = (
-    <p>
-      <Link to="/installningar">‹ Inställningar</Link>
-    </p>
-  );
+  // Tillbaka sköts av knappen i sidhuvudet (KK-62-B).
   if (deleted !== null) {
     return (
       <main>
-        {back}
         <h1>Kopplingen är borttagen</h1>
         <p role="status">{deleted}</p>
       </main>
     );
   }
-  if (state === null) return <main>{back}<p>Hämtar…</p></main>;
-  if (state === "not_found") return <main>{back}<h1>Kopplingen finns inte</h1></main>;
-  if (state === "error") return <main>{back}<p role="alert">Det gick inte att hämta kopplingen. Försök igen om en stund.</p></main>;
+  if (state === null) return <main><Skeleton lines={4} /></main>;
+  if (state === "not_found") return <main><h1>Kopplingen finns inte</h1></main>;
+  if (state === "error") return <main><p role="alert">Det gick inte att hämta kopplingen. Försök igen om en stund.</p></main>;
 
   const c = state;
   return (
     <main>
-      {back}
-      <h1>{c.bank}</h1>
-      <section className="card">
+      <div className="page-header">
+        <h1>{c.bank}</h1>
+        <SyncStatus onDone={() => { setReload((n) => n + 1); }} />
+      </div>
+      <Card title="Samtycke">
         {c.consentExpiresOn === null ? (
-          <p>Samtycket har inget slutdatum.</p>
+          <p className="ui-body">Samtycket har inget slutdatum.</p>
         ) : (
-          <p>
+          <p className="ui-body">
             Samtycket gäller till {formatDateShort(c.consentExpiresOn)}
             {c.consentDaysLeft !== null && c.consentDaysLeft >= 0 ? ` (${String(c.consentDaysLeft)} dagar kvar)` : ", och har gått ut"}.
           </p>
@@ -141,46 +140,28 @@ export function ConnectionView({ id }: { id: string }) {
         {c.failures > 0 && <p role="alert">De senaste {c.failures} synkarna har misslyckats.</p>}
         {/* Förnya är framträdande när samtycket har 14 dagar eller mindre kvar, eller har gått ut (KK-8). */}
         <RenewConnection id={id} urgent={c.consentDaysLeft !== null && c.consentDaysLeft <= 14} />
-        <div className="sync">
-          <SyncStatus onDone={() => { setReload((n) => n + 1); }} />
-        </div>
-      </section>
+      </Card>
       <h2>Konton</h2>
       {c.accounts.length === 0 ? (
         <p>Inga konton.</p>
       ) : (
-        <ul aria-label="Konton">
+        <List label="Konton">
           {c.accounts.map((a) => (
-            <li key={a.id} className="tx">
-              <div className="tx-main">
-                <span className="tx-name">{a.name}</span>
-                <span className="amount">{a.balanceMinor === null ? "–" : formatSek(a.balanceMinor)}</span>
-              </div>
-            </li>
+            <ListRow key={a.id} label={a.name} value={a.balanceMinor === null ? "–" : formatSek(a.balanceMinor)} />
           ))}
-        </ul>
+        </List>
       )}
       <h2>Synklogg</h2>
       {c.runs.length === 0 ? (
         <p>Inga synkar än.</p>
       ) : (
-        <ul aria-label="Synklogg">
+        <List label="Synklogg">
           {c.runs.map((r) => {
-            const status = STATUS[r.status] ?? { text: r.status, tone: "warn" as const };
-            return (
-              <li key={`${r.startedAt}-${r.kind}`} className="tx">
-                <div className="tx-main">
-                  <span className="tx-name">{time.format(new Date(r.startedAt))}</span>
-                  <span className={`badge ${status.tone}`}>{status.text}</span>
-                </div>
-                <small className="tx-notes">
-                  {KIND[r.kind] ?? r.kind} · {counts(r)}
-                  {r.errorCode === null ? "" : ` · ${ERROR[r.errorCode] ?? r.errorCode}`}
-                </small>
-              </li>
-            );
+            const status = STATUS[r.status] ?? { text: r.status, tone: "warning" as const };
+            const detail = `${KIND[r.kind] ?? r.kind} · ${counts(r)}${r.errorCode === null ? "" : ` · ${ERROR[r.errorCode] ?? r.errorCode}`}`;
+            return <ListRow key={`${r.startedAt}-${r.kind}`} label={time.format(new Date(r.startedAt))} detail={detail} value={<Chip tone={status.tone}>{status.text}</Chip>} />;
           })}
-        </ul>
+        </List>
       )}
       <DeleteConnection id={id} bank={c.bank} history={c.history} onDeleted={setDeleted} />
     </main>

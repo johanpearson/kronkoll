@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { field, postJson } from "../api.ts";
 import { browser } from "../browser.ts";
+import { Button } from "../ui/Button.tsx";
 
 export function RenewConnection(props: { id: string; urgent: boolean }) {
   const [busy, setBusy] = useState(false);
@@ -23,12 +24,14 @@ export function RenewConnection(props: { id: string; urgent: boolean }) {
 
   return (
     <>
-      <p>
-        <button type="button" className={props.urgent ? "primary" : undefined} disabled={busy} onClick={() => void start()}>
-          {busy ? "Startar…" : "Förnya med BankID"}
-        </button>
-      </p>
-      {error && <p role="alert">{error}</p>}
+      <Button variant={props.urgent ? "primary" : "secondary"} block busy={busy} onClick={() => void start()}>
+        {busy ? "Startar…" : "Förnya med BankID"}
+      </Button>
+      {error && (
+        <p role="alert" className="ui-field-error">
+          {error}
+        </p>
+      )}
     </>
   );
 }
