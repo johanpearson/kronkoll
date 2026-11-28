@@ -144,7 +144,10 @@ pnpm --filter @kronkoll/<paket> test:coverage
 
 - Skandia skickar **ingen motpart**. Butiken står i meddelandet (`remittance_information`, sparas som
   `description`), t.ex. `LIDL188HOOR, STOCKHOLM` eller `AmazonMktplc*BT4W355R4, www.amazon.se`.
-  Regler matchar därför på `ruleKey` (motparten, annars meddelandet normaliserat).
+  Regler matchar därför på `ruleKey` (motparten, annars meddelandet normaliserat). Avstämningens fingeravtryck
+  (`reconcile.ts`) gör likadant sedan #252, annars parades preliminära ihop med bokförda från andra butiker.
+- En preliminär som bokförs släpper kategorin från en regel (`template` eller `learned`), så att `categorizeNew`
+  sätter den igen på den bokförda texten (KK-56-B). Det görs i `transactionRepository.save`.
 - Normaliseringen tar bort ort efter sista kommatecknet, ordernummer efter `*`, ord med siffror på flera
   ställen (koder) och delar av butiksnummer som sitter ihop med namnet. Se `packages/domain/src/normalize.ts`.
 - Alla fyra konton har typen `checking`; två av dem hör till kort. Samtycket går ut 2027-05-01.
