@@ -14,7 +14,9 @@ import {
   periodTotals,
   recentPeriods,
   todayInStockholm,
+  accountBalances,
   totalBalance,
+  totalBalances,
   trend,
   type BudgetPeriod,
   type BufferTotals,
@@ -60,11 +62,14 @@ export async function getOverview(request: Request, env: { DB: D1Database }, syn
     const left = leftToSpend({ period, today, budgetMinor, actualMinor: totals.expenseMinor });
     // En koppling som aldrig blev klar (avbruten med BankID) är ingen bank att visa.
     const connections = allConnections.filter((c) => c.status !== "pending_auth");
+    const balances = totalBalances(accounts);
     const syncs = connections.flatMap((c) => (c.lastSuccessAt === null ? [] : [c.lastSuccessAt])).sort();
     return json(
       {
         period,
         balance_minor: totalBalance(accounts),
+        // Bokfört och disponibelt (med preliminära) för valet i översikten (KK-56-F, KK-60-A).
+        balances: { booked_minor: balances.bookedMinor, available_minor: balances.availableMinor, pending_minor: balances.pendingMinor },
         income_minor: totals.incomeMinor,
         expense_minor: totals.expenseMinor,
         net_minor: totals.netMinor,
@@ -77,7 +82,10 @@ export async function getOverview(request: Request, env: { DB: D1Database }, syn
         // Kortet Buffert (KK-55-A): insatt, uttaget och antal uttag i perioden, och samma för de 12 senaste.
         buffer: { ...bufferJson(bufferTotals(transactions, period)), trend: bufferTrend(transactions, periods).map(bufferJson) },
         // Uteslutna konton listas inte, så listan summerar till saldot (KK-38-A, KK-53-D). Rollen visar bufferten för sig.
-        accounts: accounts.filter((a) => a.included).map((a) => ({ id: a.id, name: a.name, bank: a.bank, role: a.role, balance_minor: a.balanceMinor })),
+        accounts: accounts.filter((a) => a.included).map((a) => {
+          const own = a.balanceMinor === null ? null : accountBalances({ amountMinor: a.balanceMinor, type: a.balanceType }, [a.pendingMinor]);
+          return { id: a.id, name: a.name, bank: a.bank, role: a.role, balance_minor: a.balanceMinor, booked_minor: own?.bookedMinor ?? null, available_minor: own?.availableMinor ?? null };
+        }),
         connections: connections.map((c) => ({
           id: c.id,
           bank: c.bank,
