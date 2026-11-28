@@ -10,7 +10,7 @@
 //   POST   /api/rules/reset         { preview: true } hur många regler som tas bort, { confirm: true } tar bort alla (KK-51)
 //   PUT    /api/rules/order         { order: [id, …] } de egna reglernas ordning, den som vinner först (KK-58-C)
 // POST och PATCH tar också `override_manual: true`, som skriver över manuellt valda där regeln vinner (KK-58-B), och
-// POST `preview: true`, som bara räknar vad regeln skulle göra.
+// `preview: true`, som bara räknar vad regeln skulle göra och listar träffarna som GET /matches, utan att spara (#251).
 // En ny eller ändrad regel tillämpas direkt på tidigare transaktioner där den vinner, utan fråga (KK-58-A),
 // och synken kategoriserar nya med den. Svaret säger hur många som ändrades. Manuellt valda rörs aldrig.
 // POST /api/rules/{id}/apply finns kvar för äldre appar och ändrar då inget mer.
@@ -90,11 +90,37 @@ function flags(input: Record<string, unknown>): { overrideManual: boolean; previ
 async function preview(db: D1Database, rule: CategoryRule, overrideManual: boolean): Promise<Response> {
   const rules = (await ruleRepository(db).list()).filter((r) => r.id !== rule.id);
   const places = rules.flatMap((r) => (r.position === undefined ? [] : [r.position]));
-  const candidate = { ...rule, position: rule.position ?? Math.min(1, ...places) - 1 };
-  const transactions = await transactionRepository(db).categorizable();
+  // En egen regel som sparas står först om den är ny, och annars kvar på sin plats. En mallregel har ingen plats.
+  const place = rule.source === "learned" ? (rule.position ?? Math.min(1, ...places) - 1) : rule.position;
+  const candidate: CategoryRule = place === undefined ? rule : { ...rule, position: place };
+  const [transactions, listed] = await Promise.all([transactionRepository(db).categorizable(), transactionRepository(db).forRulePreview()]);
   const reach: RuleReach = ruleReach(transactions, [...rules, candidate], rule.id, { overrideManual });
   const overridden = overrideManual ? ruleReach(transactions, [...rules, candidate], rule.id).protectedManual : 0;
-  return json({ applied: reach.changes.length, protected_manual: reach.protectedManual, overridden_manual: overridden }, 200);
+  return json({ applied: reach.changes.length, protected_manual: reach.protectedManual, overridden_manual: overridden, matches: matchSummary(listed, [...rules, candidate], rule.id) }, 200);
+}
+
+/** Så många transaktioner som förhandsvisningen listar. Antalen räknas alltid på alla. */
+export const PREVIEW_LIMIT = 100;
+
+type PreviewTransaction = Awaited<ReturnType<ReturnType<typeof transactionRepository>["forRulePreview"]>>[number];
+
+/** Transaktionerna regeln gäller, nyast först, med antal per vad som händer och de första som lista. Bankens text som den är (KK-30). */
+function matchSummary(transactions: readonly PreviewTransaction[], rules: readonly CategoryRule[], id: string) {
+  const byId = new Map(transactions.map((t) => [t.id, t]));
+  const matches = ruleMatches(transactions, rules, id);
+  const count = (effect: string) => matches.filter((m) => m.effect === effect).length;
+  return {
+    total: matches.length,
+    change: count("change"),
+    unchanged: count("unchanged"),
+    manual: count("manual"),
+    items: matches.slice(0, PREVIEW_LIMIT).flatMap((m) => {
+      const t = byId.get(m.id);
+      return t
+        ? [{ id: t.id, transaction_date: t.transactionDate, name: t.counterparty || t.description, amount_minor: t.amountMinor, category_id: t.categoryId, effect: m.effect }]
+        : [];
+    }),
+  };
 }
 
 export async function listRules(env: { DB: D1Database }): Promise<Response> {
@@ -174,7 +200,7 @@ export async function patchRule(request: Request, env: { DB: D1Database }, id: s
   if (input === null || (!("pattern" in input) && !("category_id" in input) && !("match" in input))) return invalid();
   const kind = kindFrom(input);
   const options = flags(input);
-  if (kind === null || options === null || options.preview || ("category_id" in input && typeof input.category_id !== "string")) return invalid();
+  if (kind === null || options === null || ("category_id" in input && typeof input.category_id !== "string")) return invalid();
   try {
     const repo = ruleRepository(env.DB);
     const exclude = (await repo.excludeRules()).find((r) => r.id === id);
@@ -186,7 +212,7 @@ export async function patchRule(request: Request, env: { DB: D1Database }, id: s
     if (pattern === null) return invalid();
     if (exclude) {
       // En Räkna inte-regel har bara mönster och slag, och ändringen gäller hela historiken direkt (KK-39-C).
-      if ("category_id" in input) return invalid();
+      if ("category_id" in input || options.preview) return invalid();
       const rule = { ...exclude, pattern, match: MATCH[nextKind] };
       await repo.updateExclude(rule);
       await recomputeTransfers(env.DB);
@@ -197,6 +223,7 @@ export async function patchRule(request: Request, env: { DB: D1Database }, id: s
     const categoryId = typeof input.category_id === "string" ? input.category_id : category.categoryId;
     if (categoryId !== category.categoryId && !(await usable(env.DB, categoryId))) return json({ error: "unknown_category" }, 400);
     const rule = { ...category, pattern, categoryId, match: MATCH[nextKind] };
+    if (options.preview) return await preview(env.DB, rule, options.overrideManual);
     await repo.update(rule);
     return await applied(env.DB, rule, 200, options.overrideManual);
   } catch {
@@ -217,9 +244,6 @@ export async function deleteRule(env: { DB: D1Database }, id: string): Promise<R
   }
 }
 
-/** Så många transaktioner som förhandsvisningen listar. Antalen räknas alltid på alla. */
-export const PREVIEW_LIMIT = 100;
-
 /**
  * GET /api/rules/{id}/matches: transaktionerna regeln gäller, nyast först, med vad som händer med var och
  * en om regeln appliceras (KK-18-C). Bankens text skickas som den är och visas som text i appen (KK-30).
@@ -228,24 +252,7 @@ export async function getRuleMatches(env: { DB: D1Database }, id: string): Promi
   try {
     const [rules, transactions] = await Promise.all([ruleRepository(env.DB).list(), transactionRepository(env.DB).forRulePreview()]);
     if (!rules.some((r) => r.id === id)) return json({ error: "not_found" }, 404);
-    const byId = new Map(transactions.map((t) => [t.id, t]));
-    const matches = ruleMatches(transactions, rules, id);
-    const count = (effect: string) => matches.filter((m) => m.effect === effect).length;
-    return json(
-      {
-        total: matches.length,
-        change: count("change"),
-        unchanged: count("unchanged"),
-        manual: count("manual"),
-        items: matches.slice(0, PREVIEW_LIMIT).flatMap((m) => {
-          const t = byId.get(m.id);
-          return t
-            ? [{ id: t.id, transaction_date: t.transactionDate, name: t.counterparty || t.description, amount_minor: t.amountMinor, category_id: t.categoryId, effect: m.effect }]
-            : [];
-        }),
-      },
-      200,
-    );
+    return json(matchSummary(transactions, rules, id), 200);
   } catch {
     return json({ error: "unavailable" }, 503);
   }
