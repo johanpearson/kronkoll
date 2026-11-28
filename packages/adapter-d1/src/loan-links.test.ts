@@ -134,6 +134,15 @@ describe("kopplingar i D1 (KK-59-B)", () => {
     expect(await row("bet-nov")).toMatchObject({ loan: null, source: "manual" });
   });
 
+  it("ger lånens betalningar i en period, utan borttagna och okopplade (KK-59-C)", async () => {
+    await db.batch([
+      db.prepare(`UPDATE transactions SET loan_id = 'lan1', loan_source = 'auto' WHERE id IN ('bet-nov', 'bet-okt', 'borta')`),
+    ]);
+    const repo = loanLinkRepository(db);
+    expect((await repo.payments("2026-11-01", "2026-11-30")).map((p) => [p.id, p.loanId, p.amountMinor])).toEqual([["bet-nov", "lan1", -812_500]]);
+    expect(await repo.payments("2026-12-01", "2026-12-31")).toEqual([]);
+  });
+
   it("kopplade betalningar räknas inte om av reglerna, och ett borttaget lån släpper kopplingen", async () => {
     await loanLinkRepository(db).setMatching("lan1", ["9020-12 345 67"], null);
     await link();
