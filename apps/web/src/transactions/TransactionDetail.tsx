@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { field, getJson, putJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { CategoryEditor } from "./CategoryEditor.tsx";
+import { CategoryReason, toReason, type Reason } from "./CategoryReason.tsx";
 import { INCOME_TYPES, IncomeTypePicker, incomeLabel, type IncomeType } from "./IncomeType.tsx";
 import { LoanLink, loanLabel, toLinkedLoan, type LinkedLoan } from "./LoanLink.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
@@ -32,6 +33,8 @@ interface Detail {
   readonly splits: readonly { categoryId: string; amountMinor: number }[];
   /** Lånet betalningen är kopplad till (KK-59-B). */
   readonly loan: LinkedLoan | null;
+  /** Varför kategorin är vad den är (KK-58-D). */
+  readonly reason: Reason | null;
 }
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
@@ -72,6 +75,7 @@ function toDetail(body: unknown): Detail | null {
         })
       : [],
     loan: toLinkedLoan(field(body, "loan")),
+    reason: toReason(field(body, "category_reason")),
   };
 }
 
@@ -176,6 +180,8 @@ export function TransactionDetail({ id }: { id: string }) {
           {d.manualTransfer !== null && <button type="button" disabled={busy} onClick={() => void setTransfer(null)}>Låt Kronkoll avgöra</button>}
         </p>
       )}
+      {/* Varför kategorin är vad den är (KK-58-D). En uppdelad transaktion har flera kategorier. */}
+      {mode === null && d.reason !== null && d.splits.length === 0 && <CategoryReason reason={d.reason} names={categories.names} />}
       {/* En lånebetalning är en utgift, men en som redan är kopplad kan alltid kopplas loss. */}
       {mode === null && (d.loan !== null || d.amountMinor < 0) && <LoanLink transactionId={d.id} loan={d.loan} onSaved={() => void load()} />}
       {mode === null && income && <IncomeTypePicker transactionId={d.id} value={d.incomeType} onSaved={() => void load()} />}

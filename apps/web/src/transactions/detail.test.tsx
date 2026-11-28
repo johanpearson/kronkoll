@@ -94,6 +94,34 @@ describe("detaljsidan för en transaktion (#32)", () => {
     expect(row("Kategori")).toBe("Mat › Livsmedel (mall)");
   });
 
+  it("Varför den här kategorin? förklarar vilken regel som gav kategorin, och vilka andra som träffar (KK-58-D)", async () => {
+    api(
+      detail({
+        category_source: "learned",
+        category_reason: {
+          source: "learned",
+          rule: { id: "r1", match: "counterparty_prefix", pattern: "ICA", category_id: "mat-livsmedel", source: "learned" },
+          also_matched: [{ id: "r2", match: "description_contains", pattern: "KORTKOP", category_id: "hushall", source: "template" }],
+        },
+      }),
+    );
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Varför den här kategorin?" }));
+    const sheet = within(screen.getByRole("dialog", { name: "Varför den här kategorin?" }));
+    expect(sheet.getByText("Regeln Börjar med ICA → Mat › Livsmedel gav kategorin. Det är en av dina egna regler.")).toBeTruthy();
+    expect(within(sheet.getByRole("list", { name: "Regler som också träffar" })).getAllByRole("listitem")).toHaveLength(1);
+  });
+
+  it("Varför den här kategorin? finns inte för en uppdelad transaktion, eller när sidan saknar förklaring", async () => {
+    api(detail({ splits: [{ category_id: "mat-livsmedel", amount_minor: -20000 }, { category_id: "hushall", amount_minor: -21250 }], category_reason: { source: "manual", rule: null, also_matched: [] } }));
+    await open();
+    expect(screen.queryByRole("button", { name: "Varför den här kategorin?" })).toBeNull();
+    cleanup();
+    api(detail());
+    await open();
+    expect(screen.queryByRole("button", { name: "Varför den här kategorin?" })).toBeNull();
+  });
+
   it("visar bankens råa text, så att en okänd motpart går att förstå (KK-30)", async () => {
     api(detail({ counterparty: "<b>Okänd</b>", description: "Swish från mamma" }));
     await open();
