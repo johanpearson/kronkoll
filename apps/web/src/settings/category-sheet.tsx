@@ -1,18 +1,17 @@
 // Ändra en kategori i ett ark (#251, KK-18-A): först ett val av åtgärd, sedan ett litet formulär. Reglerna
 // (två nivåer, unika namn, samma nivå och typ vid sammanslagning) finns i domänen på servern, och dess
 // förklaring visas vid fältet. Efter en lyckad ändring hämtar vyn listan igen.
+import { sortCategories, type Category as DomainCategory, type CategoryKind } from "@kronkoll/domain";
 import { useEffect, useId, useRef, useState, type SyntheticEvent } from "react";
 import { field, getJson, patchJson, postJson, type ApiResult } from "../api.ts";
 import { Button } from "../ui/Button.tsx";
 import { List, ListRow } from "../ui/ListRow.tsx";
 import { Sheet } from "../ui/Modal.tsx";
 
-export interface Category {
-  readonly id: string;
-  readonly parentId: string | null;
-  readonly name: string;
-  readonly kind: string;
-}
+/** Kategorierna som visas är aldrig arkiverade, och en plats saknas tills användaren har ordnat listan (#251). */
+export type Category = DomainCategory;
+
+const KINDS: readonly CategoryKind[] = ["expense", "income", "transfer"];
 
 export async function fetchCategories(): Promise<Category[] | null> {
   const { status, body } = await getJson("/api/categories");
@@ -22,9 +21,10 @@ export async function fetchCategories(): Promise<Category[] | null> {
     const id = field(raw, "id");
     const name = field(raw, "name");
     const parent = field(raw, "parent_id");
-    const kind = field(raw, "kind");
+    const kind = KINDS.find((k) => k === field(raw, "kind")) ?? "expense";
+    const position = field(raw, "position");
     if (typeof id !== "string" || typeof name !== "string" || field(raw, "archived") === true) return [];
-    return [{ id, name, parentId: typeof parent === "string" ? parent : null, kind: typeof kind === "string" ? kind : "expense" }];
+    return [{ id, name, parentId: typeof parent === "string" ? parent : null, kind, archived: false, ...(typeof position === "number" ? { position } : {}) }];
   });
 }
 
@@ -43,7 +43,9 @@ export function useCategories(reload: number): Category[] | null | "error" {
   return categories;
 }
 
-export const byName = (a: Category, b: Category) => a.name.localeCompare(b.name, "sv");
+/** Kategorierna som visas i samma lista som `c`, i den ordning de visas: samma förälder och typ. */
+export const siblingsOf = (categories: readonly Category[], c: Category) =>
+  sortCategories(categories.filter((o) => o.parentId === c.parentId && o.kind === c.kind));
 
 /** Felet att visa för ett svar som inte lyckades: domänens förklaring, eller ett allmänt fel. */
 function failure({ status, body }: ApiResult): string | null {
@@ -52,7 +54,7 @@ function failure({ status, body }: ApiResult): string | null {
   return typeof message === "string" ? message : "Det gick inte att spara. Försök igen.";
 }
 
-type Mode = "menu" | "rename" | "add" | "merge" | "archive";
+export type Mode = "menu" | "rename" | "add" | "merge" | "archive" | "move";
 
 /** Vad arket gäller: en befintlig kategori, eller en ny huvudkategori. */
 export type Target = { readonly category: Category; readonly mode: Mode } | { readonly category: null; readonly mode: "add" };
@@ -114,7 +116,50 @@ function Form(props: { label: string; submit: string; initial?: string; options?
   );
 }
 
-const TITLE: Record<Mode, string> = { menu: "Ändra", rename: "Byt namn", add: "Ny underkategori", merge: "Slå ihop", archive: "Arkivera" };
+const TITLE: Record<Mode, string> = { menu: "Ändra", rename: "Byt namn", add: "Ny underkategori", merge: "Slå ihop", archive: "Arkivera", move: "Flytta" };
+
+/**
+ * Åtgärderna för en kategori. Flytta upp och ner lämnar arket öppet, så att man kan flytta flera steg, och plats
+ * N av M läses upp som status. Flytten sparas först och visas när servern har svarat (#251).
+ */
+function Menu(props: { category: Category; categories: readonly Category[]; go: (mode: Mode) => () => void; onMoved: () => void }) {
+  const c = props.category;
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const siblings = siblingsOf(props.categories, c);
+  const at = siblings.findIndex((o) => o.id === c.id);
+  const move = async (beforeId: string | null) => {
+    setBusy(true);
+    setError(null);
+    const problem = failure(await postJson(`/api/categories/${encodeURIComponent(c.id)}/move`, { before_id: beforeId }));
+    setBusy(false);
+    if (problem === null) props.onMoved();
+    else setError(problem);
+  };
+  const main = c.parentId === null;
+  return (
+    <div className="ui-stack">
+      {at >= 0 && siblings.length > 1 && (
+        <p className="ui-caption" role="status">
+          Plats {at + 1} av {siblings.length}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="ui-field-error">
+          {error}
+        </p>
+      )}
+      <List label={`Åtgärder för ${c.name}`}>
+        {at > 0 && !busy && <ListRow label="Flytta upp" onClick={() => void move(siblings[at - 1]?.id ?? null)} />}
+        {at >= 0 && at < siblings.length - 1 && !busy && <ListRow label="Flytta ner" onClick={() => void move(siblings[at + 2]?.id ?? null)} />}
+        <ListRow label="Byt namn" onClick={props.go("rename")} />
+        {main && <ListRow label="Ny underkategori" onClick={props.go("add")} />}
+        <ListRow label="Slå ihop med en annan" onClick={props.go("merge")} />
+        <ListRow label="Arkivera" danger onClick={props.go("archive")} />
+      </List>
+    </div>
+  );
+}
 
 export function CategorySheet(props: { target: Target | null; categories: readonly Category[]; onTarget: (target: Target | null) => void; onChanged: (mode: Mode) => void }) {
   const { target } = props;
@@ -137,20 +182,13 @@ export function CategorySheet(props: { target: Target | null; categories: readon
     const go = (mode: Mode) => () => { props.onTarget({ category: c, mode }); };
     title = target.mode === "menu" ? c.name : `${TITLE[target.mode]}: ${c.name}`;
     if (target.mode === "menu") {
-      body = (
-        <List label={`Åtgärder för ${c.name}`}>
-          <ListRow label="Byt namn" onClick={go("rename")} />
-          {main && <ListRow label="Ny underkategori" onClick={go("add")} />}
-          <ListRow label="Slå ihop med en annan" onClick={go("merge")} />
-          <ListRow label="Arkivera" danger onClick={go("archive")} />
-        </List>
-      );
+      body = <Menu category={c} categories={props.categories} go={go} onMoved={() => { props.onChanged("move"); }} />;
     } else if (target.mode === "rename") {
       body = <Form label="Nytt namn" submit="Spara" initial={c.name} onSubmit={(name) => done("rename")(patchJson(path, { name }))} onClose={close} />;
     } else if (target.mode === "add") {
       body = <Form label="Namn på underkategorin" submit="Lägg till" initial="" onSubmit={(name) => done("add")(postJson("/api/categories", { parent_id: c.id, name }))} onClose={close} />;
     } else if (target.mode === "merge") {
-      const peers = props.categories.filter((o) => o.id !== c.id && o.kind === c.kind && (o.parentId === null) === main).sort(byName);
+      const peers = sortCategories(props.categories.filter((o) => o.id !== c.id && o.kind === c.kind && (o.parentId === null) === main));
       body = <Form label={`Slå ihop ${c.name} med`} submit="Slå ihop" options={peers} onSubmit={(into) => done("merge")(postJson(`${path}/merge`, { into_id: into }))} onClose={close} />;
     } else {
       const text = `${c.name}${main ? " och dess underkategorier" : ""} går inte att välja längre. Äldre transaktioner behåller kategorin.`;

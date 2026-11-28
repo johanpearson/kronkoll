@@ -1,6 +1,7 @@
 // En huvudkategori (#251, KK-18-A): dess underkategorier som listrader. Ett tryck på en rad öppnar ett ark
 // med åtgärderna. Huvudkategorin ändras med knappen i sidhuvudet. Är den arkiverad eller ihopslagen
 // säger sidan det, och tillbakaknappen leder till listan.
+import { sortCategories } from "@kronkoll/domain";
 import { Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { CategoryDot } from "../category-color.tsx";
@@ -8,7 +9,7 @@ import { useToast } from "../toast.tsx";
 import { Button, IconButton } from "../ui/Button.tsx";
 import { List, ListRow } from "../ui/ListRow.tsx";
 import { EmptyState, Skeleton } from "../ui/Surface.tsx";
-import { byName, CategorySheet, useCategories, type Target } from "./category-sheet.tsx";
+import { CategorySheet, useCategories, type Target } from "./category-sheet.tsx";
 
 const DONE: Record<string, string> = { archive: "arkiverad", merge: "ihopslagen" };
 
@@ -24,7 +25,7 @@ export function CategoryView({ id }: { id: string }) {
   if (main === undefined) return <main><EmptyState title="Kategorin finns inte">Den kan vara arkiverad eller ihopslagen med en annan.</EmptyState></main>;
 
   const parentOf = new Map(categories.map((c) => [c.id, c.parentId]));
-  const subs = categories.filter((c) => c.parentId === id).sort(byName);
+  const subs = sortCategories(categories.filter((c) => c.parentId === id));
   return (
     <main>
       <div className="page-header">
@@ -53,7 +54,8 @@ export function CategoryView({ id }: { id: string }) {
         onChanged={(mode) => {
           const done = DONE[mode];
           if (done !== undefined && target?.category) toast.done(`${target.category.name} är ${done}.`);
-          setTarget(null);
+          // Flytta upp och ner lämnar arket öppet, så att man kan flytta flera steg.
+          if (mode !== "move") setTarget(null);
           setReload((n) => n + 1);
         }}
       />
