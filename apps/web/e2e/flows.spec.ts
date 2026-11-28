@@ -341,3 +341,13 @@ test("Visa träffar listar de senaste transaktionerna regeln gäller, med vad so
   await expect(rows.nth(1)).toContainText("Okänd motpart");
   await expect(rows.nth(2)).toContainText("Manuellt vald, ändras inte");
 });
+
+test("Varför den här kategorin? förklarar varför en transaktion saknar kategori (V-e2e-category-reason, KK-58-D)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/transaktioner/lon1");
+  await page.getByRole("button", { name: "Varför den här kategorin?" }).click();
+  const sheet = page.getByRole("dialog", { name: "Varför den här kategorin?" });
+  await expect(sheet).toContainText("Ingen kategori är vald, och ingen regel träffar den här transaktionen.");
+  await sheet.getByRole("button", { name: "Stäng" }).click();
+  await expect(sheet).toHaveCount(0);
+});
