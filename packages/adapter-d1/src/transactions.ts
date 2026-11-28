@@ -22,7 +22,7 @@ import {
 } from "@kronkoll/domain";
 import { and, desc, eq, gte, inArray, isNull, lt, max, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { accounts, transactions } from "./schema.ts";
+import { accounts, loans, transactions } from "./schema.ts";
 
 /** Kontots namn som det visas: användarens eget namn, annars bankens maskerade (KK-37). */
 const accountName = sql<string>`coalesce(${accounts.nickname}, ${accounts.displayName})`;
@@ -96,6 +96,8 @@ export interface TransactionDetail {
   readonly incomeType: "salary" | "parental_benefit" | "other" | null;
   readonly incomeSource: Row["categorySource"];
   readonly transferPair: { id: string; accountName: string; amountMinor: number; transactionDate: string } | null;
+  /** Lånet som betalningen är kopplad till, och om kopplingen gjordes för hand (KK-59-B). Null utan koppling. */
+  readonly loan: { id: string; name: string; source: "auto" | "manual" } | null;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -433,9 +435,13 @@ export function transactionRepository(d1: D1Database) {
           incomeType: transactions.incomeType,
           incomeSource: transactions.incomeSource,
           pairId: transactions.transferPairId,
+          loanId: loans.id,
+          loanName: loans.name,
+          loanSource: transactions.loanSource,
         })
         .from(transactions)
         .innerJoin(accounts, eq(accounts.id, transactions.accountId))
+        .leftJoin(loans, eq(loans.id, transactions.loanId))
         .where(and(eq(transactions.id, id), ne(transactions.status, "removed")))
         .all();
       if (!row) return null;
@@ -468,6 +474,7 @@ export function transactionRepository(d1: D1Database) {
         incomeType: row.incomeType,
         incomeSource: row.incomeSource,
         transferPair: pair ?? null,
+        loan: row.loanId === null || row.loanName === null ? null : { id: row.loanId, name: row.loanName, source: row.loanSource === "manual" ? "manual" : "auto" },
       };
     },
 
