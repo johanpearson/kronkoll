@@ -72,25 +72,40 @@ test("undervyer har en synlig tillbakaknapp, eftersom iOS saknar bakåtknapp (KK
   await expect(page.getByRole("button", { name: "Tillbaka" })).toHaveCount(0);
 });
 
+/**
+ * Ett finger som drar över skärmen, genom webbläsarens riktiga gesthantering (touch-action, scrollning och
+ * pointercancel) via Chromes CDP. Syntetiska händelser direkt på elementet går förbi den, och då syns inte
+ * fel som att webbläsaren tar över ett lodrätt drag (#247).
+ */
+async function drag(page: Page, from: [number, number], to: [number, number], steps = 12) {
+  const cdp = await page.context().newCDPSession(page);
+  const point = (x: number, y: number) => [{ x, y, id: 1, radiusX: 5, radiusY: 5, force: 1 }];
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: point(...from) });
+  for (let i = 1; i <= steps; i += 1) {
+    const x = from[0] + ((to[0] - from[0]) * i) / steps;
+    const y = from[1] + ((to[1] - from[1]) * i) / steps;
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: point(x, y) });
+    await page.waitForTimeout(16);
+  }
+  await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+}
+
 test("ett svep i sidled byter flik i menyns ordning, utan nytt steg bakåt (KK-63-A, C)", async ({ page }) => {
   await useFakeApi(page);
   await page.goto("/budget");
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  const view = page.locator(".ui-view");
-  const swipe = async (from: number, to: number) => {
-    const init = { pointerId: 1, pointerType: "touch", isPrimary: true, bubbles: true, clientY: 400 };
-    await view.dispatchEvent("pointerdown", { ...init, clientX: from });
-    for (const x of [from + (to - from) / 3, from + ((to - from) * 2) / 3, to]) await view.dispatchEvent("pointermove", { ...init, clientX: x });
-    await view.dispatchEvent("pointerup", { ...init, clientX: to });
-  };
-  await swipe(330, 60);
+  await drag(page, [330, 400], [60, 405]);
   await expect(page).toHaveURL(/\/lan$/u);
   await expect(tab(page, "Lån")).toHaveAttribute("aria-current", "page");
-  await swipe(60, 330);
+  await drag(page, [60, 400], [330, 405]);
   await expect(page).toHaveURL(/\/budget$/u);
   // Svepen lade inte till steg: bakåt går till Översikt.
   await page.goBack();
   await expect(page).toHaveURL(/\/$/u);
+  // Översikt har också dra för att synka, men ett svep i sidled byter ändå flik.
+  await expect(page.getByRole("heading", { level: 1, name: "Översikt" })).toBeVisible();
+  await drag(page, [330, 400], [60, 410]);
+  await expect(page).toHaveURL(/\/transaktioner$/u);
 });
 
 test("dra nedåt högst upp i Översikt startar en synk, som syns i synkikonen (KK-63-D)", async ({ page }) => {
@@ -101,12 +116,11 @@ test("dra nedåt högst upp i Översikt startar en synk, som syns i synkikonen (
   });
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Översikt" })).toBeVisible();
-  const view = page.locator(".ui-view");
-  const init = { pointerId: 1, pointerType: "touch", isPrimary: true, bubbles: true, clientX: 200 };
-  await view.dispatchEvent("pointerdown", { ...init, clientY: 150 });
-  for (const y of [180, 300, 450]) await view.dispatchEvent("pointermove", { ...init, clientY: y });
-  await expect(page.locator(".ui-pull-ready")).toBeVisible();
-  await view.dispatchEvent("pointerup", { ...init, clientY: 450 });
+  await drag(page, [200, 200], [200, 520]);
   await expect.poll(() => syncs.length).toBe(1);
   await expect(page.locator(".ui-pull")).toHaveCount(0);
+  // Ett kort drag synkar inte.
+  await drag(page, [200, 200], [200, 260]);
+  await page.waitForTimeout(300);
+  expect(syncs).toHaveLength(1);
 });

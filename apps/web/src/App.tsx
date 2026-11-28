@@ -1,7 +1,7 @@
 // Appens skal (#30): sidorna och huvudmenyn. Service workern (sw/) ger offline-skal och senaste
 // översikten i högst 24 h.
 import { ChevronLeft, House, Landmark, PiggyBank, ReceiptText, RefreshCw, Wallet } from "lucide-react";
-import { lazy, Suspense, useEffect, type PointerEvent } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { ConnectBank, ConnectDone, Consent } from "./connect/ConnectViews.tsx";
 import { PlannerView } from "./planner/PlannerView.tsx";
 import { IncomeView } from "./income/IncomeView.tsx";
@@ -101,16 +101,6 @@ function page(path: string): React.JSX.Element {
 /** Vyerna där man kan dra nedåt för att synka (KK-63-D). */
 const PULL_VIEWS = new Set(["/", "/transaktioner"]);
 
-type Handlers = Record<"onPointerDown" | "onPointerMove" | "onPointerUp" | "onPointerCancel", (event: PointerEvent<HTMLElement>) => void>;
-
-/** Båda gesterna får varje pekhändelse och avgör själva om den gäller dem. */
-const both = (a: Handlers, b: Handlers): Handlers => ({
-  onPointerDown: (e) => { a.onPointerDown(e); b.onPointerDown(e); },
-  onPointerMove: (e) => { a.onPointerMove(e); b.onPointerMove(e); },
-  onPointerUp: (e) => { a.onPointerUp(e); b.onPointerUp(e); },
-  onPointerCancel: (e) => { a.onPointerCancel(e); b.onPointerCancel(e); },
-});
-
 export function App() {
   const path = usePath();
   const subview = canGoBack();
@@ -130,7 +120,7 @@ export function App() {
           <RefreshCw size={22} strokeWidth={2} className={pull.distance >= PULL_TRIGGER_PX ? "ui-pull-ready" : undefined} />
         </div>
       )}
-      <div key={path} className={`ui-view ui-view-${navigationKind()}${subview ? "" : " ui-view-swipe"}`} {...both(swipe, pull.handlers)}>
+      <div key={path} className={`ui-view ui-view-${navigationKind()}${subview ? "" : " ui-view-swipe"}`} ref={pull.ref} {...swipe}>
         {subview && (
           // iOS saknar bakåtknapp, så undervyer har en egen (KK-62-B). Den följer samma steg som telefonens.
           <nav className="ui-backbar" aria-label="Tillbaka">
