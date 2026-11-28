@@ -3,12 +3,13 @@
 //   POST  /api/categories              { parent_id, name } ny huvud- eller underkategori
 //   PATCH /api/categories/{id}         { name } eller { archived: true }
 //   POST  /api/categories/{id}/merge   { into_id } flyttar allt och arkiverar den gamla
+//   POST  /api/categories/{id}/move    { before_id } flyttar före en annan bland syskonen, eller sist med null (#251)
 //   POST  /api/categories/reset        { preview: true } hur mycket en rensning berör (KK-48-A)
 //                                      { confirm: true, restore_template? } rensar alla kategorier (KK-48-B)
 // Reglerna (två nivåer, unika namn, samma typ vid sammanslagning) finns i domänen. Ett brott mot dem ger
 // 400 med domänens förklaring på svenska, som appen kan visa. Den innehåller aldrig bankdata.
 import { categoryRepository, type CategoryRow } from "@kronkoll/adapter-d1";
-import { CATEGORY_TEMPLATE, TEMPLATE_RULES, addCategory, archiveCategory, mergeCategories, renameCategory } from "@kronkoll/domain";
+import { CATEGORY_TEMPLATE, TEMPLATE_RULES, addCategory, archiveCategory, mergeCategories, moveCategory, renameCategory, type Category } from "@kronkoll/domain";
 import type { SyncDeps } from "./sync.ts";
 
 const MAX_NAME_LENGTH = 40;
@@ -18,7 +19,7 @@ function json(body: unknown, status: number): Response {
 }
 
 const invalid = () => json({ error: "invalid_request" }, 400);
-const toItem = (c: CategoryRow) => ({ id: c.id, parent_id: c.parentId, name: c.name, kind: c.kind, archived: c.archived });
+const toItem = (c: CategoryRow) => ({ id: c.id, parent_id: c.parentId, name: c.name, kind: c.kind, archived: c.archived, position: c.position ?? null });
 
 /** Kör en ändring. En RangeError från domänen blir 400 med förklaringen, annat fel 503. */
 async function attempt(change: () => Promise<Response>): Promise<Response> {
@@ -38,11 +39,11 @@ async function body(request: Request): Promise<Record<string, unknown> | null> {
 const nameOf = (value: unknown) => (typeof value === "string" && value.trim().length <= MAX_NAME_LENGTH && !/\p{Cc}/u.test(value) ? value : null);
 
 /** Kategorierna som skiljer sig mellan före och efter. */
-function changedRows(before: readonly CategoryRow[], after: readonly CategoryRow[]): CategoryRow[] {
+function changedRows(before: readonly Category[], after: readonly Category[]): Category[] {
   const old = new Map(before.map((c) => [c.id, c]));
   return after.filter((c) => {
     const o = old.get(c.id);
-    return o !== undefined && (o.name !== c.name || o.archived !== c.archived || o.parentId !== c.parentId);
+    return o !== undefined && (o.name !== c.name || o.archived !== c.archived || o.parentId !== c.parentId || o.position !== c.position);
   });
 }
 
@@ -96,6 +97,25 @@ export async function mergeCategory(request: Request, env: { DB: D1Database }, f
     const { categories } = mergeCategories({ categories: before, fromId, intoId, transactions: [], rules: [] });
     const moved = await repo.merge(fromId, intoId, changedRows(before, categories));
     return json({ from_id: fromId, into_id: intoId, moved_transactions: moved }, 200);
+  });
+}
+
+/**
+ * POST /api/categories/{id}/move (#251): flyttar kategorin före `before_id` bland sina syskon, eller sist med
+ * `before_id: null`. Syskonen numreras om, och svaret har dem vars plats ändrades. Reglerna (samma nivå och typ,
+ * ingen arkiverad) finns i domänen och ger 400 med förklaringen.
+ */
+export async function moveCategoryTo(request: Request, env: { DB: D1Database }, id: string): Promise<Response> {
+  const input = await body(request);
+  const beforeId = input?.before_id;
+  if (input === null || !("before_id" in input) || (beforeId !== null && typeof beforeId !== "string")) return invalid();
+  return attempt(async () => {
+    const repo = categoryRepository(env.DB);
+    const before = await repo.list();
+    if (!before.some((c) => c.id === id)) return json({ error: "not_found" }, 404);
+    const changed = changedRows(before, moveCategory(before, id, beforeId));
+    await repo.save(changed);
+    return json({ items: changed.map(toItem) }, 200);
   });
 }
 

@@ -14,6 +14,8 @@ export interface CategoryRow {
   readonly name: string;
   readonly kind: "expense" | "income" | "transfer";
   readonly archived: boolean;
+  /** Platsen bland syskonen (#251). Utelämnad: ordnas på namn, efter dem som har en plats. */
+  readonly position?: number;
 }
 
 /** Vad en rensning av alla kategorier berör (KK-48-A). */
@@ -35,21 +37,23 @@ export interface CategoryTemplate {
 export function categoryRepository(d1: D1Database) {
   const db = drizzle(d1);
   const update = (c: CategoryRow) =>
-    db.update(categories).set({ parentId: c.parentId, name: c.name, archived: c.archived }).where(eq(categories.id, c.id));
+    db.update(categories).set({ parentId: c.parentId, name: c.name, archived: c.archived, position: c.position ?? null }).where(eq(categories.id, c.id));
 
   return {
     async list(): Promise<CategoryRow[]> {
-      return db
-        .select({ id: categories.id, parentId: categories.parentId, name: categories.name, kind: categories.kind, archived: categories.archived })
+      const rows = await db
+        .select({ id: categories.id, parentId: categories.parentId, name: categories.name, kind: categories.kind, archived: categories.archived, position: categories.position })
         .from(categories)
         .all();
+      // En plats som saknas utelämnas, så att raden också är en `Category` i domänen.
+      return rows.map(({ position, ...row }) => (position === null ? row : { ...row, position }));
     },
 
     async insert(category: CategoryRow): Promise<void> {
       await db.insert(categories).values(category);
     },
 
-    /** Sparar ändrat namn, förälder och arkivering för kategorierna, i en batch. */
+    /** Sparar ändrat namn, förälder, arkivering och plats för kategorierna, i en batch. */
     async save(changed: readonly CategoryRow[]): Promise<void> {
       const [first, ...rest] = changed.map(update);
       if (first) await db.batch([first, ...rest]);
@@ -115,7 +119,7 @@ export function categoryRepository(d1: D1Database) {
         d1.prepare(`UPDATE budget_lines SET category_id = ?2 WHERE category_id = ?1 AND period NOT IN (SELECT period FROM budget_lines WHERE category_id = ?2)`).bind(fromId, intoId),
         d1.prepare(`DELETE FROM budget_lines WHERE category_id = ?1`).bind(fromId),
         ...changed.map((c) =>
-          d1.prepare(`UPDATE categories SET parent_id = ?, name = ?, archived = ? WHERE id = ?`).bind(c.parentId, c.name, c.archived ? 1 : 0, c.id),
+          d1.prepare(`UPDATE categories SET parent_id = ?, name = ?, archived = ?, position = ? WHERE id = ?`).bind(c.parentId, c.name, c.archived ? 1 : 0, c.position ?? null, c.id),
         ),
       ]);
       return results[0]?.meta.changes ?? 0;

@@ -708,6 +708,14 @@
       "satisfies": ["KK-18-A"]
     },
     {
+      "id": "api-category-move", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "POST", "path": "/api/categories/{id}/move",
+      "summary": "Flytta en kategori före en annan bland syskonen, eller sist",
+      "request": { "before_id": "halsa-apotek" },
+      "responses": { "200": { "body": { "items": [{ "id": "halsa-vard", "parent_id": "halsa", "name": "Vård", "kind": "expense", "archived": false, "position": 0 }] } } },
+      "description": "Syskon är kategorier med samma förälder och typ. De numreras om från noll, och svaret har dem vars plats ändrades. before_id null flyttar sist. Domänens förklaring ger 400 för en arkiverad kategori, en flytt före sig själv och en kategori på annan nivå eller av annan typ (#251).",
+      "satisfies": ["KK-18-A"]
+    },
+    {
       "id": "api-settings", "group": "API (Worker, nås via /api/* på pages.dev)", "method": "PATCH", "path": "/api/settings",
       "summary": "Budgetperiodens startdag; GET samma path ger nuvarande värde",
       "request": { "budget_period_start_day": 25 },

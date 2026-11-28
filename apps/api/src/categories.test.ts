@@ -47,7 +47,7 @@ describe("GET /api/categories (KK-18-A, #32)", () => {
   it("ger kategorierna i snake_case", async () => {
     const res = await call();
     expect(res.status).toBe(200);
-    expect((await items()).find((c) => c.id === "mat-livsmedel")).toEqual({ id: "mat-livsmedel", parent_id: "mat", name: "Livsmedel", kind: "expense", archived: false });
+    expect((await items()).find((c) => c.id === "mat-livsmedel")).toEqual({ id: "mat-livsmedel", parent_id: "mat", name: "Livsmedel", kind: "expense", archived: false, position: null });
     expect((await items()).find((c) => c.id === "mat")).toMatchObject({ parent_id: null });
   });
 
@@ -68,7 +68,7 @@ describe("POST /api/categories (KK-18-A)", () => {
   it("lägger till en underkategori som ärver huvudkategorins typ, och en ny huvudkategori för utgifter", async () => {
     const sub = await call("POST", undefined, { parent_id: "fritid", name: " Simskola " });
     expect(sub.status).toBe(201);
-    expect(await sub.json()).toEqual({ id: "ny-1", parent_id: "fritid", name: "Simskola", kind: "expense", archived: false });
+    expect(await sub.json()).toEqual({ id: "ny-1", parent_id: "fritid", name: "Simskola", kind: "expense", archived: false, position: null });
     const main = await call("POST", undefined, { parent_id: null, name: "Husdjur" });
     expect(await main.json()).toMatchObject({ parent_id: null, name: "Husdjur", kind: "expense" });
     expect((await items()).some((c) => c.name === "Husdjur")).toBe(true);
@@ -99,7 +99,7 @@ describe("PATCH /api/categories/{id} (KK-18-A)", () => {
   it("byter namn", async () => {
     const res = await call("PATCH", "/api/categories/noje-spel", { name: "Spel & dataspel" });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ id: "noje-spel", parent_id: "noje", name: "Spel & dataspel", kind: "expense", archived: false });
+    expect(await res.json()).toEqual({ id: "noje-spel", parent_id: "noje", name: "Spel & dataspel", kind: "expense", archived: false, position: null });
   });
 
   it("arkiverar en huvudkategori och dess underkategorier", async () => {
@@ -152,5 +152,58 @@ describe("POST /api/categories/{id}/merge (KK-18-A)", () => {
     const res = await call("GET", "/api/categories/fritid-hobby/merge");
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toBe("POST");
+  });
+});
+
+describe("POST /api/categories/{id}/move (KK-18-A, #251)", () => {
+  const places = async (parent: string) =>
+    (await items()).filter((c) => c.parent_id === parent).sort((a, b) => (a.position as number) - (b.position as number)).map((c) => [c.id, c.position]);
+
+  it("flyttar en kategori före en annan, numrerar syskonen om och svarar med dem som ändrats", async () => {
+    // Utan plats ordnas Hälsa på namn: Apotek, Träning, Vård.
+    const res = await call("POST", "/api/categories/halsa-vard/move", { before_id: "halsa-apotek" });
+    expect(res.status).toBe(200);
+    const { items: changed } = await res.json<{ items: { id: string; position: number }[] }>();
+    const want = [["halsa-vard", 0], ["halsa-apotek", 1], ["halsa-traning", 2]];
+    expect(changed.toSorted((a, b) => a.position - b.position).map((c) => [c.id, c.position])).toEqual(want);
+    expect(await places("halsa")).toEqual(want);
+    // Syskon i andra listor får ingen plats.
+    expect((await items()).find((c) => c.id === "mat-livsmedel")?.position).toBeNull();
+  });
+
+  it("before_id null flyttar sist, och en flytt som inte ändrar något svarar med en tom lista", async () => {
+    const res = await call("POST", "/api/categories/halsa-vard/move", { before_id: null });
+    expect(res.status).toBe(200);
+    expect(await places("halsa")).toEqual([["halsa-apotek", 0], ["halsa-traning", 1], ["halsa-vard", 2]]);
+    const again = await call("POST", "/api/categories/halsa-vard/move", { before_id: null });
+    expect(await again.json()).toEqual({ items: [] });
+  });
+
+  it("platsen följer med när kategorin slås ihop eller arkiveras", async () => {
+    await call("POST", "/api/categories/mat-systembolaget/move", { before_id: "mat-livsmedel" });
+    await call("PATCH", "/api/categories/mat-systembolaget", { name: "Bolaget" });
+    expect((await items()).find((c) => c.id === "mat-systembolaget")).toMatchObject({ name: "Bolaget", position: 0 });
+    await call("POST", "/api/categories/mat-restaurang-cafe/merge", { into_id: "mat-livsmedel" });
+    expect((await items()).find((c) => c.id === "mat-livsmedel")).toMatchObject({ position: 1 });
+  });
+
+  it("en flytt som domänen avvisar ger 400 med förklaringen", async () => {
+    const res = await call("POST", "/api/categories/mat-livsmedel/move", { before_id: "boende-el" });
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "rejected", message: "Kategorierna måste ligga på samma nivå och vara av samma typ" });
+    expect((await call("POST", "/api/categories/mat-livsmedel/move", { before_id: "mat-livsmedel" })).status).toBe(400);
+  });
+
+  it("utan before_id eller med fel typ 400, okänd kategori 404, andra metoder 405, och databasfel 503", async () => {
+    expect((await call("POST", "/api/categories/mat-livsmedel/move", {})).status).toBe(400);
+    expect((await call("POST", "/api/categories/mat-livsmedel/move", { before_id: 5 })).status).toBe(400);
+    expect((await call("POST", "/api/categories/mat-livsmedel/move", "inte json")).status).toBe(400);
+    expect((await call("POST", "/api/categories/finns-inte/move", { before_id: null })).status).toBe(404);
+    const res = await call("GET", "/api/categories/mat-livsmedel/move");
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("POST");
+    const down = await call("POST", "/api/categories/mat-livsmedel/move", { before_id: null }, { DB: broken });
+    expect(down.status).toBe(503);
+    expect(await down.json()).toEqual({ error: "unavailable" });
   });
 });
