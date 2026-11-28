@@ -13,6 +13,7 @@ import { canGoBack, Link, navigationKind, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
 import { CategoryView } from "./settings/CategoryView.tsx";
 import { ConnectionView } from "./settings/ConnectionView.tsx";
+import { KnownAccountsView } from "./settings/KnownAccountsView.tsx";
 import { RulesView } from "./settings/RulesView.tsx";
 import { AboutSettings, AccountsSettings, BankSettings, NotificationSettings, PeriodSettings, SettingsView } from "./settings/SettingsView.tsx";
 import { TransactionDetail } from "./transactions/TransactionDetail.tsx";
@@ -41,6 +42,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/installningar": SettingsView,
   "/installningar/kategorier": CategoriesView,
   "/installningar/regler": RulesView,
+  "/installningar/kanda-konton": KnownAccountsView,
   "/installningar/konton": AccountsSettings,
   "/installningar/bank": BankSettings,
   "/installningar/budgetperiod": PeriodSettings,

@@ -1,7 +1,7 @@
 // Inställningar (#259, KK-62-B, KK-65-A): grupperade listrader med ikon och chevron som leder till varsin
 // undervy, utseendet direkt på sidan och Logga ut som en tydlig knapp längst ned (KK-35-A). Undervyerna har
 // sina egna sidor nedan, så att bakåt går tillbaka hit.
-import { Bell, CalendarDays, Info, Landmark, ListChecks, Tag, Wallet } from "lucide-react";
+import { Bell, CalendarDays, Info, Landmark, ListChecks, Tag, Users, Wallet } from "lucide-react";
 import { useState, type ReactNode } from "react";
 import { browser } from "../browser.ts";
 import { setTheme, storedTheme, type Theme } from "../theme.ts";
@@ -48,6 +48,7 @@ export function SettingsView() {
       <List label="Budget">
         <ListRow icon={Tag} label="Kategorier" to="/installningar/kategorier" />
         <ListRow icon={ListChecks} label="Regler" to="/installningar/regler" />
+        <ListRow icon={Users} label="Kända konton" detail="Konton utanför appen, till exempel en partners" to="/installningar/kanda-konton" />
         <ListRow icon={CalendarDays} label="Budgetperiod" detail="Vilken dag perioden börjar" to="/installningar/budgetperiod" />
       </List>
       <List label="Appen">

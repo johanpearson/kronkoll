@@ -30,6 +30,8 @@ interface Transaction {
   readonly split: boolean;
   /** Dold av användaren (KK-49). */
   readonly hidden: boolean;
+  /** Namnet på det kända konto överföringen hör till (KK-54-B), användarens text. Null utan koppling. */
+  readonly knownAccountName: string | null;
 }
 
 export interface Period {
@@ -67,6 +69,7 @@ function toTransaction(raw: unknown): Transaction | null {
     manualTransfer: typeof manual === "boolean" ? manual : null,
     split: field(raw, "split") === true,
     hidden: field(raw, "hidden") === true,
+    knownAccountName: text(field(raw, "known_account_name")) || null,
   };
 }
 
@@ -199,6 +202,7 @@ function Row(props: {
   const categoryNames = categories.names;
   const name = t.counterparty || t.description || "Okänd motpart";
   const notes = [
+    t.knownAccountName === null ? null : `Till: ${t.knownAccountName}`,
     t.categoryId === null ? null : (categoryNames.get(t.categoryId) ?? null),
     t.status === "pending" ? "Preliminär" : null,
     t.hidden ? "Dold" : null,

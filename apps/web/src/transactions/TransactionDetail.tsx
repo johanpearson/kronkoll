@@ -9,6 +9,7 @@ import { Link } from "../router.tsx";
 import { CategoryEditor } from "./CategoryEditor.tsx";
 import { CategoryReason, toReason, type Reason } from "./CategoryReason.tsx";
 import { INCOME_TYPES, IncomeTypePicker, incomeLabel, type IncomeType } from "./IncomeType.tsx";
+import { KnownAccountLink, knownAccountLabel, toLinkedKnownAccount, type LinkedKnownAccount } from "./KnownAccountLink.tsx";
 import { LoanLink, loanLabel, toLinkedLoan, type LinkedLoan } from "./LoanLink.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "./TransactionsView.tsx";
@@ -33,6 +34,8 @@ interface Detail {
   readonly splits: readonly { categoryId: string; amountMinor: number }[];
   /** Lånet betalningen är kopplad till (KK-59-B). */
   readonly loan: LinkedLoan | null;
+  /** Det kända konto överföringen är kopplad till (KK-54-B). */
+  readonly knownAccount: LinkedKnownAccount | null;
   /** Varför kategorin är vad den är (KK-58-D). */
   readonly reason: Reason | null;
 }
@@ -75,6 +78,7 @@ function toDetail(body: unknown): Detail | null {
         })
       : [],
     loan: toLinkedLoan(field(body, "loan")),
+    knownAccount: toLinkedKnownAccount(field(body, "known_account")),
     reason: toReason(field(body, "category_reason")),
   };
 }
@@ -154,6 +158,7 @@ export function TransactionDetail({ id }: { id: string }) {
         <div><dt>Kategori</dt><dd>{category}</dd></div>
         <div><dt>Räknas</dt><dd>{counting(d)}</dd></div>
         {d.loan && <div><dt>Lån</dt><dd>{loanLabel(d.loan)}</dd></div>}
+        {d.knownAccount && <div><dt>Känt konto</dt><dd>{`Till: ${knownAccountLabel(d.knownAccount)}`}</dd></div>}
         {income && <div><dt>Inkomsttyp</dt><dd>{incomeLabel(d.incomeType, d.incomeSource)}</dd></div>}
         {d.pair && (
           <div><dt>Motpost</dt><dd>{`${d.pair.accountName} · ${formatSek(d.pair.amountMinor)} · ${formatDateShort(d.pair.transactionDate)}`}</dd></div>
@@ -184,6 +189,7 @@ export function TransactionDetail({ id }: { id: string }) {
       {mode === null && d.reason !== null && d.splits.length === 0 && <CategoryReason reason={d.reason} names={categories.names} />}
       {/* En lånebetalning är en utgift, men en som redan är kopplad kan alltid kopplas loss. */}
       {mode === null && (d.loan !== null || d.amountMinor < 0) && <LoanLink transactionId={d.id} loan={d.loan} onSaved={() => void load()} />}
+      {mode === null && <KnownAccountLink transactionId={d.id} account={d.knownAccount} onSaved={() => void load()} />}
       {mode === null && income && <IncomeTypePicker transactionId={d.id} value={d.incomeType} onSaved={() => void load()} />}
       {mode === "category" && (
         <section className="card tx-editor">

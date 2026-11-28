@@ -123,7 +123,11 @@ export async function useFakeApi(
     is_internal_transfer: false, manual_transfer: null, income_type: "other", income_source: "template", transfer_pair: null, splits: [],
     // Varför fick den här kategorin? (KK-58-D). Ingen kategori, och ingen regel träffar.
     category_reason: { source: "none", rule: null, also_matched: [] },
+    // Det kända konto överföringen är kopplad till (KK-54-B). Ingen från början.
+    known_account: null as { id: string; name: string; source: string } | null,
   };
+  /** Kända konton (KK-54), sparade av PUT /api/known-accounts/{id} under testet. */
+  const knownAccounts: { id: string; name: string; match_patterns: string[]; category_id: string }[] = [];
   /** Ett påhittat bolån vars bindningstid slutar om 41 dagar (KK-36-C). */
   const loans: Record<string, unknown>[] = [{
     id: "lan1", name: "Bolån del 1", lender: "Exempelbanken", balance_minor: 120000000, interest_rate_bp: 350, rate_fixed_until: "2026-12-15", amortization_minor: 200000,
@@ -368,6 +372,34 @@ export async function useFakeApi(
     if (path === "/api/transactions/pending") {
       const items = transactions.filter((t) => t.status === "pending" && !hiddenIds.has(t.id));
       return [200, { items: items.map((t) => ({ ...t, hidden: false })), total_minor: items.reduce((sum, t) => sum + t.amount_minor, 0), count: items.length }];
+    }
+    // Kända konton (KK-54): lista, förhandsvisning, spara och ta bort.
+    if (path === "/api/known-accounts" && method === "GET") return [200, { known_accounts: knownAccounts }];
+    if (path === "/api/known-accounts/preview" && method === "POST") {
+      // Två påhittade överföringar innehåller "swish"; allt annat träffar inget.
+      const patterns = Array.isArray(body["match_patterns"]) ? (body["match_patterns"] as string[]) : [];
+      return [200, { count: patterns.some((p) => p.toLowerCase().includes("swish")) ? 2 : 0 }];
+    }
+    const knownId = /^\/api\/known-accounts\/([^/]+)$/u.exec(path)?.[1];
+    if (knownId && method === "PUT") {
+      const account = { id: knownId, name: String(body["name"]), match_patterns: body["match_patterns"] as string[], category_id: String(body["category_id"]) };
+      const i = knownAccounts.findIndex((a) => a.id === knownId);
+      if (i >= 0) knownAccounts[i] = account;
+      else knownAccounts.push(account);
+      return [i >= 0 ? 200 : 201, { ...account, linked: 2 }];
+    }
+    if (knownId && method === "DELETE") {
+      const i = knownAccounts.findIndex((a) => a.id === knownId);
+      if (i < 0) return [404, { error: "not_found" }];
+      knownAccounts.splice(i, 1);
+      return [204, null];
+    }
+    // Koppla en överföring till ett känt konto för hand (KK-54-C).
+    const txKnown = /^\/api\/transactions\/([^/]+)\/known-account$/u.exec(path)?.[1];
+    if (txKnown && method === "PUT") {
+      const account = knownAccounts.find((a) => a.id === body["known_account_id"]);
+      salary.known_account = account ? { id: account.id, name: account.name, source: "manual" } : null;
+      return [200, { known_account: salary.known_account, category_id: account?.category_id ?? null, category_source: account ? "learned" : "none" }];
     }
     // Koppla en betalning till ett lån för hand (KK-59-B).
     const txLoan = /^\/api\/transactions\/([^/]+)\/loan$/u.exec(path)?.[1];
