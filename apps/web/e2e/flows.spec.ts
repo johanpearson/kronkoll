@@ -250,3 +250,25 @@ test("välj ett konto i Transaktioner och se vilket filter som gäller (V-e2e-ac
   await page.getByRole("button", { name: "Visa alla konton" }).click();
   await expect(page.getByText(/Visar bara/u)).toHaveCount(0);
 });
+
+test("flytta en kategori upp och ner med knapparna, och ordningen finns kvar efter omladdning (V-e2e-category-order, KK-18-A)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/installningar/kategorier/mat");
+  const subs = page.getByRole("list", { name: "Underkategorier" }).getByRole("listitem");
+  await expect(subs).toHaveText(["Livsmedel", "Restaurang", "Systembolaget"]);
+  await page.getByRole("button", { name: "Systembolaget" }).click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByRole("status")).toHaveText("Plats 3 av 3");
+  // Arket är kvar efter en flytt, så att man kan flytta flera steg.
+  await sheet.getByRole("button", { name: "Flytta upp" }).click();
+  await expect(sheet.getByRole("status")).toHaveText("Plats 2 av 3");
+  await sheet.getByRole("button", { name: "Flytta upp" }).click();
+  await expect(sheet.getByRole("status")).toHaveText("Plats 1 av 3");
+  await expect(sheet.getByRole("button", { name: "Flytta upp" })).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Stäng" }).click();
+  await expect(subs).toHaveText(["Systembolaget", "Livsmedel", "Restaurang"]);
+  await page.getByRole("button", { name: "Livsmedel" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Flytta ner" }).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Stäng" }).click();
+  await expect(subs).toHaveText(["Systembolaget", "Restaurang", "Livsmedel"]);
+});

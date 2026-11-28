@@ -7,6 +7,8 @@ const NOVEMBER = { key: "2026-11", start: "2026-11-01", end: "2026-11-30" };
 const CATEGORIES = [
   { id: "mat", parent_id: null, name: "Mat", kind: "expense", archived: false },
   { id: "mat-livsmedel", parent_id: "mat", name: "Livsmedel", kind: "expense", archived: false },
+  { id: "mat-restaurang", parent_id: "mat", name: "Restaurang", kind: "expense", archived: false },
+  { id: "mat-systembolaget", parent_id: "mat", name: "Systembolaget", kind: "expense", archived: false },
   { id: "hushall", parent_id: null, name: "Hushåll", kind: "expense", archived: false },
   { id: "hushall-forbrukning", parent_id: "hushall", name: "Förbrukning", kind: "expense", archived: false },
   { id: "boende", parent_id: null, name: "Boende", kind: "expense", archived: false },
@@ -131,6 +133,8 @@ export async function useFakeApi(
   }];
   const state: FakeApi = { rules: [], budgetPuts: [], guidelinePuts: [], accountPatches: [], categoryResets: [] };
   let categoriesCleared = false;
+  // En kopia per test, eftersom en flytt ändrar platserna (#251). Utan plats ordnas syskonen på namn.
+  const categories = CATEGORIES.map((c) => ({ ...c, position: null as number | null }));
   /** Påhittat underlag till budgetplaneraren (KK-42): fasta siffror. */
   const guidelines = () => ({
     period: NOVEMBER,
@@ -242,7 +246,20 @@ export async function useFakeApi(
         { period: "2026-11", salary_minor: 3361000, parental_benefit_minor: 483000, other_minor: 281000 },
       ] }];
     }
-    if (path === "/api/categories") return [200, { items: categoriesCleared ? [] : CATEGORIES }];
+    if (path === "/api/categories") return [200, { items: categoriesCleared ? [] : categories }];
+    const move = /^\/api\/categories\/([^/]+)\/move$/u.exec(path);
+    if (move && method === "POST") {
+      const moving = categories.find((c) => c.id === move[1]);
+      if (!moving) return [404, { error: "not_found" }];
+      const place = (c: { position: number | null }) => c.position ?? Number.POSITIVE_INFINITY;
+      const siblings = categories
+        .filter((c) => c.parent_id === moving.parent_id && c.kind === moving.kind && c.id !== moving.id)
+        .sort((a, b) => (place(a) === place(b) ? a.name.localeCompare(b.name, "sv") : place(a) - place(b)));
+      const at = siblings.findIndex((c) => c.id === body["before_id"]);
+      siblings.splice(at < 0 ? siblings.length : at, 0, moving);
+      siblings.forEach((c, i) => { c.position = i; });
+      return [200, { items: siblings.map((c) => ({ ...c })) }];
+    }
     if (path === "/api/rules" && method === "POST") {
       const text = String(body["pattern"]).trim().toUpperCase();
       const rule = { id: `r-${String(state.rules.length + 1)}`, match: body["match"] === "contains" ? "description_contains" : "counterparty_prefix", pattern: text, category_id: String(body["category_id"]), source: "learned", hits: 0 };

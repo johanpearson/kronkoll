@@ -194,6 +194,12 @@ pnpm --filter @kronkoll/<paket> test:coverage
   där just den regeln vinner. Den inbyggda prioriteten (inlärd före mall, exakt före prefix före Innehåller)
   gör att en äldre prefixregel slår en ny Innehåller-regel. Det byts mot användarens ordning i #250 PR 2.
   `retroactive_candidates` är alltid 0 och finns kvar för appar i telefonens cache.
+- Kategoriernas plats (`categories.position`, 0027, #251): null betyder "ordnas på namn, efter dem som har en plats". Första
+  flytten i en lista (`moveCategory`, `POST /api/categories/{id}/move`) ger alla syskon platserna 0, 1, 2 …. Syskon är
+  samma förälder och typ. Adaptern utelämnar en plats som saknas i stället för att ge null, så att raden också är en
+  domänens `Category`. Webben ordnar med `sortCategories` och flyttar upp och ner med knappar i arket.
+- Kontrollera utgångskoden på lint och typecheck. `pnpm -s typecheck | tail` döljer ett fel, eftersom `tail` lyckas. Kör
+  `set -o pipefail` eller `echo $?` direkt efter kommandot. #316 gick röd i CI av det.
 - Regelns plats (`category_rules.position`, 0024): lägst vinner. En ny egen regel får `MIN(position) - 1`, så
   platserna kan bli negativa tills `setOrder` skriver 0, 1, 2 … Mallregler och Räkna inte-regler har null.
   `ROW_NUMBER() OVER (…)` fungerar i D1-migreringar.

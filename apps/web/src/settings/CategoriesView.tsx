@@ -1,13 +1,14 @@
 // Kategorier (#251, KK-18-A): huvudkategorierna per typ som listrader med färgprick (KK-26-D) och antal
 // underkategorier. En rad leder till huvudkategorins undervy. Ny huvudkategori läggs till i ett ark.
 // Arkiverade visas inte.
+import { sortCategories } from "@kronkoll/domain";
 import { Plus } from "lucide-react";
 import { useState } from "react";
 import { CategoryDot } from "../category-color.tsx";
 import { Button } from "../ui/Button.tsx";
 import { List, ListRow } from "../ui/ListRow.tsx";
 import { EmptyState, Skeleton } from "../ui/Surface.tsx";
-import { byName, CategorySheet, useCategories, type Target } from "./category-sheet.tsx";
+import { CategorySheet, useCategories, type Target } from "./category-sheet.tsx";
 import { ResetCategories } from "./ResetCategories.tsx";
 
 const KINDS = [
@@ -31,7 +32,7 @@ export function CategoriesView() {
     <main>
       <h1>Kategorier</h1>
       {KINDS.map(({ kind, title }) => {
-        const mains = categories.filter((c) => c.kind === kind && c.parentId === null).sort(byName);
+        const mains = sortCategories(categories.filter((c) => c.kind === kind && c.parentId === null));
         if (mains.length === 0) return null;
         return (
           <section key={kind}>
@@ -62,8 +63,9 @@ export function CategoriesView() {
         target={target}
         categories={categories}
         onTarget={setTarget}
-        onChanged={() => {
-          setTarget(null);
+        onChanged={(mode) => {
+          // Flytta upp och ner lämnar arket öppet, så att man kan flytta flera steg.
+          if (mode !== "move") setTarget(null);
           setReload((n) => n + 1);
         }}
       />

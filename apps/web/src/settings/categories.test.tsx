@@ -92,12 +92,12 @@ describe("kategorier i Inställningar (#251, KK-18-A)", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Mat");
     expect(rows("Underkategorier")).toEqual(["Livsmedel", "Restaurang"]);
     fireEvent.click(screen.getByRole("button", { name: "Livsmedel" }));
-    expect(rows("Åtgärder för Livsmedel")).toEqual(["Byt namn", "Slå ihop med en annan", "Arkivera"]);
+    expect(rows("Åtgärder för Livsmedel")).toEqual(["Flytta ner", "Byt namn", "Slå ihop med en annan", "Arkivera"]);
     fireEvent.click(sheet().getByRole("button", { name: "Stäng" }));
     expect(screen.queryByRole("dialog")).toBeNull();
     // Huvudkategorin ändras med knappen i sidhuvudet, och kan få underkategorier.
     fireEvent.click(screen.getByRole("button", { name: "Ändra Mat" }));
-    expect(rows("Åtgärder för Mat")).toEqual(["Byt namn", "Ny underkategori", "Slå ihop med en annan", "Arkivera"]);
+    expect(rows("Åtgärder för Mat")).toEqual(["Flytta upp", "Byt namn", "Ny underkategori", "Slå ihop med en annan", "Arkivera"]);
   });
 
   it("byter namn med CSRF-skydd och hämtar listan igen", async () => {
@@ -189,5 +189,88 @@ describe("kategorier i Inställningar (#251, KK-18-A)", () => {
     await open("/installningar/kategorier/mat");
     const tab = within(screen.getByRole("navigation", { name: "Huvudmeny" })).getByRole("link", { name: "Översikt" });
     expect(tab.getAttribute("aria-current")).toBe("page");
+  });
+});
+
+describe("flytta kategorier upp och ner (#251, KK-18-A)", () => {
+  /** Mat har tre underkategorier. Platser finns bara när ett test ger dem. */
+  const list = (places: Record<string, number> = {}) => ({
+    items: [
+      { id: "mat", parent_id: null, name: "Mat", kind: "expense", archived: false, position: places["mat"] ?? null },
+      { id: "boende", parent_id: null, name: "Boende", kind: "expense", archived: false, position: places["boende"] ?? null },
+      { id: "mat-livsmedel", parent_id: "mat", name: "Livsmedel", kind: "expense", archived: false, position: places["mat-livsmedel"] ?? null },
+      { id: "mat-restaurang", parent_id: "mat", name: "Restaurang", kind: "expense", archived: false, position: places["mat-restaurang"] ?? null },
+      { id: "mat-systembolaget", parent_id: "mat", name: "Systembolaget", kind: "expense", archived: false, position: places["mat-systembolaget"] ?? null },
+    ],
+  });
+  const rowsOf = (name: string) => within(sheet().getByRole("list", { name })).getAllByRole("listitem").map((li) => li.textContent);
+
+  it("visar listorna i den ordning platserna ger, och på namn för dem som saknar plats", async () => {
+    api([200, {}], [200, list({ "mat-systembolaget": 0, "mat-livsmedel": 1 })]);
+    await open("/installningar/kategorier/mat");
+    expect(rows("Underkategorier")).toEqual(["Systembolaget", "Livsmedel", "Restaurang"]);
+    cleanup();
+    api([200, {}], [200, list({ mat: 0, boende: 1 })]);
+    await open();
+    expect(rows("Utgifter")).toEqual(["Mat", "Boende"]);
+  });
+
+  it("säger vilken plats kategorin har, och erbjuder bara de flyttar som går", async () => {
+    api([200, {}], [200, list()]);
+    await open("/installningar/kategorier/mat");
+    fireEvent.click(screen.getByRole("button", { name: "Restaurang" }));
+    expect(sheet().getByRole("status").textContent).toBe("Plats 2 av 3");
+    expect(rowsOf("Åtgärder för Restaurang").slice(0, 2)).toEqual(["Flytta upp", "Flytta ner"]);
+    fireEvent.click(sheet().getByRole("button", { name: "Stäng" }));
+    fireEvent.click(screen.getByRole("button", { name: "Livsmedel" }));
+    expect(sheet().getByRole("status").textContent).toBe("Plats 1 av 3");
+    expect(sheet().queryByRole("button", { name: "Flytta upp" })).toBeNull();
+    expect(sheet().getByRole("button", { name: "Flytta ner" })).toBeTruthy();
+    fireEvent.click(sheet().getByRole("button", { name: "Stäng" }));
+    fireEvent.click(screen.getByRole("button", { name: "Systembolaget" }));
+    expect(sheet().queryByRole("button", { name: "Flytta ner" })).toBeNull();
+    expect(sheet().getByRole("button", { name: "Flytta upp" })).toBeTruthy();
+  });
+
+  it("flytta upp ber servern flytta före den som står före, lämnar arket öppet och hämtar listan igen", async () => {
+    const calls = api([200, {}], [200, list()]);
+    await open("/installningar/kategorier/mat");
+    fireEvent.click(screen.getByRole("button", { name: "Restaurang" }));
+    await submit("Flytta upp");
+    expect(changes(calls)).toEqual([{ method: "POST", path: "/api/categories/mat-restaurang/move", body: { before_id: "mat-livsmedel" }, csrf: "1" }]);
+    expect(calls.filter((c) => c.path === "/api/categories" && c.method === "GET")).toHaveLength(2);
+    expect(screen.getByRole("dialog")).toBeTruthy();
+  });
+
+  it("flytta ner ber servern flytta före den näst efter, eller sist när det inte finns någon", async () => {
+    const calls = api([200, {}], [200, list()]);
+    await open("/installningar/kategorier/mat");
+    fireEvent.click(screen.getByRole("button", { name: "Livsmedel" }));
+    await submit("Flytta ner");
+    fireEvent.click(sheet().getByRole("button", { name: "Stäng" }));
+    fireEvent.click(screen.getByRole("button", { name: "Restaurang" }));
+    await submit("Flytta ner");
+    expect(changes(calls).map((c) => [c.path, c.body])).toEqual([
+      ["/api/categories/mat-livsmedel/move", { before_id: "mat-systembolaget" }],
+      ["/api/categories/mat-restaurang/move", { before_id: null }],
+    ]);
+  });
+
+  it("en huvudkategori flyttas bland huvudkategorierna av samma typ", async () => {
+    const calls = api([200, {}], [200, list()]);
+    await open("/installningar/kategorier/mat");
+    fireEvent.click(screen.getByRole("button", { name: "Ändra Mat" }));
+    expect(sheet().getByRole("status").textContent).toBe("Plats 2 av 2");
+    await submit("Flytta upp");
+    expect(changes(calls).map((c) => [c.path, c.body])).toEqual([["/api/categories/mat/move", { before_id: "boende" }]]);
+  });
+
+  it("visar serverns förklaring i arket när flytten inte godtas, och arket är kvar", async () => {
+    api([400, { error: "rejected", message: "Kategorin är arkiverad" }], [200, list()]);
+    await open("/installningar/kategorier/mat");
+    fireEvent.click(screen.getByRole("button", { name: "Restaurang" }));
+    await submit("Flytta upp");
+    expect(sheet().getByRole("alert").textContent).toBe("Kategorin är arkiverad");
+    expect(sheet().getByRole("button", { name: "Flytta upp" })).toBeTruthy();
   });
 });
