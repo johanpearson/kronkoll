@@ -30,9 +30,11 @@ const accountName = sql<string>`coalesce(${accounts.nickname}, ${accounts.displa
 type Row = typeof transactions.$inferSelect;
 
 export interface TransactionListQuery {
-  /** Första och sista dagen, båda inräknade. */
-  readonly from: string;
-  readonly to: string;
+  /** Första och sista dagen, båda inräknade. Utelämnade betyder alla perioder, t.ex. för alla preliminära. */
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
+  /** Bara bokförda eller bara preliminära (KK-56-A). Utelämnat betyder båda. Borttagna kommer aldrig med. */
+  readonly status?: "booked" | "pending" | undefined;
   readonly limit: number;
   /** En kategori med dess underkategorier, och uppdelningar med en del i dem. */
   readonly categoryId?: string | undefined;
@@ -217,7 +219,10 @@ export function transactionRepository(d1: D1Database) {
         // Uteslutna konton syns inte i listan (KK-53), bara överföringar dit som utgifter.
         sql`${transactions.accountId} IN (SELECT id FROM accounts WHERE role <> 'excluded')`,
         // Perioden räknas som i budgeten: bokföringsdagen, annars köpdagen (KK-20, KK-34).
-        sql`coalesce(${transactions.bookingDate}, ${transactions.transactionDate}) BETWEEN ${query.from} AND ${query.to}`,
+        query.from === undefined || query.to === undefined
+          ? undefined
+          : sql`coalesce(${transactions.bookingDate}, ${transactions.transactionDate}) BETWEEN ${query.from} AND ${query.to}`,
+        query.status === undefined ? undefined : eq(transactions.status, query.status),
         query.uncategorized ? isNull(transactions.categoryId) : undefined,
         query.accountIds === undefined ? undefined : inArray(transactions.accountId, [...query.accountIds]),
         query.categoryId === undefined ? undefined : inCategory(query.categoryId),

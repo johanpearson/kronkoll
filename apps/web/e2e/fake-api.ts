@@ -288,7 +288,14 @@ export async function useFakeApi(
     }
     if (path === "/api/transactions") {
       const wantHidden = query.get("hidden") === "true";
-      return [200, { period: NOVEMBER, items: transactions.filter((t) => hiddenIds.has(t.id) === wantHidden).map((t) => ({ ...t, hidden: hiddenIds.has(t.id) })), next_cursor: null }];
+      const status = query.get("status");
+      const items = transactions.filter((t) => hiddenIds.has(t.id) === wantHidden && (status === null || t.status === status));
+      return [200, { period: NOVEMBER, items: items.map((t) => ({ ...t, hidden: hiddenIds.has(t.id) })), next_cursor: null }];
+    }
+    // Gruppen Preliminärt (KK-56-A): alla preliminära som inte är dolda, med summa.
+    if (path === "/api/transactions/pending") {
+      const items = transactions.filter((t) => t.status === "pending" && !hiddenIds.has(t.id));
+      return [200, { items: items.map((t) => ({ ...t, hidden: false })), total_minor: items.reduce((sum, t) => sum + t.amount_minor, 0), count: items.length }];
     }
     const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
     // En påhittad löneinbetalning som bara nås via sin adress, för inkomsttypen på detaljsidan (KK-22-A).
