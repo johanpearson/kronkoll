@@ -7,8 +7,8 @@
 // historiken efter en fråga. En regel kan också ha åtgärden Räkna inte (KK-39-C): den gäller hela historiken direkt,
 // så formuläret visar först hur många den träffar och sparar när användaren bekräftar. Egna val ändras aldrig.
 import { Plus } from "lucide-react";
-import { useEffect, useState, type SyntheticEvent } from "react";
-import { deleteJson, field, getJson, patchJson, postJson, putJson, type ApiResult } from "../api.ts";
+import { useEffect, useState } from "react";
+import { deleteJson, field, getJson, postJson, putJson } from "../api.ts";
 import { SyncStatus } from "../sync/SyncStatus.tsx";
 import { useToast } from "../toast.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "../transactions/TransactionsView.tsx";
@@ -18,10 +18,8 @@ import { List, ListRow } from "../ui/ListRow.tsx";
 import { Dialog, Sheet } from "../ui/Modal.tsx";
 import { EmptyState, Skeleton } from "../ui/Surface.tsx";
 import { ResetRules } from "./ResetRules.tsx";
+import { EXCLUDE, RuleForm } from "./RuleForm.tsx";
 import { RuleMatches } from "./RuleMatches.tsx";
-
-/** Värdet i kategorivalet som betyder Räkna inte i stället för en kategori. */
-const EXCLUDE = "exclude";
 
 interface Rule {
   readonly id: string;
@@ -63,112 +61,6 @@ async function fetchRules(): Promise<Rule[] | null> {
   const { status, body } = await getJson("/api/rules");
   const items = field(body, "items");
   return status === 200 && Array.isArray(items) ? items.map(toRule).filter((r): r is Rule => r !== null) : null;
-}
-
-/** Svaret på en sparad regel: hur många tidigare transaktioner som fick kategorin (KK-58-A), eller ett fel som text. */
-function outcome({ status, body }: ApiResult): number | string {
-  if (status === 400) return field(body, "error") === "unknown_category" ? "Välj en kategori som finns." : "Skriv en text, till exempel IKEA.";
-  if (status !== 200 && status !== 201) return "Det gick inte att spara regeln. Försök igen.";
-  const applied = field(body, "applied");
-  return typeof applied === "number" ? applied : 0;
-}
-
-/** Mönster och kategori (eller Räkna inte), för en ny regel eller en som ändras. */
-function RuleForm(props: { title: string; rule?: Rule; categories: Categories; onSaved: (applied: number) => void; onExcluded: (matches: number) => void; onClose: () => void }) {
-  const [pattern, setPattern] = useState(props.rule?.pattern ?? "");
-  const [match, setMatch] = useState<"prefix" | "contains">(props.rule?.contains ? "contains" : "prefix");
-  const [categoryId, setCategoryId] = useState(props.rule?.exclude ? EXCLUDE : (props.rule?.categoryId ?? ""));
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  /** Antalet träffar för en ny Räkna inte-regel, som visas innan den sparas. */
-  const [confirm, setConfirm] = useState<number | null>(null);
-
-  /** Sparar en Räkna inte-regel: ny med POST, ändrad med PATCH där bara namnet går att byta. */
-  const saveExclude = async () => {
-    setBusy(true);
-    const result = props.rule ? await patchJson(`/api/rules/${encodeURIComponent(props.rule.id)}`, { pattern, match }) : await postJson("/api/rules", { pattern, match, action: EXCLUDE });
-    setBusy(false);
-    const matches = field(result.body, "matches");
-    if ((result.status === 200 || result.status === 201) && typeof matches === "number") props.onExcluded(matches);
-    else setError(result.status === 400 ? "Skriv en text, till exempel IKEA." : "Det gick inte att spara regeln. Försök igen.");
-  };
-
-  const save = async (event: SyntheticEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setError(null);
-    if (categoryId === EXCLUDE && props.rule) return saveExclude();
-    setBusy(true);
-    if (categoryId === EXCLUDE) {
-      const { status, body } = await postJson("/api/rules", { pattern, match, action: EXCLUDE, preview: true });
-      setBusy(false);
-      const matches = field(body, "matches");
-      if (status === 200 && typeof matches === "number") setConfirm(matches);
-      else setError(status === 400 ? "Skriv en text, till exempel IKEA." : "Det gick inte att räkna träffarna. Försök igen.");
-      return;
-    }
-    const body = { pattern, match, category_id: categoryId };
-    const result = props.rule ? await patchJson(`/api/rules/${encodeURIComponent(props.rule.id)}`, body) : await postJson("/api/rules", body);
-    setBusy(false);
-    const next = outcome(result);
-    if (typeof next === "string") setError(next);
-    else props.onSaved(next);
-  };
-
-  if (confirm !== null) {
-    return (
-      <div className="tx-editor">
-        <p>Regeln träffar {confirm} transaktioner. De räknas inte i budget och översikt. Det du själv har valt ändras inte.</p>
-        {error && <p role="alert">{error}</p>}
-        <p>
-          <button type="button" className="primary small" disabled={busy} onClick={() => void saveExclude()}>
-            Spara regeln
-          </button>
-          <button type="button" className="small" onClick={props.onClose}>
-            Avbryt
-          </button>
-        </p>
-      </div>
-    );
-  }
-  return (
-    <form className="tx-editor" aria-label={props.title} onSubmit={(e) => void save(e)}>
-      <label>
-        Träffar
-        <select value={match} onChange={(e) => { setMatch(e.target.value === "contains" ? "contains" : "prefix"); }}>
-          <option value="prefix">Allt som börjar med</option>
-          <option value="contains">Allt som innehåller</option>
-        </select>
-      </label>
-      <label>
-        Text
-        <input value={pattern} maxLength={60} placeholder={match === "contains" ? "amazon" : "IKEA"} aria-describedby="rule-case-hint" onChange={(e) => { setPattern(e.target.value); }} />
-      </label>
-      <small id="rule-case-hint">Versaler och gemener spelar ingen roll.</small>
-      {!props.rule?.exclude && (
-        <label>
-          Får kategorin
-          <select value={categoryId} onChange={(e) => { setCategoryId(e.target.value); }}>
-            <option value="">Välj kategori</option>
-            {!props.rule && <option value={EXCLUDE}>Räkna inte i budget och översikt</option>}
-            {props.categories.options.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
-      {error && <p role="alert">{error}</p>}
-      <p>
-        <button type="submit" className="primary small" disabled={busy || categoryId === "" || pattern.trim() === ""}>
-          Spara
-        </button>
-        <button type="button" className="small" onClick={props.onClose}>
-          Avbryt
-        </button>
-      </p>
-    </form>
-  );
 }
 
 type Open = { readonly id: string; readonly view: "menu" | "matches" | "edit" } | { readonly id: null; readonly view: "add" };

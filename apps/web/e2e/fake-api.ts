@@ -260,6 +260,29 @@ export async function useFakeApi(
       siblings.forEach((c, i) => { c.position = i; });
       return [200, { items: siblings.map((c) => ({ ...c })) }];
     }
+    if (path === "/api/rules" && method === "POST" && body["preview"] === true) {
+      // Träffarna för regeln som den skulle bli (#251), utan att spara den. Fyra transaktioner, varav en är manuellt vald.
+      const name = String(body["pattern"]).trim().toUpperCase();
+      return [
+        200,
+        {
+          applied: 3,
+          protected_manual: 1,
+          overridden_manual: body["override_manual"] === true ? 1 : 0,
+          matches: {
+            total: 4,
+            change: 2,
+            unchanged: 1,
+            manual: 1,
+            items: [
+              { id: "p1", transaction_date: "2026-11-02", name: `${name} KARLSTAD`, amount_minor: -49900, category_id: null, effect: "change" },
+              { id: "p2", transaction_date: "2026-10-20", name: `${name} STOCKHOLM`, amount_minor: -12000, category_id: "hushall-forbrukning", effect: "unchanged" },
+              { id: "p3", transaction_date: "2026-10-01", name: `${name} JARFALLA`, amount_minor: -30000, category_id: "fritid", effect: "manual" },
+            ],
+          },
+        },
+      ];
+    }
     if (path === "/api/rules" && method === "POST") {
       const text = String(body["pattern"]).trim().toUpperCase();
       const rule = { id: `r-${String(state.rules.length + 1)}`, match: body["match"] === "contains" ? "description_contains" : "counterparty_prefix", pattern: text, category_id: String(body["category_id"]), source: "learned", hits: 0 };
