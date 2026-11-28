@@ -30,9 +30,11 @@ const accountName = sql<string>`coalesce(${accounts.nickname}, ${accounts.displa
 type Row = typeof transactions.$inferSelect;
 
 export interface TransactionListQuery {
-  /** Första och sista dagen, båda inräknade. */
-  readonly from: string;
-  readonly to: string;
+  /** Första och sista dagen, båda inräknade. Utelämnade betyder alla perioder, t.ex. för alla preliminära. */
+  readonly from?: string | undefined;
+  readonly to?: string | undefined;
+  /** Bara bokförda eller bara preliminära (KK-56-A). Utelämnat betyder båda. Borttagna kommer aldrig med. */
+  readonly status?: "booked" | "pending" | undefined;
   readonly limit: number;
   /** En kategori med dess underkategorier, och uppdelningar med en del i dem. */
   readonly categoryId?: string | undefined;
@@ -187,6 +189,16 @@ export function transactionRepository(d1: D1Database) {
     /** Sparar nya och ändrade rader i en batch. Ett fel rullar tillbaka alltihop. */
     async save(result: ReconcileResult): Promise<void> {
       const statements = [
+        // En preliminär som bokförs släpper kategorin från en regel, så att synken sätter reglerna igen
+        // på bankens bokförda text (KK-56-B). En manuell kategori rörs aldrig. Måste gå före uppdateringen av status.
+        ...result.updated
+          .filter((tx) => tx.status === "booked")
+          .map((tx) =>
+            db
+              .update(transactions)
+              .set({ categoryId: null, categorySource: "none" })
+              .where(and(eq(transactions.id, tx.id), eq(transactions.status, "pending"), inArray(transactions.categorySource, ["learned", "template"]))),
+          ),
         ...result.inserted.map((tx) => db.insert(transactions).values({ id: tx.id, ...toSyncColumns(tx) })),
         ...result.updated.map((tx) => db.update(transactions).set(toSyncColumns(tx)).where(eq(transactions.id, tx.id))),
       ];
@@ -207,7 +219,10 @@ export function transactionRepository(d1: D1Database) {
         // Uteslutna konton syns inte i listan (KK-53), bara överföringar dit som utgifter.
         sql`${transactions.accountId} IN (SELECT id FROM accounts WHERE role <> 'excluded')`,
         // Perioden räknas som i budgeten: bokföringsdagen, annars köpdagen (KK-20, KK-34).
-        sql`coalesce(${transactions.bookingDate}, ${transactions.transactionDate}) BETWEEN ${query.from} AND ${query.to}`,
+        query.from === undefined || query.to === undefined
+          ? undefined
+          : sql`coalesce(${transactions.bookingDate}, ${transactions.transactionDate}) BETWEEN ${query.from} AND ${query.to}`,
+        query.status === undefined ? undefined : eq(transactions.status, query.status),
         query.uncategorized ? isNull(transactions.categoryId) : undefined,
         query.accountIds === undefined ? undefined : inArray(transactions.accountId, [...query.accountIds]),
         query.categoryId === undefined ? undefined : inCategory(query.categoryId),

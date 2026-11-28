@@ -100,6 +100,29 @@ describe("transaktioner i D1 (KK-9, KK-7-A)", () => {
     expect(row).toEqual({ description: "Kaffe och bulle", source: "manual", transfer: 1 });
   });
 
+  it("när en preliminär bokförs släpps kategorin från en regel, så att reglerna sätts igen, men en manuell ligger kvar (KK-56-B)", async () => {
+    const pend = (id: string, amountMinor: number) =>
+      imported({ status: "pending", providerTxId: id, bookingDate: null, amountMinor, counterpartyNorm: "", counterparty: "", description: `BUTIK${id.toUpperCase()}` });
+    await sync([pend("r1", -2000), pend("m1", -3000), pend("s1", -4000)], "2026-11-14");
+    await db.prepare(`UPDATE transactions SET category_id = 'mat-livsmedel', category_source = 'template' WHERE provider_tx_id = 'r1'`).run();
+    await db.prepare(`UPDATE transactions SET category_id = 'mat-livsmedel', category_source = 'manual' WHERE provider_tx_id = 'm1'`).run();
+    await db.prepare(`UPDATE transactions SET category_id = 'mat-livsmedel', category_source = 'learned' WHERE provider_tx_id = 's1'`).run();
+    // r1 och m1 bokförs. s1 är fortfarande preliminär och behåller sin kategori.
+    await sync([{ ...pend("r1", -2000), status: "booked", bookingDate: "2026-11-15" }, { ...pend("m1", -3000), status: "booked", bookingDate: "2026-11-15" }, pend("s1", -4000)], "2026-11-15");
+    const { results } = await db
+      .prepare(`SELECT provider_tx_id AS id, status, category_id AS category, category_source AS source FROM transactions WHERE provider_tx_id IN ('r1', 'm1', 's1') ORDER BY provider_tx_id`)
+      .all();
+    expect(results).toEqual([
+      { id: "m1", status: "booked", category: "mat-livsmedel", source: "manual" },
+      { id: "r1", status: "booked", category: null, source: "none" },
+      { id: "s1", status: "pending", category: "mat-livsmedel", source: "learned" },
+    ]);
+    // En bokförd som synkas igen släpper inte sin kategori.
+    await db.prepare(`UPDATE transactions SET category_id = 'mat-livsmedel', category_source = 'template' WHERE provider_tx_id = 'r1'`).run();
+    await sync([{ ...pend("r1", -2000), status: "booked", bookingDate: "2026-11-15", description: "BUTIKR1 NY TEXT" }], "2026-11-16");
+    expect(await db.prepare(`SELECT category_source AS source FROM transactions WHERE provider_tx_id = 'r1'`).first()).toEqual({ source: "template" });
+  });
+
   it("läser bara det som behövs för avstämningen: från datumgränsen minus matchningsfönstret (3 dagar), plus alla preliminära", async () => {
     const repo = transactionRepository(db);
     await db.prepare(`DELETE FROM transactions`).run();

@@ -130,6 +130,7 @@ describe("GET /api/transactions (#32, KK-9, KK-18, KK-34)", () => {
     ["limit som inte är ett tal", "?limit=många"],
     ["uncategorized som inte är true eller false", "?uncategorized=ja"],
     ["för lång sökning", `?q=${"x".repeat(101)}`],
+    ["status som inte är booked eller pending", "?status=removed"],
   ])("%s ger 400", async (_, query) => {
     const res = await get(query);
     expect(res.status).toBe(400);
@@ -147,5 +148,64 @@ describe("GET /api/transactions (#32, KK-9, KK-18, KK-34)", () => {
     const res = await get("", { method: "POST" });
     expect(res.status).toBe(405);
     expect(res.headers.get("allow")).toBe("GET");
+  });
+});
+
+describe("preliminära i en egen grupp (KK-56-A)", () => {
+  type Pending = { items: Record<string, unknown>[]; total_minor: number; count: number };
+  const insert = (id: string, date: string, amount: number, status: string, hidden = 0, account = "acc_1") =>
+    db
+      .prepare(
+        `INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor, counterparty, counterparty_norm, hidden)
+         VALUES (?, ?, 'fp', ?, '2026-11-15', ?, ?, 'BUTIK', 'BUTIK', ?)`,
+      )
+      .bind(id, account, status, date, amount, hidden);
+
+  beforeAll(async () => {
+    await db.prepare(`INSERT INTO accounts (id, connection_id, display_name, type, role) VALUES ('acc_x', 'c1', 'Uteslutet', 'checking', 'excluded')`).run();
+    // En preliminär från förra perioden räknas också, eftersom den ännu inte hör till någon period.
+    await db.batch([
+      insert("p1", "2026-11-14", -25000, "pending"),
+      insert("p2", "2026-10-31", 10000, "pending"),
+      insert("p-dold", "2026-11-14", -999, "pending", 1),
+      insert("p-borta", "2026-11-14", -777, "removed"),
+      insert("p-utesl", "2026-11-14", -555, "pending", 0, "acc_x"),
+    ]);
+  });
+  afterAll(async () => {
+    await db.batch([db.prepare(`DELETE FROM transactions WHERE id LIKE 'p%'`), db.prepare(`DELETE FROM accounts WHERE id = 'acc_x'`)]);
+  });
+
+  it("GET /api/transactions/pending ger alla preliminära med summa och antal, utan dolda, borttagna och uteslutna konton", async () => {
+    const res = await get("/pending");
+    expect(res.status).toBe(200);
+    const pending = await res.json<Pending>();
+    expect(pending.items.map((i) => [i.id, i.status, i.amount_minor])).toEqual([["p1", "pending", -25000], ["p2", "pending", 10000]]);
+    expect({ total_minor: pending.total_minor, count: pending.count }).toEqual({ total_minor: -15000, count: 2 });
+  });
+
+  it("följer kontofiltret (KK-41-C)", async () => {
+    expect((await (await get("/pending?account=acc_1")).json<Pending>()).count).toBe(2);
+    expect((await (await get("/pending?account=acc_annat")).json<Pending>()).count).toBe(0);
+  });
+
+  it("?status=booked ger dagarnas grupper utan preliminära, och ?status=pending bara de preliminära i perioden", async () => {
+    expect(await ids(await get("?period=2026-11&status=booked"))).toEqual(["t5", "t4", "t3"]);
+    expect(await ids(await get("?period=2026-11&status=pending"))).toEqual(["p1"]);
+    expect(await ids(await get("?period=2026-11"))).toEqual(["t5", "t4", "p1", "t3"]);
+  });
+
+  it("andra metoder ger 405 och ett trasigt kontofilter 400", async () => {
+    const res = await get("/pending", { method: "POST" });
+    expect(res.status).toBe(405);
+    expect(res.headers.get("allow")).toBe("GET");
+    expect((await get("/pending?account=")).status).toBe(400);
+  });
+
+  it("svarar 503 utan detaljer när databasen inte går att läsa", async () => {
+    const broken = { prepare: () => { throw new Error("D1 nere"); } } as unknown as D1Database;
+    const res = await get("/pending", { env: { DB: broken } });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: "unavailable" });
   });
 });

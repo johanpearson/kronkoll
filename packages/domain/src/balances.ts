@@ -36,3 +36,24 @@ export function accountBalances(balance: BankBalance, pendingAmounts: readonly n
   const bookedMinor = includesPending(balance.type) ? amount - pendingMinor : amount;
   return { bookedMinor, availableMinor: bookedMinor + pendingMinor, pendingMinor };
 }
+
+/** Ett konto i översikten: saldot från senaste synk med typ, summan av dess preliminära och om det räknas in. */
+export interface BalanceAccount {
+  /** Null när banken inte har lämnat något saldo (KK-38-B). */
+  readonly balanceMinor: number | null;
+  readonly balanceType: string | null;
+  readonly pendingMinor: number;
+  readonly included: boolean;
+}
+
+/** Totalsaldo bokfört och disponibelt över valda konton som har saldo (KK-60-A, KK-60-D). */
+export function totalBalances(accounts: readonly BalanceAccount[]): AccountBalances {
+  const each = accounts.flatMap((a) =>
+    a.included && a.balanceMinor !== null ? [accountBalances({ amountMinor: a.balanceMinor, type: a.balanceType }, [a.pendingMinor])] : [],
+  );
+  return {
+    bookedMinor: sumMinor(each.map((b) => b.bookedMinor)),
+    availableMinor: sumMinor(each.map((b) => b.availableMinor)),
+    pendingMinor: sumMinor(each.map((b) => b.pendingMinor)),
+  };
+}

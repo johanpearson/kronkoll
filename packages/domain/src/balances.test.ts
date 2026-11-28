@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { accountBalances, includesPending } from "./balances.ts";
+import { accountBalances, includesPending, totalBalances, type BalanceAccount } from "./balances.ts";
 
 describe("bokfört och disponibelt saldo (KK-56-F)", () => {
   it("ett bokfört saldo från banken plus preliminära utgifter och insättningar ger disponibelt", () => {
@@ -49,5 +49,23 @@ describe("bokfört och disponibelt saldo (KK-56-F)", () => {
         expect(includesPending(type) ? b.availableMinor : b.bookedMinor).toBe(amountMinor);
       }),
     );
+  });
+});
+
+describe("totalsaldo bokfört och disponibelt (KK-56-F, KK-60-A, KK-60-D)", () => {
+  const account = (overrides: Partial<BalanceAccount>): BalanceAccount => ({ balanceMinor: 1_000_00, balanceType: "CLBD", pendingMinor: 0, included: true, ...overrides });
+
+  it("summerar valda konton med saldo, och konton utan saldo eller som inte räknas hoppas över", () => {
+    const totals = totalBalances([
+      account({ pendingMinor: -200_00 }),
+      account({ balanceMinor: 500_00, balanceType: "XPCD", pendingMinor: -50_00 }),
+      account({ balanceMinor: null, pendingMinor: -999_00 }),
+      account({ included: false, balanceMinor: 7_000_00, pendingMinor: -1_00 }),
+    ]);
+    expect(totals).toEqual({ bookedMinor: 1_550_00, availableMinor: 1_300_00, pendingMinor: -250_00 });
+  });
+
+  it("utan konton är allt noll", () => {
+    expect(totalBalances([])).toEqual({ bookedMinor: 0, availableMinor: 0, pendingMinor: 0 });
   });
 });

@@ -80,6 +80,7 @@ describe("GET /api/overview (KK-17)", () => {
     expect({ ...body, trend: undefined, accounts: undefined, buffer: undefined }).toEqual({
       period: { key: "2026-11", start: "2026-11-01", end: "2026-11-30" },
       balance_minor: 12231240,
+      balances: { booked_minor: 12231240, available_minor: 12231240, pending_minor: 0 },
       income_minor: 4125000,
       expense_minor: 51250,
       net_minor: 4073750,
@@ -127,11 +128,38 @@ describe("GET /api/overview (KK-17)", () => {
     const body = await (await call("/api/overview")).json<Overview>();
     await db.prepare(`UPDATE accounts SET role = 'spending' WHERE id = 'acc_2'`).run();
     expect(body.accounts).toEqual([
-      { id: "acc_3", name: "Kort", bank: "Skandia", role: "spending", balance_minor: null },
-      { id: "acc_2", name: "Spar", bank: "Skandia", role: "buffer", balance_minor: 7400000 },
-      { id: "acc_1", name: "Vardag", bank: "Skandia", role: "spending", balance_minor: 4831240 },
+      { id: "acc_3", name: "Kort", bank: "Skandia", role: "spending", balance_minor: null, booked_minor: null, available_minor: null },
+      { id: "acc_2", name: "Spar", bank: "Skandia", role: "buffer", balance_minor: 7400000, booked_minor: 7400000, available_minor: 7400000 },
+      { id: "acc_1", name: "Vardag", bank: "Skandia", role: "spending", balance_minor: 4831240, booked_minor: 4831240, available_minor: 4831240 },
     ]);
     expect(body.balance_minor).toBe(7400000 + 4831240);
+  });
+
+  it("ger saldot bokfört och disponibelt, totalt och per konto, med bankens saldotyp (KK-56-F, KK-60-A)", async () => {
+    const pending = (id: string, account: string, amount: number) =>
+      db
+        .prepare(`INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor) VALUES (?, ?, ?, 'pending', '2026-11-15', '2026-11-14', ?)`)
+        .bind(id, account, id, amount);
+    // Vardag har ett bokfört saldo och Spar ett där banken redan räknat med de preliminära.
+    // Kortet saknar saldo och Lånet är uteslutet: deras preliminära räknas inte i totalen (KK-60-D).
+    await db.batch([
+      pending("p-ica", "acc_1", -41250),
+      pending("p-swish", "acc_1", 20000),
+      pending("p-spar", "acc_2", -100000),
+      pending("p-kort", "acc_3", -5000),
+      pending("p-lan", "acc_4", -1000),
+      db.prepare(`UPDATE accounts SET balance_type = CASE id WHEN 'acc_1' THEN 'CLBD' WHEN 'acc_2' THEN 'XPCD' END`),
+    ]);
+    const body = await (await call("/api/overview")).json<Overview & { accounts: Record<string, unknown>[] }>();
+    await db.batch([db.prepare(`DELETE FROM transactions WHERE id LIKE 'p-%'`), db.prepare(`UPDATE accounts SET balance_type = NULL`)]);
+    expect(body["balances"]).toEqual({ booked_minor: 4831240 + 7500000, available_minor: 4809990 + 7400000, pending_minor: -121250 });
+    expect(body.accounts.map(({ id, booked_minor, available_minor }) => ({ id, booked_minor, available_minor }))).toEqual([
+      { id: "acc_3", booked_minor: null, available_minor: null },
+      { id: "acc_2", booked_minor: 7500000, available_minor: 7400000 },
+      { id: "acc_1", booked_minor: 4831240, available_minor: 4809990 },
+    ]);
+    // Bankens saldo som förut, för appar i telefonens cache.
+    expect(body["balance_minor"]).toBe(12231240);
   });
 
   it("har trenden för de 12 senaste perioderna, äldst först (KK-17-C)", async () => {

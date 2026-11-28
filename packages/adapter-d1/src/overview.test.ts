@@ -27,13 +27,21 @@ afterAll(async () => {
 });
 
 describe("översikten i D1 (KK-17, KK-38)", () => {
-  it("ger kontonas namn, bank, saldo (null utan saldo från banken), roll och om de räknas in (KK-53-D)", async () => {
-    await db.prepare(`UPDATE accounts SET nickname = 'Vardag', role = 'buffer' WHERE id = 'acc_1'`).run();
+  it("ger kontonas namn, bank, saldo (null utan saldo från banken) med saldotyp och preliminära, roll och om de räknas in (KK-53-D)", async () => {
+    await db.prepare(`UPDATE accounts SET nickname = 'Vardag', role = 'buffer', balance_type = 'CLBD' WHERE id = 'acc_1'`).run();
+    // Bara preliminära räknas in i pendingMinor: bokförda och borttagna gör det inte (KK-56-C, KK-56-F).
+    for (const [id, status, amount] of [["p1", "pending", -25000], ["p2", "pending", 10000], ["b1", "booked", -999], ["r1", "removed", -777]] as const) {
+      await db
+        .prepare(`INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, amount_minor) VALUES (?, 'acc_1', 'f', ?, '2026-11-01', '2026-11-01', ?)`)
+        .bind(id, status, amount)
+        .run();
+    }
     expect(await overviewRepository(db).accounts()).toEqual([
-      { id: "acc_2", name: "Kort", bank: "Skandia", balanceMinor: null, included: true, role: "spending" },
-      { id: "acc_3", name: "Lån", bank: "Skandia", balanceMinor: -200000000, included: false, role: "excluded" },
-      { id: "acc_1", name: "Vardag", bank: "Skandia", balanceMinor: 4831240, included: true, role: "buffer" },
+      { id: "acc_2", name: "Kort", bank: "Skandia", balanceMinor: null, balanceType: null, pendingMinor: 0, included: true, role: "spending" },
+      { id: "acc_3", name: "Lån", bank: "Skandia", balanceMinor: -200000000, balanceType: null, pendingMinor: 0, included: false, role: "excluded" },
+      { id: "acc_1", name: "Vardag", bank: "Skandia", balanceMinor: 4831240, balanceType: "CLBD", pendingMinor: -15000, included: true, role: "buffer" },
     ]);
+    await db.prepare(`DELETE FROM transactions`).run();
     await db.prepare(`UPDATE accounts SET nickname = NULL, role = 'spending' WHERE id = 'acc_1'`).run();
   });
 
