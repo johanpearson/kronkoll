@@ -38,7 +38,7 @@ const newId = () => `id-${String(++seq)}`;
 
 const bank: BankDataProvider = {
   accounts: () => Promise.resolve([]),
-  balance: () => Promise.resolve(1000),
+  balance: () => Promise.resolve({ amountMinor: 1000, type: "CLBD" }),
   transactions: () => Promise.resolve({ transactions: [], continuationKey: null }),
 };
 
