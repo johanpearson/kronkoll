@@ -56,25 +56,32 @@ async function open() {
   await settle();
 }
 
-const row = (pattern: string) => within(screen.getByRole("list", { name: "Regler" })).getByText(pattern).closest("li") as HTMLElement;
+const row = (pattern: string) => within(screen.getByRole("list", { name: "Regler" })).getAllByRole("listitem").find((li) => li.textContent.includes(pattern)) as HTMLElement;
+const sheet = () => within(screen.getByRole("dialog"));
 const click = async (name: string, inside: HTMLElement = document.body) => {
   fireEvent.click(within(inside).getByRole("button", { name }));
+  await settle();
+};
+/** Öppnar arket för regeln. */
+const openRule = async (pattern: string) => {
+  fireEvent.click(within(row(pattern)).getByRole("button"));
   await settle();
 };
 const writes = (calls: Call[]) => calls.filter((c) => c.method !== "GET").map(({ method, path, body }) => ({ method, path, body }));
 
 async function newExcludeRule(pattern: string) {
   await click("Ny regel");
-  fireEvent.change(screen.getByLabelText("Text"), { target: { value: pattern } });
-  fireEvent.change(screen.getByLabelText("Får kategorin"), { target: { value: "exclude" } });
-  await click("Spara");
+  fireEvent.change(sheet().getByLabelText("Text"), { target: { value: pattern } });
+  fireEvent.change(sheet().getByLabelText("Får kategorin"), { target: { value: "exclude" } });
+  await click("Spara", screen.getByRole("dialog"));
 }
 
 describe("regler med åtgärden Räkna inte (KK-39-C)", () => {
   it("visas i listan med Räknas inte i stället för kategori, och går att söka fram", async () => {
     api();
     await open();
-    expect(row("PAHITTADE MOBLER").querySelector(".tx-notes")?.textContent).toBe("Börjar med → Räknas inte · Egen · 3 träffar");
+    expect(row("PAHITTADE MOBLER").querySelector(".ui-row-label")?.textContent).toBe("Börjar med PAHITTADE MOBLER → Räknas inte");
+    expect(row("PAHITTADE MOBLER").querySelector(".ui-row-detail")?.textContent).toBe("Egen · 3 träffar");
     fireEvent.change(screen.getByRole("searchbox", { name: "Sök regel" }), { target: { value: "räknas" } });
     expect(within(screen.getByRole("list", { name: "Regler" })).getAllByRole("listitem")).toHaveLength(1);
   });
@@ -118,17 +125,17 @@ describe("regler med åtgärden Räkna inte (KK-39-C)", () => {
   it("en Räkna inte-regel har bara namnet att ändra, ingen förhandsvisning av kategorier, och säger vad borttagning gör", async () => {
     const calls = api({ save: [200, { rule: { id: "r-mobler", action: "exclude" }, matches: 1 }] });
     await open();
-    await click("Ändra regeln PAHITTADE MOBLER");
-    expect(within(row("PAHITTADE MOBLER")).queryByRole("button", { name: "Visa träffar" })).toBeNull();
-    await click("Ändra namn", row("PAHITTADE MOBLER"));
-    expect(within(row("PAHITTADE MOBLER")).queryByLabelText("Får kategorin")).toBeNull();
-    fireEvent.change(within(row("PAHITTADE MOBLER")).getByLabelText("Text"), { target: { value: "påhittade möbler ab" } });
-    await click("Spara", row("PAHITTADE MOBLER"));
+    await openRule("PAHITTADE MOBLER");
+    expect(sheet().queryByRole("button", { name: "Visa träffar" })).toBeNull();
+    await click("Ändra namn", screen.getByRole("dialog"));
+    expect(sheet().queryByLabelText("Får kategorin")).toBeNull();
+    fireEvent.change(sheet().getByLabelText("Text"), { target: { value: "påhittade möbler ab" } });
+    await click("Spara", screen.getByRole("dialog"));
     expect(writes(calls)).toEqual([{ method: "PATCH", path: "/api/rules/r-mobler", body: { pattern: "påhittade möbler ab", match: "prefix" } }]);
     expect(screen.getByRole("status").textContent).toBe("Regeln är sparad. 1 transaktioner räknas inte längre.");
 
-    await click("Ändra regeln PAHITTADE MOBLER");
-    await click("Ta bort", row("PAHITTADE MOBLER"));
-    expect(row("PAHITTADE MOBLER").textContent).toContain("Ta bort regeln? Dess träffar räknas igen, utom det du själv har valt.");
+    await openRule("PAHITTADE MOBLER");
+    await click("Ta bort", screen.getByRole("dialog"));
+    expect(sheet().getByText("Dess träffar räknas igen, utom det du själv har valt.")).toBeDefined();
   });
 });

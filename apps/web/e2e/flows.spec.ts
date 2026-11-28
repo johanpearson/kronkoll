@@ -84,7 +84,34 @@ test("lägg till en regel som innehåller en text, oavsett versaler (V-e2e-rule-
   await page.getByLabel("Får kategorin").selectOption({ label: "Hushåll › Förbrukning" });
   await page.getByRole("button", { name: "Spara" }).click();
   await expect(page.getByRole("status")).toHaveText("Regeln är sparad och gäller nya transaktioner.");
-  await expect(page.getByRole("list", { name: "Regler" }).getByRole("listitem").filter({ hasText: "AMAZON" })).toContainText("Innehåller → Hushåll › Förbrukning");
+  await expect(page.getByRole("list", { name: "Regler" }).getByRole("listitem").filter({ hasText: "AMAZON" })).toContainText("Innehåller AMAZON → Hushåll › Förbrukning");
+});
+
+test("ordna reglerna: den som står först vinner, och ordningen finns kvar efter omladdning (V-e2e-rule-order, KK-58-C)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/installningar/regler");
+  for (const [match, text] of [["prefix", "Ikea"], ["contains", "Amazon"]] as const) {
+    await page.getByRole("button", { name: "Ny regel" }).click();
+    await page.getByLabel("Träffar").selectOption(match);
+    await page.getByLabel("Text").fill(text);
+    await page.getByLabel("Får kategorin").selectOption({ label: "Hushåll › Förbrukning" });
+    await page.getByRole("button", { name: "Spara" }).click();
+    await expect(page.getByRole("status")).toContainText("Regeln är sparad");
+  }
+  const rules = page.getByRole("list", { name: "Regler" }).getByRole("listitem");
+  // Den nyaste regeln står först, som i det riktiga API:t.
+  await expect(rules).toContainText(["Innehåller AMAZON", "Börjar med IKEA"]);
+  await rules.filter({ hasText: "IKEA" }).getByRole("button").click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByRole("status")).toContainText("Plats 2 av 2");
+  await sheet.getByRole("button", { name: "Flytta upp" }).click();
+  await expect(sheet.getByRole("status")).toContainText("Plats 1 av 2");
+  await sheet.getByRole("button", { name: "Stäng" }).click();
+  await expect(rules).toContainText(["Börjar med IKEA", "Innehåller AMAZON"]);
+  // Arkets steg i historiken ska vara borta innan sidan laddas om.
+  await page.waitForFunction(() => (history.state as { overlay?: boolean } | null)?.overlay !== true);
+  await page.goto("/installningar/regler");
+  await expect(rules).toContainText(["Börjar med IKEA", "Innehåller AMAZON"]);
 });
 
 test("rensa alla kategorier efter en fråga och börja om (V-e2e-categories-reset, KK-48)", async ({ page }) => {
