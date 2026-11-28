@@ -13,7 +13,7 @@ import { canGoBack, Link, navigationKind, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
 import { ConnectionView } from "./settings/ConnectionView.tsx";
 import { RulesView } from "./settings/RulesView.tsx";
-import { AccountsSettings, BankSettings, NotificationSettings, PeriodSettings, SettingsView } from "./settings/SettingsView.tsx";
+import { AboutSettings, AccountsSettings, BankSettings, NotificationSettings, PeriodSettings, SettingsView } from "./settings/SettingsView.tsx";
 import { TransactionDetail } from "./transactions/TransactionDetail.tsx";
 import { TransactionsView } from "./transactions/TransactionsView.tsx";
 import { ToastProvider } from "./toast.tsx";
@@ -44,6 +44,7 @@ const ROUTES: Record<string, () => React.JSX.Element> = {
   "/installningar/bank": BankSettings,
   "/installningar/budgetperiod": PeriodSettings,
   "/installningar/notiser": NotificationSettings,
+  "/installningar/om": AboutSettings,
   "/koppla": ConnectBank,
   "/koppla/samtycke": Consent,
   "/koppla/klar": ConnectDone,
