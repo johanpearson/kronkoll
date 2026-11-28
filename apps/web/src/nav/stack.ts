@@ -21,6 +21,8 @@ function parentOf(path: string): string | null {
   if (tab !== "/") return path === tab ? "/" : tab;
   // En bankkoppling hör till Bank under Inställningar (#259).
   if (under(path, "/installningar/koppling")) return "/installningar/bank";
+  // En huvudkategori hör till listan med kategorier (#251).
+  if (path.startsWith("/installningar/kategorier/")) return "/installningar/kategorier";
   if (under(path, "/installningar")) return path === "/installningar" ? "/" : "/installningar";
   // Bankkopplingen startar från Bank. Klar-sidan leder inte tillbaka in i flödet.
   if (path === "/koppla" || path === "/koppla/klar") return "/installningar/bank";

@@ -13,6 +13,7 @@ import { usePullToSync } from "./nav/usePullToSync.ts";
 import { useTabSwipe } from "./nav/useTabSwipe.ts";
 import { canGoBack, Link, navigationKind, usePath } from "./router.tsx";
 import { CategoriesView } from "./settings/CategoriesView.tsx";
+import { CategoryView } from "./settings/CategoryView.tsx";
 import { ConnectionView } from "./settings/ConnectionView.tsx";
 import { RulesView } from "./settings/RulesView.tsx";
 import { AccountsSettings, BankSettings, NotificationSettings, PeriodSettings, SettingsView } from "./settings/SettingsView.tsx";
@@ -80,12 +81,16 @@ const DEV_ROUTES: Record<string, React.LazyExoticComponent<() => React.JSX.Eleme
 const DETAIL = /^\/transaktioner\/([^/]+)$/u;
 /** /installningar/koppling/{id}: sidan om en bankkoppling. */
 const CONNECTION = /^\/installningar\/koppling\/([^/]+)$/u;
+/** /installningar/kategorier/{id}: en huvudkategori med sina underkategorier. */
+const CATEGORY = /^\/installningar\/kategorier\/([^/]+)$/u;
 
 function page(path: string): React.JSX.Element {
   const detailId = DETAIL.exec(path)?.[1];
   if (detailId !== undefined) return <TransactionDetail key={detailId} id={decodeURIComponent(detailId)} />;
   const connectionId = CONNECTION.exec(path)?.[1];
   if (connectionId !== undefined) return <ConnectionView key={connectionId} id={decodeURIComponent(connectionId)} />;
+  const categoryId = CATEGORY.exec(path)?.[1];
+  if (categoryId !== undefined) return <CategoryView key={categoryId} id={decodeURIComponent(categoryId)} />;
   const DevPage = DEV_ROUTES[path];
   if (DevPage !== undefined) {
     return (
