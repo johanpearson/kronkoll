@@ -126,6 +126,7 @@ describe("interna överföringar i D1 (KK-20-C)", () => {
       incomeType: null,
       incomeSource: "none",
       transferPair: { id: "in", accountName: "Spar", amountMinor: 500000, transactionDate: "2026-11-02" },
+      loan: null,
     });
   });
 

@@ -309,6 +309,12 @@ export async function useFakeApi(
       const items = transactions.filter((t) => t.status === "pending" && !hiddenIds.has(t.id));
       return [200, { items: items.map((t) => ({ ...t, hidden: false })), total_minor: items.reduce((sum, t) => sum + t.amount_minor, 0), count: items.length }];
     }
+    // Koppla en betalning till ett lån för hand (KK-59-B).
+    const txLoan = /^\/api\/transactions\/([^/]+)\/loan$/u.exec(path)?.[1];
+    if (txLoan && method === "PUT") {
+      const loan = loans.find((l) => l["id"] === body["loan_id"]);
+      return [200, { loan: loan ? { id: loan["id"], name: loan["name"], source: "manual" } : null, category_id: null, category_source: "none" }];
+    }
     const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
     // En påhittad löneinbetalning som bara nås via sin adress, för inkomsttypen på detaljsidan (KK-22-A).
     if (tx?.[1] === "lon1" && method === "PATCH") {

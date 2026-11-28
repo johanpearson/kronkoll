@@ -27,6 +27,7 @@ import { putTransfer } from "./transfers.ts";
 import { completeConnection, renewConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
 import { getTransaction, hideTransactions, listPending, listTransactions } from "./transactions.ts";
+import { putTransactionLoan } from "./transaction-loan.ts";
 
 export interface Env extends AccessEnv, SyncEnv, ConnectEnv, PushEnv {
   /** Secret: Enable Bankings application id. */
@@ -134,6 +135,12 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (transferMatch?.[1]) {
     if (request.method !== "PUT") return json({ error: "method_not_allowed" }, 405, { allow: "PUT" });
     return putTransfer(request, env, transferMatch[1]);
+  }
+
+  const txLoanMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})\/loan$/u.exec(pathname);
+  if (txLoanMatch?.[1]) {
+    if (request.method !== "PUT") return json({ error: "method_not_allowed" }, 405, { allow: "PUT" });
+    return putTransactionLoan(request, env, txLoanMatch[1]);
   }
 
   const splitMatch = /^\/api\/transactions\/([A-Za-z0-9_-]{1,64})\/splits$/u.exec(pathname);
