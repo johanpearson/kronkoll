@@ -1,7 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { accountRepository, connectionRepository, deriveKeys, pushRepository, type Keys } from "@kronkoll/adapter-d1";
 import { migratedDb, randomSecret } from "@kronkoll/adapter-d1/test-support";
-import { fixedClock, ProviderError, type BankDataProvider, type Notice, type ProviderTransaction } from "@kronkoll/domain";
+import { fixedClock, ProviderError, type BankDataProvider, type Notice, type ProviderBalance, type ProviderTransaction } from "@kronkoll/domain";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PushSender } from "./notify.ts";
 import { runSync, type SyncDeps } from "./sync.ts";
@@ -41,10 +41,10 @@ function bankTx(overrides: Partial<ProviderTransaction> = {}): ProviderTransacti
   };
 }
 
-function fakeBank(behaviour: { transactions?: ProviderTransaction[] | ProviderError; balance?: number | null } = {}): BankDataProvider {
+function fakeBank(behaviour: { transactions?: ProviderTransaction[] | ProviderError; balance?: ProviderBalance | null } = {}): BankDataProvider {
   return {
     accounts: () => Promise.resolve([]),
-    balance: () => Promise.resolve(behaviour.balance === undefined ? 1_250_050 : behaviour.balance),
+    balance: () => Promise.resolve(behaviour.balance === undefined ? { amountMinor: 1_250_050, type: "CLBD" } : behaviour.balance),
     transactions() {
       const t = behaviour.transactions ?? [bankTx()];
       return t instanceof ProviderError ? Promise.reject(t) : Promise.resolve({ transactions: t, continuationKey: null });
@@ -87,7 +87,7 @@ describe("schemalagd synk (KK-7-A, V-i-sync)", () => {
 
     const tx = await db.prepare(`SELECT counterparty, counterparty_norm AS norm, amount_minor AS amount, status FROM transactions`).first();
     expect(tx).toEqual({ counterparty: "K*ESPRESSO HOUSE 123 STHLM", norm: "ESPRESSO HOUSE", amount: -4500, status: "booked" });
-    expect((await db.prepare(`SELECT balance_minor AS b FROM accounts WHERE id = ?`).bind(accountId).first<{ b: number }>())?.b).toBe(1_250_050);
+    expect(await db.prepare(`SELECT balance_minor AS b, balance_type AS t FROM accounts WHERE id = ?`).bind(accountId).first()).toEqual({ b: 1_250_050, t: "CLBD" });
     expect(await db.prepare(`SELECT kind, status, new_count AS n, error_code AS e FROM sync_runs`).first()).toEqual({ kind: "cron", status: "ok", n: 1, e: null });
     expect(await db.prepare(`SELECT last_success_at AS at, consecutive_failures AS f FROM bank_connections`).first()).toEqual({ at: NOW, f: 0 });
     expect(logs.lines.map((l) => l.event)).toEqual(["sync.finished"]);

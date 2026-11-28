@@ -140,7 +140,7 @@ export function createEnableBankingProvider(options: EnableBankingOptions): Bank
       const balances = Array.isArray(body.balances) ? body.balances.filter(isObject) : bad();
       for (const type of BALANCE_PREFERENCE) {
         const match = balances.find((b) => b.balance_type === type);
-        if (match) return amountOf(match.balance_amount);
+        if (match) return { amountMinor: amountOf(match.balance_amount), type };
       }
       return null;
     },

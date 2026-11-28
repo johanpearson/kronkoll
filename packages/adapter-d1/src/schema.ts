@@ -119,6 +119,8 @@ export const accounts = sqliteTable(
     nickname: text("nickname"),
     type: text("type", { enum: ACCOUNT_TYPES }).notNull(),
     balanceMinor: integer("balance_minor"),
+    /** Bankens saldotyp för balance_minor, t.ex. "CLBD" (KK-56-F). Null för saldon från före 0025. */
+    balanceType: text("balance_type"),
     /** Kontots roll (KK-53): Inkomst/Utgift, Buffert eller Uteslutet. Ersatte included och saving (KK-53-B). */
     role: text("role", { enum: ACCOUNT_ROLES }).notNull().default("spending"),
     syncCursor: text("sync_cursor"),

@@ -61,7 +61,12 @@ describe("saldo", () => {
         ],
       },
     });
-    expect(await provider.balance("a")).toBe(-320010);
+    expect(await provider.balance("a")).toEqual({ amountMinor: -320010, type: "CLBD" });
+  });
+
+  it("ger tillgängligt saldo med sin typ när bokfört saknas, så att de preliminära inte räknas två gånger (KK-56-F)", async () => {
+    const { provider } = fakeApi({ "/accounts/a/balances": { balances: [{ balance_type: "XPCD", balance_amount: { currency: "SEK", amount: "812.50" } }] } });
+    expect(await provider.balance("a")).toEqual({ amountMinor: 81250, type: "XPCD" });
   });
 
   it("ger null om banken inte har något känt saldo", async () => {
@@ -214,8 +219,8 @@ describe("kontraktssviten (KK-14-B, V-c-provider)", () => {
     });
     expect(await runProviderContract(provider, "s1")).toEqual({
       accounts: [
-        { type: "checking", hasBalance: true, pages: 2, booked: 2, pending: 1, oldest: "2026-08-01" },
-        { type: "credit_card", hasBalance: false, pages: 1, booked: 0, pending: 0, oldest: null },
+        { type: "checking", balanceType: "CLBD", pages: 2, booked: 2, pending: 1, oldest: "2026-08-01" },
+        { type: "credit_card", balanceType: null, pages: 1, booked: 0, pending: 0, oldest: null },
       ],
       failures: [],
     });

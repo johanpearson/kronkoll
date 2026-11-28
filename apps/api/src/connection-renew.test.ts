@@ -68,7 +68,7 @@ function fakeBank(options: { startError?: ProviderError; sessionError?: Provider
   // Banken ger kontot ett nytt uid i den nya sessionen; IBAN känns igen (KK-8-B).
   const provider: BankDataProvider = {
     accounts: () => Promise.resolve([{ providerUid: "uid-ny", iban: IBAN, name: "Privatkonto", type: "checking", currency: "SEK" }]),
-    balance: () => Promise.resolve(2000_00),
+    balance: () => Promise.resolve({ amountMinor: 2000_00, type: "CLBD" }),
     transactions: () =>
       Promise.resolve({
         transactions: [

@@ -29,6 +29,12 @@ export interface ProviderTransaction {
   readonly description: string;
 }
 
+/** Kontots saldo från banken och bankens saldotyp enligt ISO 20022, t.ex. "CLBD" (KK-56-F). */
+export interface ProviderBalance {
+  readonly amountMinor: number;
+  readonly type: string;
+}
+
 export interface TransactionPage {
   readonly transactions: readonly ProviderTransaction[];
   /** Nyckel till nästa sida, eller null när allt är hämtat. */
@@ -80,8 +86,8 @@ export interface BankConnector {
 export interface BankDataProvider {
   /** Kontona i ett godkänt samtycke. */
   accounts(sessionId: string): Promise<BankAccount[]>;
-  /** Bokfört saldo i öre, eller null om banken inte ger något. */
-  balance(accountUid: string): Promise<number | null>;
+  /** Saldot i öre, helst bokfört, med saldotypen. Null om banken inte ger något. */
+  balance(accountUid: string): Promise<ProviderBalance | null>;
   /**
    * En sida transaktioner från och med ett datum. Hämtas sida för sida (CPU-gränsen, R-3).
    * `dateFrom: null` betyder så långt bakåt som banken tillåter (KK-5-C).
