@@ -132,12 +132,12 @@ describe("appskalet (#30, KK-4)", () => {
     const { container } = at("/");
     expect(document.documentElement.classList.contains("ui-own-pull")).toBe(true);
     const view = container.querySelector(".ui-view") as HTMLElement;
-    fireEvent.pointerDown(view, { pointerId: 1, clientX: 200, clientY: 100 });
-    fireEvent.pointerMove(view, { pointerId: 1, clientX: 200, clientY: 130 });
-    fireEvent.pointerMove(view, { pointerId: 1, clientX: 200, clientY: 420 });
+    fireEvent.touchStart(view, { touches: [{ clientX: 200, clientY: 100 }] });
+    fireEvent.touchMove(view, { touches: [{ clientX: 200, clientY: 130 }], cancelable: true });
+    fireEvent.touchMove(view, { touches: [{ clientX: 200, clientY: 420 }], cancelable: true });
     expect(container.querySelector(".ui-pull")).not.toBeNull();
     expect(container.querySelector(".ui-pull-ready")).not.toBeNull();
-    fireEvent.pointerCancel(view, { pointerId: 1 });
+    fireEvent.touchCancel(view, { touches: [] });
     expect(container.querySelector(".ui-pull")).toBeNull();
     cleanup();
     at("/budget");
