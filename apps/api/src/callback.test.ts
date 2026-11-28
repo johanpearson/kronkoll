@@ -68,7 +68,7 @@ function fakeBank(options: { sessionError?: ProviderError; accountsError?: Provi
         { providerUid: "uid-lan", iban: null, name: "Bolån", type: "loan", currency: "SEK" },
       ]);
     },
-    balance: () => Promise.resolve(10_000_00),
+    balance: () => Promise.resolve({ amountMinor: 10_000_00, type: "CLBD" }),
     transactions: () =>
       Promise.resolve({
         transactions: [{ providerTxId: "t1", status: "booked", transactionDate: "2026-11-18", bookingDate: "2026-11-18", amountMinor: 50_000, counterparty: "INSÄTTNING", description: "" }],

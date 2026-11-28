@@ -144,17 +144,17 @@ describe("synkens portar (KK-7, KK-14)", () => {
   it("sätter ett kontos saldo, och kastar för ett konto som inte finns", async () => {
     const accounts = accountRepository(db, keys);
     const id = await accounts.upsertFromBank({ connectionId: "c1", providerUid: "saldo-1", iban: null, name: "Sparkonto", type: "savings", balanceMinor: null }, newId);
-    await accounts.setBalance(id, 4_250_075);
-    expect((await accounts.list()).find((a) => a.id === id)?.balanceMinor).toBe(4_250_075);
-    await accounts.setBalance(id, -1200);
-    expect((await accounts.list()).find((a) => a.id === id)?.balanceMinor).toBe(-1200);
-    await expect(accounts.setBalance("saknas", 1)).rejects.toThrow();
+    await accounts.setBalance(id, { amountMinor: 4_250_075, type: "CLBD" });
+    expect((await accounts.list()).find((a) => a.id === id)).toMatchObject({ balanceMinor: 4_250_075, balanceType: "CLBD" });
+    await accounts.setBalance(id, { amountMinor: -1200, type: "XPCD" });
+    expect((await accounts.list()).find((a) => a.id === id)).toMatchObject({ balanceMinor: -1200, balanceType: "XPCD" });
+    await expect(accounts.setBalance("saknas", { amountMinor: 1, type: "CLBD" })).rejects.toThrow();
   });
 
   it("avvisar ett saldo som inte är heltal öre", async () => {
     const accounts = accountRepository(db, keys);
     const [first] = await accounts.list();
-    await expect(accounts.setBalance(first?.id ?? "", 12.5)).rejects.toThrow(RangeError);
+    await expect(accounts.setBalance(first?.id ?? "", { amountMinor: 12.5, type: "CLBD" })).rejects.toThrow(RangeError);
   });
 
   it("listar en kopplings konton med bankens id, utan manuella konton", async () => {

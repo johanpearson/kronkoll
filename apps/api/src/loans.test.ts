@@ -59,6 +59,8 @@ describe("lån (#72, KK-36)", () => {
       rate_fixed: true,
       rate_fixed_days_left: 41,
       rate_fixed_ending: true,
+      match_patterns: [],
+      category_id: null,
     });
   });
 
@@ -117,5 +119,97 @@ describe("lån (#72, KK-36)", () => {
     expect((await call("GET", "/api/loans", undefined, { DB: broken })).status).toBe(503);
     expect((await call("PUT", "/api/loans/bolan", BOLAN, { DB: broken })).status).toBe(503);
     expect((await call("DELETE", "/api/loans/bolan", undefined, { DB: broken })).status).toBe(503);
+  });
+});
+
+describe("lånens matchningstexter och betalningar (KK-59)", () => {
+  // Påhittade betalningar med påhittat kontonummer (KK-13, KK-59-E). Juni ligger längre bort än synkens 60 dagar.
+  beforeAll(async () => {
+    await db.batch([
+      db.prepare(`INSERT INTO bank_connections (id, provider, aspsp_name, status) VALUES ('c1', 'enablebanking', 'Skandia', 'active')`),
+      db.prepare(`INSERT INTO accounts (id, connection_id, display_name, type) VALUES ('acc_1', 'c1', 'Privatkonto', 'checking')`),
+    ]);
+  });
+  beforeEach(async () => {
+    const rows: [string, string, number, string][] = [
+      ["nov", "2026-11-02", -812_500, "Betalning 9020 1234567"],
+      ["jun", "2026-06-27", -812_500, "BG 9020.12.34567"],
+      ["ica", "2026-11-03", -41_250, "<b>ICA</b> NARA EXEMPEL"],
+    ];
+    await db.batch([
+      db.prepare(`DELETE FROM transactions`),
+      ...rows.map(([id, date, amount, description]) =>
+        db
+          .prepare(
+            `INSERT INTO transactions (id, account_id, fingerprint, status, last_seen_at, transaction_date, booking_date, amount_minor, description)
+             VALUES (?, 'acc_1', 'fp', 'booked', ?, ?, ?, ?, ?)`,
+          )
+          .bind(id, date, date, date, amount, description),
+      ),
+    ]);
+    await call("PUT", "/api/loans/bolan", BOLAN);
+  });
+  const linked = async () => (await db.prepare(`SELECT id, loan_id AS loan, category_id AS c FROM transactions ORDER BY id`).all()).results;
+
+  it("förhandsvisar hur många betalningar texterna träffar, med de senaste som exempel och bankens text oförändrad (KK-59-A)", async () => {
+    const res = await call("POST", "/api/loans/preview", { match_patterns: ["9020-12 345 67"] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      count: 2,
+      examples: [
+        { id: "nov", date: "2026-11-02", amount_minor: -812_500, counterparty: "", description: "Betalning 9020 1234567" },
+        { id: "jun", date: "2026-06-27", amount_minor: -812_500, counterparty: "", description: "BG 9020.12.34567" },
+      ],
+    });
+    expect(await (await call("POST", "/api/loans/preview", { match_patterns: ["<b>ICA</b>"] })).json()).toMatchObject({ examples: [{ description: "<b>ICA</b> NARA EXEMPEL" }] });
+    expect(await linked()).toEqual([{ id: "ica", loan: null, c: null }, { id: "jun", loan: null, c: null }, { id: "nov", loan: null, c: null }]);
+  });
+
+  it("sparar texterna och kopplar hela historiken, med Boende › Låneränta som standardkategori (KK-59-A, KK-59-B)", async () => {
+    const res = await call("PUT", "/api/loans/bolan/matching", { match_patterns: ["9020-12 345 67"] });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ match_patterns: ["9020-12 345 67"], category_id: "boende-laneranta", linked: 2 });
+    expect(await linked()).toEqual([
+      { id: "ica", loan: null, c: null },
+      { id: "jun", loan: "bolan", c: "boende-laneranta" },
+      { id: "nov", loan: "bolan", c: "boende-laneranta" },
+    ]);
+    // Utan texter tas de automatiska kopplingarna bort. Med kategori null kopplas det bara.
+    expect(await (await call("PUT", "/api/loans/bolan/matching", { match_patterns: [] })).json()).toMatchObject({ linked: 2 });
+    expect(await (await call("PUT", "/api/loans/bolan/matching", { match_patterns: ["9020-12 345 67"], category_id: null })).json()).toMatchObject({ category_id: null, linked: 2 });
+    expect(await linked()).toEqual([{ id: "ica", loan: null, c: null }, { id: "jun", loan: "bolan", c: null }, { id: "nov", loan: "bolan", c: null }]);
+  });
+
+  it("listar varje lån med texterna, kategorin och Betalt denna period (KK-59-C)", async () => {
+    await call("PUT", "/api/loans/bolan/matching", { match_patterns: ["9020-12 345 67"] });
+    await call("PUT", "/api/loans/bil", BIL);
+    const body = await (await call("GET", "/api/loans")).json<{ loans: Record<string, unknown>[] }>();
+    expect(body.loans.map((l) => [l["id"], l["match_patterns"], l["category_id"], l["paid"]])).toEqual([
+      ["bolan", ["9020-12 345 67"], "boende-laneranta", { paid_minor: 812_500, last_paid_on: "2026-11-02", missing: false }],
+      ["bil", [], null, { paid_minor: 0, last_paid_on: null, missing: false }],
+    ]);
+  });
+
+  it("felaktiga texter, en okänd kategori och ett lån som inte finns ger 400 och 404", async () => {
+    const bad: unknown[] = [
+      "inte json",
+      { match_patterns: "9020" },
+      { match_patterns: [5] },
+      { match_patterns: ["x".repeat(61)] },
+      { match_patterns: Array.from({ length: 11 }, (_, i) => `text ${String(i)}`) },
+      { match_patterns: ["9020"], category_id: 5 },
+      { match_patterns: ["9020"], category_id: "finns-inte" },
+    ];
+    for (const body of bad) expect((await call("PUT", "/api/loans/bolan/matching", body)).status, JSON.stringify(body)).toBe(400);
+    for (const body of bad.slice(0, 5)) expect((await call("POST", "/api/loans/preview", body)).status, JSON.stringify(body)).toBe(400);
+    expect((await call("PUT", "/api/loans/saknas/matching", { match_patterns: [] })).status).toBe(404);
+  });
+
+  it("fel metod ger 405 och en databas som inte svarar 503", async () => {
+    expect((await call("GET", "/api/loans/preview")).headers.get("allow")).toBe("POST");
+    expect((await call("GET", "/api/loans/bolan/matching")).headers.get("allow")).toBe("PUT");
+    const broken = { prepare: () => { throw new Error("nere"); }, batch: () => { throw new Error("nere"); } } as unknown as D1Database;
+    expect((await call("POST", "/api/loans/preview", { match_patterns: [] }, { DB: broken })).status).toBe(503);
+    expect((await call("PUT", "/api/loans/bolan/matching", { match_patterns: [] }, { DB: broken })).status).toBe(503);
   });
 });

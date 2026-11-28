@@ -4,12 +4,12 @@
  * `budgetRepository`.
  */
 import type { D1Database } from "@cloudflare/workers-types";
-import type { AccountRole, OverviewAccount } from "@kronkoll/domain";
+import type { AccountRole, BalanceAccount, OverviewAccount } from "@kronkoll/domain";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
 import { accounts, bankConnections, syncRuns } from "./schema.ts";
 
-export interface OverviewAccountRow extends OverviewAccount {
+export interface OverviewAccountRow extends OverviewAccount, BalanceAccount {
   readonly id: string;
   /** Eget namn om det finns, annars bankens maskerade (KK-37). */
   readonly name: string;
@@ -33,11 +33,25 @@ export interface OverviewConnection {
 export function overviewRepository(d1: D1Database) {
   const db = drizzle(d1);
   return {
-    /** Kontona med namn som de visas, bank, saldo (null om banken inte har lämnat något), roll och om de räknas in (KK-38, KK-53-D). */
+    /**
+     * Kontona med namn som de visas, bank, saldo (null om banken inte har lämnat något) med saldotyp, summan av
+     * kontots preliminära, roll och om de räknas in (KK-38, KK-53-D, KK-56-F).
+     */
     async accounts(): Promise<OverviewAccountRow[]> {
       const name = sql<string>`coalesce(${accounts.nickname}, ${accounts.displayName})`;
+      // Tabellnamnen skrivs ut, eftersom Drizzle annars lämnar "id" okvalificerat i underfrågan.
+      const pendingMinor = sql<number>`(SELECT coalesce(sum(amount_minor), 0) FROM transactions WHERE transactions.account_id = accounts.id AND transactions.status = 'pending')`.mapWith(Number);
       return db
-        .select({ id: accounts.id, name, bank: bankConnections.aspspName, balanceMinor: accounts.balanceMinor, included: sql<boolean>`${accounts.role} <> 'excluded'`.mapWith(Boolean), role: accounts.role })
+        .select({
+          id: accounts.id,
+          name,
+          bank: bankConnections.aspspName,
+          balanceMinor: accounts.balanceMinor,
+          balanceType: accounts.balanceType,
+          pendingMinor,
+          included: sql<boolean>`${accounts.role} <> 'excluded'`.mapWith(Boolean),
+          role: accounts.role,
+        })
         .from(accounts)
         .innerJoin(bankConnections, eq(accounts.connectionId, bankConnections.id))
         .orderBy(asc(bankConnections.aspspName), asc(name), asc(accounts.id))

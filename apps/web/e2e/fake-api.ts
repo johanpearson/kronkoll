@@ -35,6 +35,8 @@ export const FAKE_BANK = "https://bank.example.test";
 const OVERVIEW = {
   period: NOVEMBER,
   balance_minor: 4831240,
+  // Ett preliminärt köp på Vardag på 412,50 kr (KK-56-F).
+  balances: { booked_minor: 4831240, available_minor: 4789990, pending_minor: -41250 },
   income_minor: 4125000,
   expense_minor: 2341800,
   net_minor: 1783200,
@@ -47,9 +49,9 @@ const OVERVIEW = {
   connections: [{ id: "c1", bank: "Exempelbanken", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
   // Ett konto utan saldo, så att axe och Lighthouse även granskar "Saldo saknas" (KK-38-B).
   accounts: [
-    { id: "acc_1", name: "Vardag", bank: "Exempelbanken", balance_minor: 1852790 },
-    { id: "acc_2", name: "Sparkonto ••7712", bank: "Exempelbanken", balance_minor: 2978450 },
-    { id: "acc_3", name: "Kort ••1190", bank: "Exempelbanken", balance_minor: null },
+    { id: "acc_1", name: "Vardag", bank: "Exempelbanken", balance_minor: 1852790, booked_minor: 1852790, available_minor: 1811540 },
+    { id: "acc_2", name: "Sparkonto ••7712", bank: "Exempelbanken", balance_minor: 2978450, booked_minor: 2978450, available_minor: 2978450 },
+    { id: "acc_3", name: "Kort ••1190", bank: "Exempelbanken", balance_minor: null, booked_minor: null, available_minor: null },
   ],
   trend: [
     { period: "2026-10", income_minor: 3300000, expense_minor: 2900000, net_minor: 400000 },
@@ -124,6 +126,8 @@ export async function useFakeApi(
   const loans: Record<string, unknown>[] = [{
     id: "lan1", name: "Bolån del 1", lender: "Exempelbanken", balance_minor: 120000000, interest_rate_bp: 350, rate_fixed_until: "2026-12-15", amortization_minor: 200000,
     monthly_interest_minor: 350000, monthly_amortization_minor: 200000, monthly_cost_minor: 550000, rate_fixed: true, rate_fixed_days_left: 41, rate_fixed_ending: true,
+    // Påhittat kontonummer och Betalt denna period (KK-59).
+    match_patterns: ["9020-12 345 67"], category_id: "boende-laneranta", paid: { paid_minor: 550000, last_paid_on: "2026-11-02", missing: false },
   }];
   const state: FakeApi = { rules: [], budgetPuts: [], guidelinePuts: [], accountPatches: [], categoryResets: [] };
   let categoriesCleared = false;
@@ -183,6 +187,15 @@ export async function useFakeApi(
         total_monthly_cost_minor: loans.reduce((s, l) => s + Number(l["monthly_cost_minor"]), 0),
       }];
     }
+    // Kontouppgifter på lånet (KK-59): förhandsvisningen träffar inget i det påhittade API:t.
+    if (path === "/api/loans/preview" && method === "POST") return [200, { count: 0, examples: [] }];
+    const matchingId = /^\/api\/loans\/([^/]+)\/matching$/u.exec(path)?.[1];
+    const matchingLoan = loans.find((l) => l["id"] === matchingId);
+    if (matchingLoan && method === "PUT") {
+      matchingLoan["match_patterns"] = body["match_patterns"];
+      matchingLoan["category_id"] = body["category_id"] === undefined ? "boende-laneranta" : body["category_id"];
+      return [200, { match_patterns: matchingLoan["match_patterns"], category_id: matchingLoan["category_id"], linked: 0 }];
+    }
     const loanId = /^\/api\/loans\/([^/]+)$/u.exec(path)?.[1];
     if (loanId && method === "DELETE") {
       const i = loans.findIndex((l) => l["id"] === loanId);
@@ -195,6 +208,7 @@ export async function useFakeApi(
       const loan = {
         id: loanId, ...body, monthly_interest_minor: interest, monthly_amortization_minor: body["amortization_minor"],
         monthly_cost_minor: interest + Number(body["amortization_minor"]), rate_fixed: body["rate_fixed_until"] !== null, rate_fixed_days_left: body["rate_fixed_until"] === null ? null : 500, rate_fixed_ending: false,
+        match_patterns: [], category_id: null, paid: { paid_minor: 0, last_paid_on: null, missing: false },
       };
       const i = loans.findIndex((l) => l["id"] === loanId);
       if (i >= 0) loans[i] = loan;
@@ -255,6 +269,18 @@ export async function useFakeApi(
       return [201, { connection_id: "c1", accounts: 3, initial_sync: "started", renewed: false }];
     }
     if (path === "/api/connections") return [200, { items: [CONNECTION] }];
+    // Sidan om en koppling (#259): påhittade konton och en kort synklogg.
+    if (path === "/api/connections/c1" && method === "GET") {
+      return [
+        200,
+        {
+          ...CONNECTION,
+          accounts: ACCOUNTS.map((a) => ({ id: a.id, name: a.name, balance_minor: 1852790 })),
+          history: { accounts: 2, transactions: 120, splits: 1 },
+          sync_runs: [{ kind: "cron", status: "ok", started_at: "2026-11-15T05:02:11.000Z", new_count: 3, updated_count: 1, error_code: null }],
+        },
+      ];
+    }
     if (path === "/api/accounts") return [200, { items: accounts }];
     const accountPath = /^\/api\/accounts\/([^/]+)$/u.exec(path);
     const account = accounts.find((a) => a.id === accountPath?.[1]);
@@ -274,7 +300,14 @@ export async function useFakeApi(
     }
     if (path === "/api/transactions") {
       const wantHidden = query.get("hidden") === "true";
-      return [200, { period: NOVEMBER, items: transactions.filter((t) => hiddenIds.has(t.id) === wantHidden).map((t) => ({ ...t, hidden: hiddenIds.has(t.id) })), next_cursor: null }];
+      const status = query.get("status");
+      const items = transactions.filter((t) => hiddenIds.has(t.id) === wantHidden && (status === null || t.status === status));
+      return [200, { period: NOVEMBER, items: items.map((t) => ({ ...t, hidden: hiddenIds.has(t.id) })), next_cursor: null }];
+    }
+    // Gruppen Preliminärt (KK-56-A): alla preliminära som inte är dolda, med summa.
+    if (path === "/api/transactions/pending") {
+      const items = transactions.filter((t) => t.status === "pending" && !hiddenIds.has(t.id));
+      return [200, { items: items.map((t) => ({ ...t, hidden: false })), total_minor: items.reduce((sum, t) => sum + t.amount_minor, 0), count: items.length }];
     }
     const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
     // En påhittad löneinbetalning som bara nås via sin adress, för inkomsttypen på detaljsidan (KK-22-A).

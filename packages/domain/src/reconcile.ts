@@ -3,6 +3,7 @@
  *
  * 1. Bankens id först: samma konto och samma provider-id.
  * 2. Annars fingeravtryck: samma konto, belopp och normaliserade motpart, och datum inom ±3 dagar.
+ *    Saknas motpart (Skandia) jämförs det normaliserade meddelandet i stället, som för regler (ruleKey).
  *    När en preliminär blir bokförd får beloppet skilja högst 20 % (samma riktning); finns flera
  *    kandidater väljs den med minst beloppsskillnad. Varje befintlig rad kan bara matchas en gång, så två identiska köp samma dag blir två rader
  *    (löpnummer i praktiken). Två transaktioner med olika bank-id matchas aldrig, utom när en
@@ -15,6 +16,7 @@
  */
 import { daysBetween, parseDate } from "./calendar.ts";
 import { assertMinor } from "./money.ts";
+import { normalizeCounterparty } from "./normalize.ts";
 
 export type TransactionStatus = "pending" | "booked" | "removed";
 
@@ -110,12 +112,12 @@ function amountsCompatible(existing: StoredTransaction, incoming: ImportedTransa
  * banken matchas aldrig mot en redan bokförd här, eftersom det i praktiken är ett nytt köp. Bara
  * samma bank-id får knyta ihop dem.
  */
-function sameFingerprint(existing: StoredTransaction, incoming: ImportedTransaction): boolean {
+function sameFingerprint(existing: StoredTransaction, incoming: ImportedTransaction, keys: ReadonlyMap<ImportedTransaction | StoredTransaction, string>): boolean {
   return (
     !(existing.status === "booked" && incoming.status === "pending") &&
     existing.accountId === incoming.accountId &&
     amountsCompatible(existing, incoming) &&
-    existing.counterpartyNorm === incoming.counterpartyNorm &&
+    keys.get(existing) === keys.get(incoming) &&
     Math.abs(daysBetween(existing.transactionDate, incoming.transactionDate)) <= MATCH_WINDOW_DAYS &&
     idsCompatible(existing, incoming)
   );
@@ -191,10 +193,13 @@ export function reconcile(input: ReconcileInput): ReconcileResult {
     }
   }
 
-  // 2. Fingeravtryck.
+  // 2. Fingeravtryck. Nyckeln räknas en gång per transaktion, eftersom normaliseringen kostar CPU (R-3).
+  const keys = new Map<ImportedTransaction | StoredTransaction, string>(
+    [...unmatched, ...leftovers].map((tx) => [tx, tx.counterpartyNorm !== "" ? tx.counterpartyNorm : normalizeCounterparty(tx.description)]),
+  );
   const inserted: StoredTransaction[] = [];
   for (const tx of leftovers) {
-    const match = bestCandidate([...unmatched].filter((e) => sameFingerprint(e, tx)), tx);
+    const match = bestCandidate([...unmatched].filter((e) => sameFingerprint(e, tx, keys)), tx);
     if (match) {
       unmatched.delete(match);
       matches.set(match, tx);

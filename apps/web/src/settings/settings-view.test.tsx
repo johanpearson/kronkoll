@@ -38,7 +38,10 @@ describe("Inställningar (#259)", () => {
       ["Regler", "/installningar/regler"],
       ["BudgetperiodVilken dag perioden börjar", "/installningar/budgetperiod"],
     ]);
-    expect(rows("Appen")).toEqual([["Notiser", "/installningar/notiser"]]);
+    expect(rows("Appen")).toEqual([
+      ["Notiser", "/installningar/notiser"],
+      ["Om appenVersion och integritet", "/installningar/om"],
+    ]);
     expect(screen.getByRole("button", { name: "Logga ut och rensa enheten" })).toBeTruthy();
   });
 
@@ -47,6 +50,7 @@ describe("Inställningar (#259)", () => {
     ["Bank", "/installningar/bank"],
     ["Budgetperiod", "/installningar/budgetperiod"],
     ["Notiser", "/installningar/notiser"],
+    ["Om appen", "/installningar/om"],
   ])("%s har en egen sida med tillbakaknapp till Inställningar", async (title, path) => {
     at("/installningar");
     fireEvent.click(screen.getByRole("link", { name: new RegExp(`^${title}`, "u") }));
@@ -56,5 +60,15 @@ describe("Inställningar (#259)", () => {
     await waitFor(() => {
       expect(window.location.pathname).toBe("/installningar");
     });
+  });
+
+  it("Om appen visar versionen och vad som gäller för bankdata", () => {
+    at("/installningar/om");
+    // I Actions är versionen commitens början, lokalt finns ingen.
+    expect(screen.getByRole("heading", { name: "Version" }).closest("section")?.textContent).toMatch(/^Version(?:[0-9a-f]{7}|Utvecklingsversion)$/u);
+    const privacy = screen.getByRole("heading", { name: "Integritet" }).closest("section")?.textContent ?? "";
+    expect(privacy).toContain("bara läsbehörighet hos banken");
+    expect(privacy).toContain("inte göra betalningar");
+    expect(screen.getByRole("heading", { name: "Villkor" })).toBeTruthy();
   });
 });

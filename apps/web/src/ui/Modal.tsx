@@ -73,9 +73,10 @@ export function Dialog(props: { open: boolean; title: string; onClose: () => voi
         <h2 id={titleId} className="ui-heading">
           {props.title}
         </h2>
-        <p id={textId} className="ui-body">
+        {/* En div, så att frågan kan ha flera stycken och t.ex. en brytare. */}
+        <div id={textId} className="ui-body ui-stack">
           {props.children}
-        </p>
+        </div>
         <div className="ui-dialog-actions">{props.actions}</div>
       </div>
     </dialog>

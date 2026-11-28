@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ProviderError, type BankDataProvider, type ProviderTransaction } from "./bank.ts";
+import { ProviderError, type BankDataProvider, type ProviderBalance, type ProviderTransaction } from "./bank.ts";
 import { fixedClock } from "./clock.ts";
 import type { ConnectionStatus } from "./consent.ts";
 import type { ReconcileResult, StoredTransaction } from "./reconcile.ts";
@@ -27,7 +27,7 @@ function bankTx(overrides: Partial<ProviderTransaction> = {}): ProviderTransacti
   };
 }
 
-type Behaviour = { transactions: ProviderTransaction[] | ProviderError; balance?: number | null | ProviderError };
+type Behaviour = { transactions: ProviderTransaction[] | ProviderError; balance?: ProviderBalance | null | ProviderError };
 
 /** Banken svarar per konto-uid, så att fel kan riktas mot ett enda konto. */
 function fakeBank(perAccount: Record<string, Behaviour>) {
@@ -38,7 +38,7 @@ function fakeBank(perAccount: Record<string, Behaviour>) {
       calls.push(`balance:${uid}`);
       const b = perAccount[uid]?.balance;
       if (b instanceof ProviderError) return Promise.reject(b);
-      return Promise.resolve(b === undefined ? 100000 : b);
+      return Promise.resolve(b === undefined ? { amountMinor: 100000, type: "CLBD" } : b);
     },
     transactions(uid) {
       calls.push(`transactions:${uid}`);
@@ -53,7 +53,7 @@ function setup(options: { connection?: { status?: ConnectionStatus; consentExpir
   const rows: StoredTransaction[] = [];
   const events: string[] = [];
   const runs = new Map<string, { startedAt: string; kind: string; finishedAt?: string; summary?: SyncRunSummary }>();
-  const balances = new Map<string, number>();
+  const balances = new Map<string, ProviderBalance>();
   let failures = options.failuresBefore ?? 0;
   const store: TransactionStore = {
     forReconcile: (ids) => Promise.resolve(rows.filter((r) => ids.includes(r.accountId))),
@@ -95,8 +95,8 @@ function setup(options: { connection?: { status?: ConnectionStatus; consentExpir
       },
     },
     balances: {
-      setBalance(accountId, balanceMinor) {
-        balances.set(accountId, balanceMinor);
+      setBalance(accountId, balance) {
+        balances.set(accountId, balance);
         return Promise.resolve();
       },
     },
@@ -108,19 +108,19 @@ function setup(options: { connection?: { status?: ConnectionStatus; consentExpir
 
 describe("synk av en koppling (KK-7-A)", () => {
   it("hämtar alla konton, sparar saldon och loggar körningen med antal", async () => {
-    const t = setup({ bank: { "uid-1": { transactions: [bankTx({ providerTxId: "a" })], balance: 125000 }, "uid-2": { transactions: [bankTx({ providerTxId: "b", amountMinor: -900 })], balance: -3200 } } });
+    const t = setup({ bank: { "uid-1": { transactions: [bankTx({ providerTxId: "a" })], balance: { amountMinor: 125000, type: "CLBD" } }, "uid-2": { transactions: [bankTx({ providerTxId: "b", amountMinor: -900 })], balance: { amountMinor: -3200, type: "XPCD" } } } });
     const outcome = await syncConnection(t.input);
     expect(outcome).toMatchObject({ skipped: false, summary: { status: "ok", newCount: 2, updatedCount: 0, errorCode: null }, consentExpired: false, notifyFailure: false });
-    expect(t.balances).toEqual(new Map([["acc_1", 125000], ["acc_2", -3200]]));
+    expect(t.balances).toEqual(new Map([["acc_1", { amountMinor: 125000, type: "CLBD" }], ["acc_2", { amountMinor: -3200, type: "XPCD" }]]));
     expect(t.events).toEqual(["run:start", "run:finish", "outcome:ok"]);
     const [run] = [...t.runs.values()];
     expect(run).toMatchObject({ kind: "cron", startedAt: NOW, finishedAt: NOW, summary: { status: "ok" } });
   });
 
   it("ett saldo som banken inte ger lämnar det gamla saldot orört", async () => {
-    const t = setup({ bank: { "uid-1": { transactions: [], balance: null }, "uid-2": { transactions: [], balance: 5 } } });
+    const t = setup({ bank: { "uid-1": { transactions: [], balance: null }, "uid-2": { transactions: [], balance: { amountMinor: 5, type: "ITAV" } } } });
     await syncConnection(t.input);
-    expect(t.balances).toEqual(new Map([["acc_2", 5]]));
+    expect(t.balances).toEqual(new Map([["acc_2", { amountMinor: 5, type: "ITAV" }]]));
   });
 
   it("en koppling utan konton är ok", async () => {
@@ -154,7 +154,7 @@ describe("fel per konto (KK-7-B)", () => {
   });
 
   it("om transaktionerna misslyckas sparas inte saldot heller", async () => {
-    const t = setup({ bank: { "uid-1": { transactions: new ProviderError("RATE_LIMITED"), balance: 777 }, "uid-2": { transactions: [], balance: 5 } } });
+    const t = setup({ bank: { "uid-1": { transactions: new ProviderError("RATE_LIMITED"), balance: { amountMinor: 777, type: "CLBD" } }, "uid-2": { transactions: [], balance: { amountMinor: 5, type: "CLBD" } } } });
     await syncConnection(t.input);
     expect([...t.balances.keys()]).toEqual(["acc_2"]);
   });

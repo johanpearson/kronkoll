@@ -11,7 +11,7 @@ import { deleteBudget, getBudget, putBudget } from "./budget.ts";
 import { createCategory, listCategories, mergeCategory, patchCategory, resetCategories } from "./categories.ts";
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
-import { deleteLoan, listLoans, putLoan } from "./loans.ts";
+import { deleteLoan, listLoans, previewLoanMatch, putLoan, putLoanMatching } from "./loans.ts";
 import { getIncome, getIncomeMonth } from "./income.ts";
 import { getGuidelines, putGuidelines } from "./guidelines.ts";
 import { getInsights } from "./insights.ts";
@@ -26,7 +26,7 @@ import { getSplits, putSplits } from "./splits.ts";
 import { putTransfer } from "./transfers.ts";
 import { completeConnection, renewConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
-import { getTransaction, hideTransactions, listTransactions } from "./transactions.ts";
+import { getTransaction, hideTransactions, listPending, listTransactions } from "./transactions.ts";
 
 export interface Env extends AccessEnv, SyncEnv, ConnectEnv, PushEnv {
   /** Secret: Enable Bankings application id. */
@@ -119,6 +119,12 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
     return pathname === "/api/connections" ? startConnection(request, env, context, email) : completeConnection(request, env, context, email);
   }
 
+  // Före /api/transactions/{id}, som annars tolkar "pending" som ett id.
+  if (pathname === "/api/transactions/pending") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return listPending(request, env);
+  }
+
   if (pathname === "/api/transactions/hide") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     return hideTransactions(request, env);
@@ -185,6 +191,18 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (ruleMatch?.[1]) {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     return applyRule(env, ruleMatch[1]);
+  }
+
+  // Före /api/loans/{id}, som annars tolkar "preview" som ett id.
+  if (pathname === "/api/loans/preview") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return previewLoanMatch(request, env);
+  }
+
+  const loanMatchingMatch = /^\/api\/loans\/([A-Za-z0-9_-]{1,64})\/matching$/u.exec(pathname);
+  if (loanMatchingMatch?.[1]) {
+    if (request.method !== "PUT") return json({ error: "method_not_allowed" }, 405, { allow: "PUT" });
+    return putLoanMatching(request, env, loanMatchingMatch[1]);
   }
 
   const loanMatch = /^\/api\/loans\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);

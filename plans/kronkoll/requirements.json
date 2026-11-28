@@ -1320,9 +1320,9 @@
     },
     {
       "id": "KK-63",
-      "title": "Svep mellan flikar och dra för att synka",
+      "title": "Svep mellan flikar",
       "normative_strength": "should",
-      "statement": "Användaren kan svepa mellan flikarna och dra ner för att synka. Andra gester, som svep på listrader, ingår inte. (Ägarens önskemål 2026-11-27, #247.)",
+      "statement": "Användaren kan svepa mellan flikarna. Andra gester, som svep på listrader, ingår inte. (Ägarens önskemål 2026-11-27, #247.) Dra för att synka är struket av ägaren 2026-11-28: synkikonen räcker.",
       "verification_note": "Unit-tester (TDD) för gestlogiken (tröskel, hastighet, riktning) i en ren modul; E2E med pekhändelser i Pixel 7-viewport.",
       "acceptance_criteria": [
         {
@@ -1339,11 +1339,11 @@
         },
         {
           "id": "KK-63-D",
-          "text": "Dra nedåt högst upp i Översikt och Transaktioner startar en synk med en indikator som följer fingret, och visar sedan status enligt KK-64-A. Under pågående synk startar inte en ny."
+          "text": "Struken av ägaren 2026-11-28: synk startas bara med synkikonen (KK-64-A), inte genom att dra nedåt. Ursprunglig lydelse: Dra nedåt högst upp i Översikt och Transaktioner startar en synk med en indikator som följer fingret, och visar sedan status enligt KK-64-A. Under pågående synk startar inte en ny."
         },
         {
           "id": "KK-63-E",
-          "text": "Webbläsarens egen dra för att ladda om är avstängd där appen har sin egen (overscroll-behavior)."
+          "text": "Struken av ägaren 2026-11-28 tillsammans med KK-63-D: appen har ingen egen dra-gest, så webbläsarens beteende lämnas orört. Ursprunglig lydelse: Webbläsarens egen dra för att ladda om är avstängd där appen har sin egen (overscroll-behavior)."
         },
         {
           "id": "KK-63-F",

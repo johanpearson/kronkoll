@@ -67,7 +67,7 @@ async function open(path = "/installningar/koppling/c1") {
   await settle();
 }
 
-const notes = (list: string) => within(screen.getByRole("list", { name: list })).getAllByRole("listitem").map((li) => li.querySelector(".tx-notes")?.textContent);
+const notes = (list: string) => within(screen.getByRole("list", { name: list })).getAllByRole("listitem").map((li) => li.querySelector(".ui-row-detail")?.textContent);
 
 describe("sidan om en bankkoppling (#34, KK-7-A, KK-8-A)", () => {
   it("Bank under Inställningar länkar till kopplingen", async () => {
@@ -89,7 +89,7 @@ describe("sidan om en bankkoppling (#34, KK-7-A, KK-8-A)", () => {
       "Schemalagd · inget nytt · Banken svarade inte.",
       "Första hämtningen · 1 ny, 2 uppdaterade · SOMETHING_NEW",
     ]);
-    const badges = within(screen.getByRole("list", { name: "Synklogg" })).getAllByRole("listitem").map((li) => li.querySelector(".badge")?.textContent);
+    const badges = within(screen.getByRole("list", { name: "Synklogg" })).getAllByRole("listitem").map((li) => li.querySelector(".ui-chip")?.textContent);
     expect(badges).toEqual(["Klar", "Misslyckades", "Delvis"]);
     expect(screen.getByRole("button", { name: "Synkstatus" })).toBeTruthy();
   });

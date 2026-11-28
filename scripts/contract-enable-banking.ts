@@ -67,10 +67,10 @@ try {
   const times = [...slowest.values()];
   out(`Konton: **${String(report.accounts.length)}** (${report.accounts.map((a) => a.type).join(", ")})`);
   out();
-  out("| Konto | Saldo finns | Sidor | Bokförda | Preliminära | Äldsta datum | Längsta sida (ms) |");
+  out("| Konto | Saldotyp | Sidor | Bokförda | Preliminära | Äldsta datum | Längsta sida (ms) |");
   out("|---|---|---|---|---|---|---|");
   for (const [index, a] of report.accounts.entries()) {
-    out(`| ${String(index + 1)} (${a.type}) | ${a.hasBalance ? "ja" : "nej"} | ${String(a.pages)} | ${String(a.booked)} | ${String(a.pending)} | ${a.oldest ?? "–"} | ${(times[index] ?? 0).toFixed(0)} |`);
+    out(`| ${String(index + 1)} (${a.type}) | ${a.balanceType ?? "saknas"} | ${String(a.pages)} | ${String(a.booked)} | ${String(a.pending)} | ${a.oldest ?? "–"} | ${(times[index] ?? 0).toFixed(0)} |`);
   }
 } catch (error) {
   if (error instanceof ProviderError && error.code === "UNAUTHORIZED") {

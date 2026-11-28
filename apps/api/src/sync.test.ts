@@ -1,7 +1,7 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import { accountRepository, connectionRepository, deriveKeys, pushRepository, type Keys } from "@kronkoll/adapter-d1";
+import { accountRepository, connectionRepository, deriveKeys, loanLinkRepository, loanRepository, pushRepository, type Keys } from "@kronkoll/adapter-d1";
 import { migratedDb, randomSecret } from "@kronkoll/adapter-d1/test-support";
-import { fixedClock, ProviderError, type BankDataProvider, type Notice, type ProviderTransaction } from "@kronkoll/domain";
+import { fixedClock, ProviderError, type BankDataProvider, type Notice, type ProviderBalance, type ProviderTransaction } from "@kronkoll/domain";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PushSender } from "./notify.ts";
 import { runSync, type SyncDeps } from "./sync.ts";
@@ -41,10 +41,10 @@ function bankTx(overrides: Partial<ProviderTransaction> = {}): ProviderTransacti
   };
 }
 
-function fakeBank(behaviour: { transactions?: ProviderTransaction[] | ProviderError; balance?: number | null } = {}): BankDataProvider {
+function fakeBank(behaviour: { transactions?: ProviderTransaction[] | ProviderError; balance?: ProviderBalance | null } = {}): BankDataProvider {
   return {
     accounts: () => Promise.resolve([]),
-    balance: () => Promise.resolve(behaviour.balance === undefined ? 1_250_050 : behaviour.balance),
+    balance: () => Promise.resolve(behaviour.balance === undefined ? { amountMinor: 1_250_050, type: "CLBD" } : behaviour.balance),
     transactions() {
       const t = behaviour.transactions ?? [bankTx()];
       return t instanceof ProviderError ? Promise.reject(t) : Promise.resolve({ transactions: t, continuationKey: null });
@@ -87,7 +87,7 @@ describe("schemalagd synk (KK-7-A, V-i-sync)", () => {
 
     const tx = await db.prepare(`SELECT counterparty, counterparty_norm AS norm, amount_minor AS amount, status FROM transactions`).first();
     expect(tx).toEqual({ counterparty: "K*ESPRESSO HOUSE 123 STHLM", norm: "ESPRESSO HOUSE", amount: -4500, status: "booked" });
-    expect((await db.prepare(`SELECT balance_minor AS b FROM accounts WHERE id = ?`).bind(accountId).first<{ b: number }>())?.b).toBe(1_250_050);
+    expect(await db.prepare(`SELECT balance_minor AS b, balance_type AS t FROM accounts WHERE id = ?`).bind(accountId).first()).toEqual({ b: 1_250_050, t: "CLBD" });
     expect(await db.prepare(`SELECT kind, status, new_count AS n, error_code AS e FROM sync_runs`).first()).toEqual({ kind: "cron", status: "ok", n: 1, e: null });
     expect(await db.prepare(`SELECT last_success_at AS at, consecutive_failures AS f FROM bank_connections`).first()).toEqual({ at: NOW, f: 0 });
     expect(logs.lines.map((l) => l.event)).toEqual(["sync.finished"]);
@@ -165,6 +165,35 @@ describe("kategorisering efter synken (KK-18, F-dataflode)", () => {
       .run();
     await runSync(env(), "cron", deps);
     expect(await db.prepare(`SELECT category_id AS c FROM transactions WHERE id = 'gammal'`).first()).toEqual({ c: "transport-kollektivtrafik" });
+  });
+});
+
+describe("lånebetalningar efter synken (KK-59-B)", () => {
+  it("kopplar en betalning till lånet med lånets kategori, som vinner över en regel, och loggar bara antalet", async () => {
+    await seedConnection("c1");
+    // Påhittat lån och kontonummer (KK-59-E). Meddelandet träffar också mallregeln för SL, men lånet vinner.
+    await db.prepare(`DELETE FROM loans`).run();
+    await loanRepository(db).save({ id: "lan1", name: "Bolån", lender: null, balanceMinor: 1, interestRateBp: 0, rateFixedUntil: null, amortizationMinor: 0 });
+    await loanLinkRepository(db).setMatching("lan1", ["9020-12 345 67"], "boende-laneranta");
+    const { deps, logs } = setup(
+      fakeBank({
+        transactions: [
+          bankTx({ providerTxId: "lan", counterparty: "", description: "SL 9020 1234567", amountMinor: -812_500 }),
+          bankTx({ providerTxId: "kaffe" }),
+        ],
+      }),
+    );
+    await runSync(env(), "cron", deps);
+    const rows = await db.prepare(`SELECT provider_tx_id AS id, loan_id AS loan, category_id AS c, category_source AS s FROM transactions ORDER BY id`).all();
+    expect(rows.results).toEqual([
+      { id: "kaffe", loan: null, c: null, s: "none" },
+      { id: "lan", loan: "lan1", c: "boende-laneranta", s: "learned" },
+    ]);
+    expect(logs.lines).toContainEqual({ level: "info", event: "sync.loans_linked", fields: { count: 1 } });
+    // En ny körning ändrar ingenting och loggar inget om lån.
+    const again = setup(fakeBank({ transactions: [] }));
+    await runSync(env(), "manual", again.deps);
+    expect(again.logs.lines.some((l) => l.event === "sync.loans_linked")).toBe(false);
   });
 });
 

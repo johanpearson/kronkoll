@@ -815,26 +815,6 @@ a.ui-row:active {
   touch-action: pan-y;
 }
 
-/* Dra för att synka (KK-63-D, E): indikatorn växer upptill, och webbläsarens egen omladdning är avstängd. */
-html.ui-own-pull,
-html.ui-own-pull body {
-  overscroll-behavior-y: contain;
-}
-
-.ui-pull {
-  display: grid;
-  place-items: end center;
-  overflow: hidden;
-  padding-bottom: var(--space-2);
-  color: var(--muted);
-}
-
-.ui-pull-ready {
-  color: var(--primary);
-  transform: rotate(180deg);
-  transition: transform var(--duration) var(--easing-out);
-}
-
 /* Textfält i formulär och ark (#259). */
 .ui-input {
   width: 100%;

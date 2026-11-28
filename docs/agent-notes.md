@@ -117,11 +117,12 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Notiser (`toast.tsx`, KK-64) visas upptill. En bekräftelse kan ha knappen Ångra, så läs meddelandet med
   `getByRole("status").querySelector("p")` (enhetstest) eller `.locator("p")` (E2E), inte hela notisens text.
   a11y-testet kräver att ingen `role="alert"` syns, så fel som hör till en vy visas där och inte som notis.
-- Gester (svep, dra för att synka) testas i E2E med riktiga pekhändelser via CDP (`Input.dispatchTouchEvent`,
+- Gester (svep mellan flikar) testas i E2E med riktiga pekhändelser via CDP (`Input.dispatchTouchEvent`,
   se `drag` i `e2e/navigation.spec.ts`). Syntetiska händelser med `dispatchEvent` går förbi webbläsarens
   gesthantering och missar t.ex. att `touch-action` inte gäller eller att webbläsaren skickar `pointercancel`.
-- Med `touch-action: pan-y` tar webbläsaren över lodräta drag och skickar `pointercancel`. Dra för att synka
-  använder därför touch-händelser med en icke-passiv lyssnare (`usePullToSync`), inte pekarhändelser.
+- Med `touch-action: pan-y` tar webbläsaren över lodräta drag och skickar `pointercancel`. En lodrät gest måste
+  därför använda touch-händelser med en icke-passiv lyssnare, inte pekarhändelser. Dra för att synka byggdes så
+  men ströks av ägaren 2026-11-28 (KK-63-D): synkikonen räcker.
 - `styles/css-syntax.test.ts` kontrollerar att varje CSS-fil har balanserade klamrar. En saknad `}` efter en
   konfliktlösning gjorde att resten av `ui.css` tolkades som nästlad CSS och slutade gälla.
 - jsdom saknar `HTMLDialogElement.showModal`, `IntersectionObserver`, `matchMedia` och `Element.animate`.
@@ -144,11 +145,18 @@ pnpm --filter @kronkoll/<paket> test:coverage
 
 - Skandia skickar **ingen motpart**. Butiken står i meddelandet (`remittance_information`, sparas som
   `description`), t.ex. `LIDL188HOOR, STOCKHOLM` eller `AmazonMktplc*BT4W355R4, www.amazon.se`.
-  Regler matchar därför på `ruleKey` (motparten, annars meddelandet normaliserat).
+  Regler matchar därför på `ruleKey` (motparten, annars meddelandet normaliserat). Avstämningens fingeravtryck
+  (`reconcile.ts`) gör likadant sedan #252, annars parades preliminära ihop med bokförda från andra butiker.
+- En preliminär som bokförs släpper kategorin från en regel (`template` eller `learned`), så att `categorizeNew`
+  sätter den igen på den bokförda texten (KK-56-B). Det görs i `transactionRepository.save`.
 - Normaliseringen tar bort ort efter sista kommatecknet, ordernummer efter `*`, ord med siffror på flera
   ställen (koder) och delar av butiksnummer som sitter ihop med namnet. Se `packages/domain/src/normalize.ts`.
 - Alla fyra konton har typen `checking`; två av dem hör till kort. Samtycket går ut 2027-05-01.
 - Skandia skickar preliminära (PDNG) och sätter `booking_date` även på dem. Status är det enda som skiljer.
+- Saldotypen (#252, KK-56-F): adaptern väljer bokfört före tillgängligt (`BALANCE_PREFERENCE`) och sparar typen i
+  `accounts.balance_type` sedan 0025. **Skandia skickar CLBD för alla fyra kontona** (bekräftat av ägaren 2026-11-28),
+  alltså bokfört saldo utan de preliminära. Disponibelt räknas därför som bokfört plus kontots preliminära.
+  `accountBalances` räknar XPCD, ITAV och CLAV som att de preliminära redan är inräknade, och allt annat (även null) som bokfört.
 - Första synken skickar `strategy=longest` på `GET /accounts/{id}/transactions` för längsta möjliga historik
   (KK-5-C). Ger det FAILED eller fler sidor än gränsen hämtas 90 dagar (`FIRST_SYNC_DAYS`) i stället.
 - En hel synk tar runt 100 ms CPU (mätt med `wrangler tail kronkoll-api --format json`, fältet `cpuTime`),

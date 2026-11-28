@@ -10,7 +10,8 @@ import type { BankAccountType, BankDataProvider, ProviderTransaction } from "./b
 
 export interface ContractAccountReport {
   readonly type: BankAccountType;
-  readonly hasBalance: boolean;
+  /** Bankens saldotyp, t.ex. "CLBD", eller null om kontot saknar saldo (KK-56-F). */
+  readonly balanceType: string | null;
   readonly pages: number;
   readonly booked: number;
   readonly pending: number;
@@ -52,7 +53,8 @@ export async function runProviderContract(provider: BankDataProvider, sessionId:
     expect(account.providerUid !== "", "kontot har ett uid");
     step(`saldo för konto ${n}`);
     const balance = await provider.balance(account.providerUid);
-    expect(balance === null || Number.isSafeInteger(balance), "saldot är heltal öre");
+    expect(balance === null || Number.isSafeInteger(balance.amountMinor), "saldot är heltal öre");
+    expect(balance === null || balance.type !== "", "saldot har en saldotyp");
 
     step(`transaktioner för konto ${n}`);
     const all: ProviderTransaction[] = [];
@@ -79,7 +81,7 @@ export async function runProviderContract(provider: BankDataProvider, sessionId:
     const booked = all.filter((t) => t.status === "booked").length;
     reports.push({
       type: account.type,
-      hasBalance: balance !== null,
+      balanceType: balance?.type ?? null,
       pages,
       booked,
       pending: all.length - booked,

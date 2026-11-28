@@ -117,6 +117,16 @@ describe("lista transaktioner (KK-9, KK-18, #32)", () => {
     expect(seen).toEqual(["t07", "t05", "t04", "t03", "t02"]);
   });
 
+  it("filtrerar på bokförda eller preliminära, och borttagna kommer aldrig med (KK-56-A, KK-56-C)", async () => {
+    expect(await ids({ status: "booked" })).toEqual(["t07", "t05", "t04", "t03"]);
+    expect(await ids({ status: "pending" })).toEqual(["t02"]);
+  });
+
+  it("utan period ger den alla, t.ex. alla preliminära oavsett period", async () => {
+    expect(await ids({ from: undefined, to: undefined, status: "pending" })).toEqual(["t02"]);
+    expect(await ids({ from: undefined, to: undefined })).toEqual(["t08", "t07", "t05", "t04", "t03", "t02", "t01"]);
+  });
+
   it("ger ingen nästa cursor när sidan inte är full", async () => {
     expect((await transactionRepository(db).list({ ...NOVEMBER, limit: 5 })).nextCursor).toBeNull();
   });
