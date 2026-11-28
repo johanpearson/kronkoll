@@ -1,9 +1,10 @@
 // GET /api/transactions (#32, KK-9, KK-18, KK-34): transaktionerna i en budgetperiod för listvyn. Dolda (KK-49)
-// visas bara med ?hidden=true. POST /api/transactions/hide döljer eller visar flera på en gång.
+// visas bara med ?hidden=true och ?status=booked|pending ger bara bokförda eller preliminära. GET /api/transactions/pending
+// ger alla preliminära med summa, för gruppen Preliminärt (KK-56-A). POST /api/transactions/hide döljer eller visar flera på en gång.
 // Perioden följer startdagen i inställningarna (t.ex. lönedagen) och svensk tid. Bankens text
 // skickas som den kom och renderas alltid som text i appen (KK-30).
 import { ruleRepository, settingsRepository, splitRepository, transactionRepository, type TransactionListItem } from "@kronkoll/adapter-d1";
-import { budgetPeriodForKey, currentBudgetPeriod, explainCategory, ruleKey, type BudgetPeriod } from "@kronkoll/domain";
+import { budgetPeriodForKey, currentBudgetPeriod, explainCategory, ruleKey, sumMinor, type BudgetPeriod } from "@kronkoll/domain";
 import { readAccountFilter } from "./account-filter.ts";
 import { recomputeTransfers } from "./transfers.ts";
 import type { SyncDeps } from "./sync.ts";
@@ -51,6 +52,8 @@ function readQuery(url: URL) {
   const q = params.get("q") ?? undefined;
   const categoryId = params.get("category_id") ?? undefined;
   const cursor = params.get("cursor");
+  const statusText = params.get("status");
+  const status: "booked" | "pending" | undefined = statusText === "booked" || statusText === "pending" ? statusText : undefined;
   const accountIds = readAccountFilter(url);
   const valid =
     accountIds !== null &&
@@ -59,10 +62,13 @@ function readQuery(url: URL) {
     limit <= MAX_LIMIT &&
     (uncategorized === null || uncategorized === "true" || uncategorized === "false") &&
     (hidden === null || hidden === "true" || hidden === "false") &&
+    (statusText === null || status !== undefined) &&
     (q === undefined || q.length <= MAX_QUERY_LENGTH) &&
     (categoryId === undefined || (categoryId !== "" && categoryId.length <= MAX_ID_LENGTH)) &&
     (cursor === null || cursor.length <= MAX_CURSOR_LENGTH);
-  return valid ? { period: params.get("period"), limit, uncategorized: uncategorized === "true", hidden: hidden === "true", q, categoryId, cursor, accountIds } : null;
+  return valid
+    ? { period: params.get("period"), limit, uncategorized: uncategorized === "true", hidden: hidden === "true", status, q, categoryId, cursor, accountIds }
+    : null;
 }
 
 export async function listTransactions(request: Request, env: { DB: D1Database }, sync: SyncDeps): Promise<Response> {
@@ -90,6 +96,7 @@ export async function listTransactions(request: Request, env: { DB: D1Database }
       limit: query.limit,
       uncategorized: query.uncategorized,
       hidden: query.hidden,
+      status: query.status,
       q: query.q,
       categoryId: query.categoryId,
       accountIds: query.accountIds,
@@ -98,6 +105,21 @@ export async function listTransactions(request: Request, env: { DB: D1Database }
     return json({ period, items: items.map(toJson), next_cursor: nextCursor }, 200);
   } catch (error) {
     return error instanceof RangeError ? invalid() : json({ error: "unavailable" }, 503);
+  }
+}
+
+/**
+ * GET /api/transactions/pending (KK-56-A): alla preliminära som inte är dolda, oavsett period, med summa och antal.
+ * Följer kontofiltret. Fler än MAX_LIMIT preliminära samtidigt förekommer inte i praktiken, så det blir en sida.
+ */
+export async function listPending(request: Request, env: { DB: D1Database }): Promise<Response> {
+  const accountIds = readAccountFilter(new URL(request.url));
+  if (accountIds === null) return invalid();
+  try {
+    const { items } = await transactionRepository(env.DB).list({ status: "pending", limit: MAX_LIMIT, accountIds });
+    return json({ items: items.map(toJson), total_minor: sumMinor(items.map((i) => i.amountMinor)), count: items.length }, 200);
+  } catch {
+    return json({ error: "unavailable" }, 503);
   }
 }
 

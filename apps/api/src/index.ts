@@ -26,7 +26,7 @@ import { getSplits, putSplits } from "./splits.ts";
 import { putTransfer } from "./transfers.ts";
 import { completeConnection, renewConnection, startConnection, type ConnectContext, type ConnectEnv } from "./connections.ts";
 import { runSync, type SyncDeps, type SyncEnv } from "./sync.ts";
-import { getTransaction, hideTransactions, listTransactions } from "./transactions.ts";
+import { getTransaction, hideTransactions, listPending, listTransactions } from "./transactions.ts";
 
 export interface Env extends AccessEnv, SyncEnv, ConnectEnv, PushEnv {
   /** Secret: Enable Bankings application id. */
@@ -117,6 +117,12 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (pathname === "/api/connections" || pathname === "/api/connections/callback") {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: pathname === "/api/connections" ? "GET, POST" : "POST" });
     return pathname === "/api/connections" ? startConnection(request, env, context, email) : completeConnection(request, env, context, email);
+  }
+
+  // Före /api/transactions/{id}, som annars tolkar "pending" som ett id.
+  if (pathname === "/api/transactions/pending") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, 405, { allow: "GET" });
+    return listPending(request, env);
   }
 
   if (pathname === "/api/transactions/hide") {
