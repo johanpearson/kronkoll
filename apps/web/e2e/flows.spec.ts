@@ -191,8 +191,10 @@ test("lägg till ett lån och se det i lånöversikten (V-e2e-loans, KK-36)", as
   await useFakeApi(page);
   await page.goto("/");
   await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Lån" }).click();
-  const loans = page.getByRole("list", { name: "Dina lån" }).getByRole("listitem");
+  // Lånens egna rader, utan diagrammens dolda värdelistor.
+  const loans = page.getByRole("list", { name: "Dina lån" }).locator(":scope > li");
   await expect(loans.first()).toContainText("Bindningstiden slutar om 41 dagar");
+  await expect(loans.first()).toContainText("Betalt denna period");
 
   await page.getByRole("button", { name: "Lägg till lån" }).click();
   const form = page.getByRole("form", { name: "Nytt lån" });
@@ -200,6 +202,10 @@ test("lägg till ett lån och se det i lånöversikten (V-e2e-loans, KK-36)", as
   await form.getByLabel("Skuld (kr)").fill("86 000");
   await form.getByLabel("Ränta (%)").fill("6,95");
   await form.getByLabel("Amortering (kr/mån)").fill("2 450");
+  // Kontouppgifter förhandsvisas innan de sparas (KK-59-A). Det påhittade API:t har inga träffar.
+  await form.getByLabel("Kontouppgifter (valfritt)").fill("9020-12 345 67");
+  await form.getByRole("button", { name: "Visa träffar" }).click();
+  await expect(form.getByRole("status")).toHaveText("Inga betalningar träffar.");
   await form.getByRole("button", { name: "Spara" }).click();
 
   await expect(page.getByRole("status")).toHaveText("Lånet är sparat.");

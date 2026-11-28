@@ -14,6 +14,18 @@ export interface Loan {
   readonly rateFixed: boolean;
   readonly daysLeft: number | null;
   readonly ending: boolean;
+  /** Användarens matchningstexter, t.ex. lånets kontonummer (KK-59-A). Visas som text (KK-30). */
+  readonly matchPatterns: readonly string[];
+  readonly categoryId: string | null;
+  /** Betalt denna period (KK-59-C). */
+  readonly paid: LoanPaid;
+}
+
+export interface LoanPaid {
+  readonly paidMinor: number;
+  readonly lastPaidOn: string | null;
+  /** Perioden är slut och ingen betalning har kommit. */
+  readonly missing: boolean;
 }
 
 const int = (v: unknown) => (Number.isSafeInteger(v) ? (v as number) : 0);
@@ -24,6 +36,8 @@ export function toLoan(raw: unknown): Loan | null {
   const name = str(field(raw, "name"));
   if (id === null || name === null) return null;
   const days = field(raw, "rate_fixed_days_left");
+  const patterns = field(raw, "match_patterns");
+  const paid = field(raw, "paid");
   return {
     id,
     name,
@@ -37,6 +51,9 @@ export function toLoan(raw: unknown): Loan | null {
     rateFixed: field(raw, "rate_fixed") === true,
     daysLeft: Number.isSafeInteger(days) ? (days as number) : null,
     ending: field(raw, "rate_fixed_ending") === true,
+    matchPatterns: Array.isArray(patterns) ? patterns.filter((p): p is string => typeof p === "string") : [],
+    categoryId: str(field(raw, "category_id")),
+    paid: { paidMinor: int(field(paid, "paid_minor")), lastPaidOn: str(field(paid, "last_paid_on")), missing: field(paid, "missing") === true },
   };
 }
 
