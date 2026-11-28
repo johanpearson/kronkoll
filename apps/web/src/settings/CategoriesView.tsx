@@ -7,7 +7,7 @@ import { useState } from "react";
 import { CategoryDot } from "../category-color.tsx";
 import { Button } from "../ui/Button.tsx";
 import { List, ListRow } from "../ui/ListRow.tsx";
-import { EmptyState, Skeleton } from "../ui/Surface.tsx";
+import { DangerZone, EmptyState, Skeleton } from "../ui/Surface.tsx";
 import { CategorySheet, useCategories, type Target } from "./category-sheet.tsx";
 import { ResetCategories } from "./ResetCategories.tsx";
 
@@ -69,7 +69,9 @@ export function CategoriesView() {
           setReload((n) => n + 1);
         }}
       />
-      <ResetCategories onDone={() => { setTarget(null); setReload((n) => n + 1); }} />
+      <DangerZone>
+        <ResetCategories onDone={() => { setTarget(null); setReload((n) => n + 1); }} />
+      </DangerZone>
     </main>
   );
 }

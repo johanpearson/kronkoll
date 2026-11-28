@@ -3,9 +3,23 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { Inbox } from "lucide-react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Card, EmptyState, Skeleton } from "./Surface.tsx";
+import { Card, DangerZone, EmptyState, Skeleton } from "./Surface.tsx";
 
 afterEach(cleanup);
+
+describe("DangerZone (#251)", () => {
+  it("är en sektion med rubriken Farozon som namn, och har det som den innehåller", () => {
+    render(
+      <DangerZone>
+        <button type="button">Ta bort allt</button>
+      </DangerZone>,
+    );
+    const zone = screen.getByRole("region", { name: "Farozon" });
+    expect(zone.className).toBe("ui-danger-zone");
+    expect(screen.getByRole("heading", { level: 2, name: "Farozon" })).toBeDefined();
+    expect(zone.querySelector("button")?.textContent).toBe("Ta bort allt");
+  });
+});
 
 describe("Card (KK-65-A)", () => {
   it("är en sektion med rubriken som namn och en valfri åtgärd", () => {
