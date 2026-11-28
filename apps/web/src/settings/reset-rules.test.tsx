@@ -78,7 +78,7 @@ describe("ta bort alla regler (KK-51)", () => {
     await click("Ta bort alla regler", dialog());
     expect(calls.find((c) => (c.body as { confirm?: boolean } | null)?.confirm === true)).toEqual({ method: "POST", path: "/api/rules/reset", body: { confirm: true } });
     expect(screen.getByRole("status").textContent).toBe("Alla regler är borttagna.");
-    expect(screen.getByText("Inga regler matchar.")).toBeTruthy();
+    expect(screen.getByText("Det finns inga regler än.")).toBeTruthy();
   });
 
   it("säger till när räkningen eller borttagningen inte går, och ingenting ändras", async () => {

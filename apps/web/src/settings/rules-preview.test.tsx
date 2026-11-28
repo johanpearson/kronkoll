@@ -31,7 +31,7 @@ function matches(total = 3) {
 
 type Call = { method: string; path: string; body: unknown };
 
-function api(answers: { matches?: [number, unknown]; preview?: [number, unknown]; apply?: [number, unknown]; save?: [number, unknown] } = {}) {
+function api(answers: { matches?: [number, unknown]; preview?: [number, unknown]; apply?: [number, unknown] } = {}) {
   const calls: Call[] = [];
   vi.stubGlobal(
     "fetch",
@@ -49,7 +49,6 @@ function api(answers: { matches?: [number, unknown]; preview?: [number, unknown]
       }
       if (url.pathname === "/api/sync" && method === "POST") return json(202, { status: "started", started_at: "2026-11-15T10:00:00.000Z" });
       if (url.pathname === "/api/sync") return json(200, { started: 1, running: 0, done: true });
-      if (method === "POST" && url.pathname === "/api/rules") return json(...(answers.save ?? [201, { rule: { id: "r-ikea" }, retroactive_candidates: 1, protected_manual: 1 }]));
       return json(200, RULES);
     }),
   );
@@ -75,12 +74,17 @@ const click = async (name: string) => {
   fireEvent.click(screen.getByRole("button", { name }));
   await settle();
 };
+/** Öppnar arket för IKEA-regeln, som är den enda i listan. */
+const openRule = async () => {
+  fireEvent.click(within(screen.getByRole("list", { name: "Regler" })).getByRole("button"));
+  await settle();
+};
 
 describe("förhandsvisa regler (#34, KK-18-C)", () => {
   it("Visa träffar listar transaktionerna med vad som händer med var och en", async () => {
     api();
     await open();
-    await click("Ändra regeln IKEA");
+    await openRule();
     await click("Visa träffar");
     expect(screen.getByText("3 träffar: 1 får kategorin, 1 manuellt valda ändras inte.")).toBeTruthy();
     const rows = within(screen.getByRole("list", { name: "Träffar" })).getAllByRole("listitem");
@@ -94,32 +98,21 @@ describe("förhandsvisa regler (#34, KK-18-C)", () => {
   it("säger hur många som visas när det finns fler, och när regeln inte träffar något", async () => {
     api({ matches: [200, matches(250)] });
     await open();
-    await click("Ändra regeln IKEA");
+    await openRule();
     await click("Visa träffar");
     expect(screen.getByText(/Visar de 3 senaste\./u)).toBeTruthy();
     cleanup();
     api({ matches: [200, { total: 0, change: 0, unchanged: 0, manual: 0, items: [] }] });
     await open();
-    await click("Ändra regeln IKEA");
+    await openRule();
     await click("Visa träffar");
     expect(screen.getByText("Regeln träffar inga transaktioner än.")).toBeTruthy();
-  });
-
-  it("frågan efter en ny regel visar träffarna innan man applicerar", async () => {
-    api();
-    await open();
-    await click("Ny regel");
-    fireEvent.change(screen.getByLabelText("Text"), { target: { value: "ikea" } });
-    fireEvent.change(screen.getByLabelText("Får kategorin"), { target: { value: "hushall" } });
-    await click("Spara");
-    expect(screen.getByText(/Regeln matchar 1 tidigare transaktioner/u)).toBeTruthy();
-    expect(screen.getByRole("list", { name: "Träffar" })).toBeTruthy();
   });
 
   it("säger till när träffarna inte går att hämta", async () => {
     api({ matches: [503, {}] });
     await open();
-    await click("Ändra regeln IKEA");
+    await openRule();
     await click("Visa träffar");
     expect(screen.getByRole("alert").textContent).toBe("Det gick inte att hämta träffarna.");
   });
