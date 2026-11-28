@@ -56,7 +56,7 @@ async function click(name: string, scope: HTMLElement = document.body) {
   await settle();
 }
 
-const dialog = () => screen.getByRole("region", { name: "Ta bort alla regler?" });
+const dialog = () => screen.getByRole("dialog", { name: "Ta bort alla regler?" });
 
 describe("ta bort alla regler (KK-51)", () => {
   it("räknar först och säger vad som berörs, och Avbryt ändrar ingenting", async () => {
@@ -66,7 +66,7 @@ describe("ta bort alla regler (KK-51)", () => {
     expect(dialog().textContent).toContain("14 regler som ger en kategori och 2 regler som gör att något inte räknas tas bort.");
     expect(dialog().textContent).toContain("Transaktionerna behåller sin kategori");
     await click("Avbryt", dialog());
-    expect(screen.queryByRole("region", { name: "Ta bort alla regler?" })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(calls.filter((c) => c.method === "POST")).toEqual([{ method: "POST", path: "/api/rules/reset", body: { preview: true } }]);
   });
 

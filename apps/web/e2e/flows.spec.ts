@@ -118,7 +118,7 @@ test("rensa alla kategorier efter en fråga och börja om (V-e2e-categories-rese
   const api = await useFakeApi(page);
   await page.goto("/installningar/kategorier");
   await page.getByRole("button", { name: "Rensa alla kategorier" }).click();
-  const dialog = page.getByRole("region", { name: "Rensa alla kategorier" });
+  const dialog = page.getByRole("dialog", { name: "Rensa alla kategorier?" });
   await expect(dialog).toContainText("37 kategorier och 14 regler tas bort");
   await dialog.getByRole("button", { name: "Rensa alla kategorier" }).click();
   await expect(page.getByRole("status")).toHaveText("Alla kategorier är rensade. Lägg till nya från början.");

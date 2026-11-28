@@ -1,4 +1,4 @@
-// Kort, tom vy och skelett (KK-65-A): ytorna som vyerna byggs av.
+// Kort, farozon, tom vy och skelett (KK-65-A): ytorna som vyerna byggs av.
 import type { LucideIcon } from "lucide-react";
 import { useId, type ReactNode } from "react";
 
@@ -16,6 +16,22 @@ export function Card(props: { title?: string; action?: ReactNode; children: Reac
           {props.action}
         </header>
       )}
+      {props.children}
+    </section>
+  );
+}
+
+/**
+ * Farozonen längst ned i en vy (#251): det som tar bort mycket på en gång, tydligt markerat och skilt från resten.
+ * Åtgärderna i den frågar alltid först i en dialog, med knappen som säger vad den gör.
+ */
+export function DangerZone(props: { children: ReactNode }) {
+  const titleId = useId();
+  return (
+    <section className="ui-danger-zone" aria-labelledby={titleId}>
+      <h2 id={titleId} className="ui-heading">
+        Farozon
+      </h2>
       {props.children}
     </section>
   );

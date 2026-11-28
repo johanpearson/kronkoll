@@ -16,7 +16,7 @@ import { Button } from "../ui/Button.tsx";
 import { Chip } from "../ui/Chip.tsx";
 import { List, ListRow } from "../ui/ListRow.tsx";
 import { Dialog, Sheet } from "../ui/Modal.tsx";
-import { EmptyState, Skeleton } from "../ui/Surface.tsx";
+import { DangerZone, EmptyState, Skeleton } from "../ui/Surface.tsx";
 import { ResetRules } from "./ResetRules.tsx";
 import { EXCLUDE, RuleForm } from "./RuleForm.tsx";
 import { RuleMatches } from "./RuleMatches.tsx";
@@ -225,10 +225,12 @@ export function RulesView() {
           ))}
         </List>
       )}
-      <ResetRules onDone={() => { setOpen(null); setReload((n) => n + 1); }} />
-      <List label="Börja om med kategorierna">
-        <ListRow label="Rensa alla kategorier" to="/installningar/kategorier" />
-      </List>
+      <DangerZone>
+        <ResetRules onDone={() => { setOpen(null); setReload((n) => n + 1); }} />
+        <List label="Börja om med kategorierna">
+          <ListRow label="Rensa alla kategorier" to="/installningar/kategorier" danger />
+        </List>
+      </DangerZone>
       <Sheet open={open?.view === "add"} title="Ny regel" onClose={close}>
         <RuleForm title="Ny regel" categories={categories} onSaved={saved} onExcluded={excluded} onClose={close} />
       </Sheet>

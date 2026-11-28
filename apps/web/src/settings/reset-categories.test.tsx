@@ -58,7 +58,7 @@ async function click(name: string, scope: HTMLElement = document.body) {
   await settle();
 }
 
-const dialog = () => screen.getByRole("region", { name: "Rensa alla kategorier" });
+const dialog = () => screen.getByRole("dialog", { name: "Rensa alla kategorier?" });
 
 describe("börja om med kategorierna (KK-48)", () => {
   it("räknar först och säger vad som berörs, och Avbryt ändrar ingenting (KK-48-A)", async () => {
@@ -68,7 +68,7 @@ describe("börja om med kategorierna (KK-48)", () => {
     expect(dialog().textContent).toContain("37 kategorier och 14 regler tas bort, 812 transaktioner blir okategoriserade, 3 uppdelningar och 9 budgetrader tas bort.");
     expect(dialog().textContent).toContain("Inga transaktioner raderas och inget hos banken ändras.");
     await click("Avbryt", dialog());
-    expect(screen.queryByRole("region", { name: "Rensa alla kategorier" })).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
     expect(calls.filter((c) => c.method === "POST")).toEqual([{ method: "POST", path: "/api/categories/reset", body: { preview: true } }]);
   });
 
@@ -87,7 +87,7 @@ describe("börja om med kategorierna (KK-48)", () => {
     const calls = api();
     await open();
     await click("Rensa alla kategorier");
-    fireEvent.click(screen.getByRole("checkbox", { name: /Sätt tillbaka mallens kategorier/u }));
+    fireEvent.click(screen.getByRole("switch", { name: /Sätt tillbaka mallens kategorier/u }));
     await click("Rensa alla kategorier", dialog());
     expect(calls.find((c) => (c.body as { confirm?: boolean } | null)?.confirm === true)?.body).toEqual({ confirm: true, restore_template: true });
     expect(screen.getByRole("status").textContent).toBe("Kategorierna är återställda till mallen.");

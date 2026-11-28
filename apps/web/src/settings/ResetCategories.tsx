@@ -1,9 +1,13 @@
-// Börja om med kategorierna (KK-48): rensa alla kategorier och regler som sätter en kategori och bygg upp nya
-// från början, eller sätt tillbaka mallen. Appen räknar först hur mycket som berörs och frågar. Transaktionerna
-// blir okategoriserade men raderas aldrig, och inget hos banken ändras.
+// Börja om med kategorierna (KK-48, #251): rensa alla kategorier och regler som sätter en kategori och bygg upp nya
+// från början, eller sätt tillbaka mallen. Appen räknar först hur mycket som berörs och frågar i en dialog, med knappen som
+// säger vad den gör. Transaktionerna blir okategoriserade men raderas aldrig, och inget hos banken ändras. Ligger i
+// farozonen längst ned.
 import { useState } from "react";
 import { field, postJson } from "../api.ts";
 import { useToast } from "../toast.tsx";
+import { Button } from "../ui/Button.tsx";
+import { Dialog } from "../ui/Modal.tsx";
+import { Switch } from "../ui/Switch.tsx";
 
 interface Summary {
   readonly categories: number;
@@ -53,40 +57,53 @@ export function ResetCategories(props: { onDone: () => void }) {
     }
   };
 
-  if (summary === null) {
-    return (
-      <section className="card" aria-label="Börja om med kategorierna">
-        <h2>Börja om</h2>
-        <p>Rensa alla kategorier och regler och sätt upp nya från början.</p>
-        {error && <p role="alert">{error}</p>}
-        <p>
-          <button type="button" disabled={busy} onClick={() => void ask()}>
-            Rensa alla kategorier
-          </button>
-        </p>
-      </section>
-    );
-  }
+  const close = () => {
+    if (!busy) {
+      setSummary(null);
+      setError(null);
+    }
+  };
+
   return (
-    <section className="card" role="region" aria-label="Rensa alla kategorier">
-      <h2>Rensa alla kategorier?</h2>
-      <p>
-        {summary.categories} kategorier och {summary.rules} regler tas bort, {summary.transactions} transaktioner blir okategoriserade, {summary.splits} uppdelningar och{" "}
-        {summary.budgetLines} budgetrader tas bort. Inga transaktioner raderas och inget hos banken ändras. Det går inte att ångra.
-      </p>
-      <label className="check">
-        <input type="checkbox" checked={template} onChange={(e) => { setTemplate(e.target.checked); }} />
-        Sätt tillbaka mallens kategorier och regler i stället för en tom lista
-      </label>
-      {error && <p role="alert">{error}</p>}
-      <p className="actions">
-        <button type="button" className="danger" disabled={busy} onClick={() => void reset()}>
-          Rensa alla kategorier
-        </button>
-        <button type="button" disabled={busy} onClick={() => { setSummary(null); }}>
-          Avbryt
-        </button>
-      </p>
-    </section>
+    <>
+      <p className="ui-body">Rensa alla kategorier och regler och sätt upp nya från början.</p>
+      {error && summary === null && (
+        <p role="alert" className="ui-field-error">
+          {error}
+        </p>
+      )}
+      <Button variant="danger" block busy={busy && summary === null} onClick={() => void ask()}>
+        Rensa alla kategorier
+      </Button>
+      <Dialog
+        open={summary !== null}
+        title="Rensa alla kategorier?"
+        onClose={close}
+        actions={
+          <>
+            <Button variant="danger" block busy={busy} onClick={() => void reset()}>
+              Rensa alla kategorier
+            </Button>
+            <Button variant="quiet" block disabled={busy} onClick={close}>
+              Avbryt
+            </Button>
+          </>
+        }
+      >
+        {summary && (
+          <p>
+            {summary.categories} kategorier och {summary.rules} regler tas bort, {summary.transactions} transaktioner blir okategoriserade, {summary.splits} uppdelningar och {summary.budgetLines} budgetrader tas bort. Inga transaktioner raderas och inget hos banken ändras. Det går inte att ångra.
+          </p>
+        )}
+        <Switch checked={template} onChange={setTemplate}>
+          Sätt tillbaka mallens kategorier och regler i stället för en tom lista
+        </Switch>
+        {error && summary !== null && (
+          <p role="alert" className="ui-field-error">
+            {error}
+          </p>
+        )}
+      </Dialog>
+    </>
   );
 }
