@@ -104,6 +104,7 @@ describe("GET /api/transactions (#32, KK-9, KK-18, KK-34)", () => {
         manual_transfer: null,
         split: false,
         hidden: false,
+        known_account_name: null,
       },
     ]);
   });

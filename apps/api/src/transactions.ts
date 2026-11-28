@@ -39,6 +39,8 @@ function toJson(item: TransactionListItem) {
     manual_transfer: item.manualTransfer,
     split: item.split,
     hidden: item.hidden,
+    // "Till: <namn>" i listan (KK-54-B). Namnet är användarens och renderas som text (KK-30).
+    known_account_name: item.knownAccountName,
   };
 }
 
@@ -155,6 +157,8 @@ export async function getTransaction(env: { DB: D1Database }, id: string): Promi
         income_source: detail.incomeSource,
         // "Lån: <namn>" i transaktionen (KK-59-B). Namnet är användarens och renderas som text (KK-30).
         loan: detail.loan,
+        // Det kända konto överföringen hör till, och om kopplingen är gjord för hand (KK-54-B, KK-54-C).
+        known_account: detail.knownAccount,
         transfer_pair: detail.transferPair && {
           id: detail.transferPair.id,
           account_name: detail.transferPair.accountName,

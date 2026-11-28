@@ -86,6 +86,7 @@ describe("GET /api/transactions/{id} (#32, KK-9, KK-18, KK-19, KK-20-C, KK-30)",
       income_source: "none",
       transfer_pair: null,
       loan: null,
+      known_account: null,
       splits: [],
       category_reason: { source: "template", rule: { id: "mall-ica", match: "counterparty_prefix", pattern: "ICA", category_id: "mat-livsmedel", source: "template" }, also_matched: expect.any(Array) as unknown[] },
     });
