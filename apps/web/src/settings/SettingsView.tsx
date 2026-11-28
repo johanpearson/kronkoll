@@ -97,9 +97,9 @@ export function BankSettings() {
 export function PeriodSettings() {
   return (
     <Page title="Budgetperiod">
-      <section className="card">
+      <Card>
         <PeriodStart />
-      </section>
+      </Card>
     </Page>
   );
 }
@@ -108,9 +108,9 @@ export function PeriodSettings() {
 export function NotificationSettings() {
   return (
     <Page title="Notiser">
-      <section className="card">
+      <Card>
         <Notifications />
-      </section>
+      </Card>
     </Page>
   );
 }

@@ -5,6 +5,8 @@
 import { useEffect, useState, type SyntheticEvent } from "react";
 import { deleteWithBody, field, getJson, postJson } from "../api.ts";
 import { useToast } from "../toast.tsx";
+import { Button } from "../ui/Button.tsx";
+import { Switch } from "../ui/Switch.tsx";
 import { pushDevice, storedTopics, type PushDevice } from "./push-device.ts";
 
 const TOPICS = [
@@ -93,31 +95,25 @@ export function Notifications({ device = pushDevice }: { readonly device?: PushD
       <ul className="switch-list">
         {TOPICS.map((t) => (
           <li key={t.value}>
-            <label>
-              <span>{t.label}</span>
-              <input
-                type="checkbox"
-                role="switch"
-                className="switch"
-                checked={chosen.includes(t.value)}
-                disabled={state.saving}
-                onChange={(e) => { flip(t.value, e.target.checked); }}
-              />
-            </label>
+            <Switch checked={chosen.includes(t.value)} disabled={state.saving} onChange={(on) => { flip(t.value, on); }}>
+              {t.label}
+            </Switch>
           </li>
         ))}
       </ul>
-      {state.message && <p role="alert">{state.message}</p>}
-      <p className="actions">
-        <button type="submit" className="primary" disabled={!changed || state.saving}>
-          {state.saving ? "Sparar…" : "Spara"}
-        </button>
-        {changed && !state.saving && (
-          <button type="button" onClick={() => { setChosen(state.topics); }}>
-            Ångra
-          </button>
-        )}
-      </p>
+      {state.message && (
+        <p role="alert" className="ui-field-error">
+          {state.message}
+        </p>
+      )}
+      <Button type="submit" variant="primary" block disabled={!changed} busy={state.saving}>
+        {state.saving ? "Sparar…" : "Spara"}
+      </Button>
+      {changed && !state.saving && (
+        <Button variant="quiet" block onClick={() => { setChosen(state.topics); }}>
+          Ångra
+        </Button>
+      )}
       <small>Notiserna innehåller aldrig belopp. {IOS_HINT}</small>
     </form>
   );
