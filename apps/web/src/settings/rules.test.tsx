@@ -140,7 +140,7 @@ describe("regler i Inställningar (#251, KK-18-B, KK-18-C, KK-58-C)", () => {
     await open();
     expect(rows().map(label)).toContain("Innehåller AMAZON → Hushåll");
     await click("Ny regel");
-    fireEvent.change(sheet().getByLabelText("Träffar"), { target: { value: "contains" } });
+    fireEvent.click(sheet().getByRole("radio", { name: "Innehåller" }));
     expect(sheet().getByLabelText<HTMLInputElement>("Text").placeholder).toBe("amazon");
     expect(sheet().getByText("Versaler och gemener spelar ingen roll.")).toBeTruthy();
     fireEvent.change(sheet().getByLabelText("Text"), { target: { value: "Amazon" } });
@@ -156,8 +156,8 @@ describe("regler i Inställningar (#251, KK-18-B, KK-18-C, KK-58-C)", () => {
     await open();
     await openRule("AMAZON");
     await press("Ändra namn eller kategori");
-    expect(sheet().getByLabelText<HTMLSelectElement>("Träffar").value).toBe("contains");
-    fireEvent.change(sheet().getByLabelText("Träffar"), { target: { value: "prefix" } });
+    expect(sheet().getByRole("radio", { name: "Innehåller" }).getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(sheet().getByRole("radio", { name: "Börjar med" }));
     await press("Spara");
     expect(changes(calls)).toEqual([{ method: "PATCH", path: "/api/rules/r-amazon", body: { pattern: "AMAZON", match: "prefix", category_id: "hushall" }, csrf: "1" }]);
   });

@@ -79,7 +79,7 @@ test("lägg till en regel som innehåller en text, oavsett versaler (V-e2e-rule-
   await useFakeApi(page);
   await page.goto("/installningar/regler");
   await page.getByRole("button", { name: "Ny regel" }).click();
-  await page.getByLabel("Träffar").selectOption("contains");
+  await page.getByRole("radio", { name: "Innehåller" }).click();
   await page.getByLabel("Text").fill("Amazon");
   await page.getByLabel("Får kategorin").selectOption({ label: "Hushåll › Förbrukning" });
   await page.getByRole("button", { name: "Spara" }).click();
@@ -92,7 +92,7 @@ test("ordna reglerna: den som står först vinner, och ordningen finns kvar efte
   await page.goto("/installningar/regler");
   for (const [match, text] of [["prefix", "Ikea"], ["contains", "Amazon"]] as const) {
     await page.getByRole("button", { name: "Ny regel" }).click();
-    await page.getByLabel("Träffar").selectOption(match);
+    await page.getByRole("radio", { name: match === "contains" ? "Innehåller" : "Börjar med" }).click();
     await page.getByLabel("Text").fill(text);
     await page.getByLabel("Får kategorin").selectOption({ label: "Hushåll › Förbrukning" });
     await page.getByRole("button", { name: "Spara" }).click();
@@ -298,4 +298,27 @@ test("flytta en kategori upp och ner med knapparna, och ordningen finns kvar eft
   await page.getByRole("dialog").getByRole("button", { name: "Flytta ner" }).click();
   await page.getByRole("dialog").getByRole("button", { name: "Stäng" }).click();
   await expect(subs).toHaveText(["Systembolaget", "Restaurang", "Livsmedel"]);
+});
+
+test("regelformuläret visar träffarna medan man skriver och valet att skriva över manuella (V-e2e-rule-preview, KK-58-B)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/installningar/regler");
+  await page.getByRole("button", { name: "Ny regel" }).click();
+  const sheet = page.getByRole("dialog");
+  await sheet.getByLabel("Text").fill("Ikea");
+  await sheet.getByLabel("Får kategorin").selectOption({ label: "Hushåll › Förbrukning" });
+  await expect(sheet).toContainText("Regeln träffar 4 transaktioner: 2 får kategorin, 1 har redan kategorin, 1 är manuellt valda.");
+  const examples = sheet.getByRole("list", { name: "Exempel på träffar" }).getByRole("listitem");
+  await expect(examples).toHaveCount(3);
+  await expect(examples.first()).toContainText("IKEA KARLSTAD");
+  const toggle = sheet.getByRole("switch", { name: "Skriv över även manuellt kategoriserade" });
+  await expect(toggle).toHaveAttribute("aria-checked", "false");
+  await expect(sheet).toContainText("1 manuellt valda ändras inte");
+  await toggle.click();
+  await expect(sheet).toContainText("1 manuellt valda får kategorin.");
+  // Inget är sparat än: listan har inga regler förrän man trycker på Spara.
+  await expect(page.getByRole("list", { name: "Regler" }).getByRole("listitem")).toHaveCount(0);
+  await sheet.getByRole("button", { name: "Spara" }).click();
+  await expect(page.getByRole("status")).toContainText("Regeln är sparad");
+  await expect(page.getByRole("list", { name: "Regler" }).getByRole("listitem")).toHaveCount(1);
 });
