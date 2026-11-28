@@ -866,3 +866,8 @@ main ul.account-list > li {
 main ul.account-list .ui-card {
   margin: 0;
 }
+
+/* En länk som ser ut som en knapp, för det som leder till en annan sida (#259). */
+a.ui-button {
+  text-decoration: none;
+}
