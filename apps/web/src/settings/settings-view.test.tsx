@@ -36,6 +36,7 @@ describe("Inställningar (#259)", () => {
     expect(rows("Budget")).toEqual([
       ["Kategorier", "/installningar/kategorier"],
       ["Regler", "/installningar/regler"],
+      ["Kända kontonKonton utanför appen, till exempel en partners", "/installningar/kanda-konton"],
       ["BudgetperiodVilken dag perioden börjar", "/installningar/budgetperiod"],
     ]);
     expect(rows("Appen")).toEqual([

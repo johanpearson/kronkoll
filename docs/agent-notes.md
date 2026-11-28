@@ -133,6 +133,16 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - Diagram ritas i sitt slutläge, och animationen från noll körs ovanpå med Web Animations API. Inline-stilar
   i SVG behövs därför inte, och CSP:n stoppar ingenting.
 
+## Kända konton (#249, KK-54)
+
+- Byggt som lån (#257): `known_accounts` (namn, matchningstexter som JSON, kategori) och `transactions.known_account_id`/`known_account_source`
+  (migrering 0028, `ON DELETE SET NULL` skrivet för hand). Domänen (`known-accounts.ts`) matchar med reglernas Innehåller-logik, så längsta
+  texten vinner. Synken kopplar de senaste 60 dagarna, och att spara eller ta bort ett konto kopplar om hela historiken.
+- `known_accounts.category_id` är nullable med `ON DELETE SET NULL`, så att en rensning av kategorier inte stoppas. Lånens `category_id`
+  har inget sådant skydd, och en rensning av alla kategorier kan därför fallera om ett lån har en kategori (inte åtgärdat).
+- Ett konto, en överföring: en transaktion kopplad till både lån och känt konto får lånets kategori, eftersom lånen kopplas sist.
+- `adapter.candidates(null)` ger all historik. En `or(undefined, x)` i Drizzle tappar `undefined` och blir bara `x`, så bygg villkoret för hand.
+
 ## Cloudflare och D1: gränser som har orsakat riktiga fel
 
 - **CPU-tid:** Workern får runt 10 ms CPU per anrop på gratisnivån. Gör dyra steg (normalisering av

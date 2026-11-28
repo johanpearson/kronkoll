@@ -351,3 +351,29 @@ test("Varför den här kategorin? förklarar varför en transaktion saknar kateg
   await sheet.getByRole("button", { name: "Stäng" }).click();
   await expect(sheet).toHaveCount(0);
 });
+
+test("lägg till ett känt konto, se träffarna innan det sparas och koppla en överföring för hand (V-e2e-known, KK-54-A, KK-54-C)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/installningar/kanda-konton");
+  await expect(page.getByText("Inga kända konton")).toBeVisible();
+  await page.getByRole("button", { name: "Lägg till konto" }).first().click();
+  const form = page.getByRole("form", { name: "Nytt känt konto" });
+  await form.getByLabel("Namn").fill("Kontot A");
+  await form.getByLabel("Texter i meddelandet").fill("Swish till Exempelkonto A");
+  await form.getByLabel("Standardkategori").selectOption({ label: "Hushåll › Förbrukning" });
+  // Antalet träffar visas innan något är sparat.
+  await expect(form).toContainText("2 transaktioner träffar.");
+  await expect(page.getByRole("list", { name: "Kända konton" })).toHaveCount(0);
+  await form.getByRole("button", { name: "Spara" }).click();
+  await expect(page.getByRole("status")).toContainText("Kontot är sparat.");
+  const rows = page.getByRole("list", { name: "Kända konton" }).getByRole("listitem");
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText("Kontot A");
+
+  // Koppla en överföring till kontot för hand i detaljvyn, och se det som text.
+  await page.goto("/transaktioner/lon1");
+  await page.getByRole("button", { name: "Koppla till känt konto" }).click();
+  await page.getByRole("combobox", { name: "Känt konto" }).selectOption({ label: "Kontot A" });
+  await page.getByRole("button", { name: "Koppla", exact: true }).click();
+  await expect(page.getByText("Till: Kontot A (vald av dig)")).toBeVisible();
+});
