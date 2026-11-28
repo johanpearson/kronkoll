@@ -875,3 +875,22 @@ a.ui-button {
 .loan-paid {
   margin: var(--space-2) 0 0;
 }
+
+/* Kontouppgifter på ett lån (#257): flera rader text och förhandsvisningen av träffarna. */
+textarea.ui-input {
+  padding: var(--space-2) var(--space-4);
+  resize: vertical;
+}
+
+.loan-preview {
+  margin-top: var(--space-2);
+}
+
+main ul.loan-preview-list,
+ul.loan-preview-list {
+  margin: var(--space-1) 0 0;
+  padding: 0;
+  list-style: none;
+  border: 0;
+  box-shadow: none;
+}
