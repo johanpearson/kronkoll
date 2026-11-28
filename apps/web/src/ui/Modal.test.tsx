@@ -78,6 +78,15 @@ describe("Sheet (KK-65-A)", () => {
     expect(screen.queryByText("Innehåll")).toBeNull();
   });
 
+  it("ger fokus åt fältet märkt data-autofocus efter showModal", () => {
+    render(
+      <Sheet open title="Byt namn" onClose={() => undefined}>
+        <input aria-label="Namn" data-autofocus />
+      </Sheet>,
+    );
+    expect(document.activeElement).toBe(screen.getByLabelText("Namn"));
+  });
+
   it("öppnas ändå i en webbläsare utan showModal", () => {
     delete proto.showModal;
     render(
