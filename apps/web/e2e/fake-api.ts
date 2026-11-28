@@ -255,6 +255,18 @@ export async function useFakeApi(
       return [201, { connection_id: "c1", accounts: 3, initial_sync: "started", renewed: false }];
     }
     if (path === "/api/connections") return [200, { items: [CONNECTION] }];
+    // Sidan om en koppling (#259): påhittade konton och en kort synklogg.
+    if (path === "/api/connections/c1" && method === "GET") {
+      return [
+        200,
+        {
+          ...CONNECTION,
+          accounts: ACCOUNTS.map((a) => ({ id: a.id, name: a.name, balance_minor: 1852790 })),
+          history: { accounts: 2, transactions: 120, splits: 1 },
+          sync_runs: [{ kind: "cron", status: "ok", started_at: "2026-11-15T05:02:11.000Z", new_count: 3, updated_count: 1, error_code: null }],
+        },
+      ];
+    }
     if (path === "/api/accounts") return [200, { items: accounts }];
     const accountPath = /^\/api\/accounts\/([^/]+)$/u.exec(path);
     const account = accounts.find((a) => a.id === accountPath?.[1]);

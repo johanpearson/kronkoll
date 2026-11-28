@@ -79,7 +79,7 @@ describe("förnya samtycket (#27, KK-8)", () => {
     const assign = vi.spyOn(browser, "assign").mockImplementation(() => undefined);
     await open("/installningar/koppling/c1");
     const button = screen.getByRole("button", { name: "Förnya med BankID" });
-    expect(button.className).toBe("primary");
+    expect(button.className).toBe("ui-button ui-button-primary ui-button-block");
     fireEvent.click(button);
     await act(async () => {
       await Promise.resolve();
@@ -92,7 +92,7 @@ describe("förnya samtycket (#27, KK-8)", () => {
   it("knappen är inte framträdande när det är långt kvar", async () => {
     api({ days: 160 });
     await open("/installningar/koppling/c1");
-    expect(screen.getByRole("button", { name: "Förnya med BankID" }).className).toBe("");
+    expect(screen.getByRole("button", { name: "Förnya med BankID" }).className).toBe("ui-button ui-button-secondary ui-button-block");
   });
 
   it.each([
