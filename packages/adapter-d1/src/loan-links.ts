@@ -75,6 +75,24 @@ export function loanLinkRepository(d1: D1Database) {
         .all();
     },
 
+    /** Betalningar som är kopplade till något lån, med datum i perioden, för Betalt denna period (KK-59-C). */
+    async payments(from: string, to: string): Promise<LoanTransaction[]> {
+      return db
+        .select({
+          id: transactions.id,
+          date: bookedOrBought,
+          status: transactions.status,
+          amountMinor: transactions.amountMinor,
+          counterparty: transactions.counterparty,
+          description: transactions.description,
+          loanId: transactions.loanId,
+          loanSource: transactions.loanSource,
+        })
+        .from(transactions)
+        .where(and(isNotNull(transactions.loanId), ne(transactions.status, "removed"), sql`${bookedOrBought} BETWEEN ${from} AND ${to}`))
+        .all();
+    },
+
     /**
      * Skriver kopplingarna från `linkLoans`. En ny koppling ger lånets kategori om lånet har en och kategorin inte är
      * manuell. En borttagen automatisk koppling släpper kategorin från lånet. Manuella kopplingar rörs aldrig.

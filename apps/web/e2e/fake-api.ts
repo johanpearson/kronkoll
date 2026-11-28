@@ -126,6 +126,8 @@ export async function useFakeApi(
   const loans: Record<string, unknown>[] = [{
     id: "lan1", name: "Bolån del 1", lender: "Exempelbanken", balance_minor: 120000000, interest_rate_bp: 350, rate_fixed_until: "2026-12-15", amortization_minor: 200000,
     monthly_interest_minor: 350000, monthly_amortization_minor: 200000, monthly_cost_minor: 550000, rate_fixed: true, rate_fixed_days_left: 41, rate_fixed_ending: true,
+    // Påhittat kontonummer och Betalt denna period (KK-59).
+    match_patterns: ["9020-12 345 67"], category_id: "boende-laneranta", paid: { paid_minor: 550000, last_paid_on: "2026-11-02", missing: false },
   }];
   const state: FakeApi = { rules: [], budgetPuts: [], guidelinePuts: [], accountPatches: [], categoryResets: [] };
   let categoriesCleared = false;
@@ -185,6 +187,15 @@ export async function useFakeApi(
         total_monthly_cost_minor: loans.reduce((s, l) => s + Number(l["monthly_cost_minor"]), 0),
       }];
     }
+    // Kontouppgifter på lånet (KK-59): förhandsvisningen träffar inget i det påhittade API:t.
+    if (path === "/api/loans/preview" && method === "POST") return [200, { count: 0, examples: [] }];
+    const matchingId = /^\/api\/loans\/([^/]+)\/matching$/u.exec(path)?.[1];
+    const matchingLoan = loans.find((l) => l["id"] === matchingId);
+    if (matchingLoan && method === "PUT") {
+      matchingLoan["match_patterns"] = body["match_patterns"];
+      matchingLoan["category_id"] = body["category_id"] === undefined ? "boende-laneranta" : body["category_id"];
+      return [200, { match_patterns: matchingLoan["match_patterns"], category_id: matchingLoan["category_id"], linked: 0 }];
+    }
     const loanId = /^\/api\/loans\/([^/]+)$/u.exec(path)?.[1];
     if (loanId && method === "DELETE") {
       const i = loans.findIndex((l) => l["id"] === loanId);
@@ -197,6 +208,7 @@ export async function useFakeApi(
       const loan = {
         id: loanId, ...body, monthly_interest_minor: interest, monthly_amortization_minor: body["amortization_minor"],
         monthly_cost_minor: interest + Number(body["amortization_minor"]), rate_fixed: body["rate_fixed_until"] !== null, rate_fixed_days_left: body["rate_fixed_until"] === null ? null : 500, rate_fixed_ending: false,
+        match_patterns: [], category_id: null, paid: { paid_minor: 0, last_paid_on: null, missing: false },
       };
       const i = loans.findIndex((l) => l["id"] === loanId);
       if (i >= 0) loans[i] = loan;
