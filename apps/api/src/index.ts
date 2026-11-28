@@ -11,7 +11,7 @@ import { deleteBudget, getBudget, putBudget } from "./budget.ts";
 import { createCategory, listCategories, mergeCategory, patchCategory, resetCategories } from "./categories.ts";
 import { deleteConnection } from "./connection-delete.ts";
 import { getConnection, listConnections } from "./connection-list.ts";
-import { deleteLoan, listLoans, putLoan } from "./loans.ts";
+import { deleteLoan, listLoans, previewLoanMatch, putLoan, putLoanMatching } from "./loans.ts";
 import { getIncome, getIncomeMonth } from "./income.ts";
 import { getGuidelines, putGuidelines } from "./guidelines.ts";
 import { getInsights } from "./insights.ts";
@@ -191,6 +191,18 @@ async function route(request: Request, env: Env, context: RouteContext, email: s
   if (ruleMatch?.[1]) {
     if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
     return applyRule(env, ruleMatch[1]);
+  }
+
+  // Före /api/loans/{id}, som annars tolkar "preview" som ett id.
+  if (pathname === "/api/loans/preview") {
+    if (request.method !== "POST") return json({ error: "method_not_allowed" }, 405, { allow: "POST" });
+    return previewLoanMatch(request, env);
+  }
+
+  const loanMatchingMatch = /^\/api\/loans\/([A-Za-z0-9_-]{1,64})\/matching$/u.exec(pathname);
+  if (loanMatchingMatch?.[1]) {
+    if (request.method !== "PUT") return json({ error: "method_not_allowed" }, 405, { allow: "PUT" });
+    return putLoanMatching(request, env, loanMatchingMatch[1]);
   }
 
   const loanMatch = /^\/api\/loans\/([A-Za-z0-9_-]{1,64})$/u.exec(pathname);
