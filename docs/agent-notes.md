@@ -128,6 +128,8 @@ pnpm --filter @kronkoll/<paket> test:coverage
 - jsdom saknar `HTMLDialogElement.showModal`, `IntersectionObserver`, `matchMedia` och `Element.animate`.
   Testerna stubbar dem själva, och komponenterna fungerar utan dem.
 - `formatSek` använder hårda mellanslag. Jämför text med `.replace(/\s/gu, " ")` eller ett regex med `\s`.
+- Kort tonar in (`ui-enter`). axe mätte kontrasten mitt i animationen och fällde en Chip med 4,05:1 (#257), så
+  `a11y.spec.ts` väntar nu på att ändliga animationer är klara. Samma sak gäller en egen axe-körning.
 - Diagram ritas i sitt slutläge, och animationen från noll körs ovanpå med Web Animations API. Inline-stilar
   i SVG behövs därför inte, och CSP:n stoppar ingenting.
 
