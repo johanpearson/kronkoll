@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   CATEGORY_TEMPLATE,
@@ -5,7 +6,9 @@ import {
   addCategory,
   archiveCategory,
   mergeCategories,
+  moveCategory,
   renameCategory,
+  sortCategories,
   type Category,
 } from "./categories.ts";
 import { categorize } from "./categorize.ts";
@@ -197,5 +200,75 @@ describe("slå ihop (V-u-template)", () => {
     ["okänd kategori", "finns-inte", "mat", "Okänd kategori"],
   ])("avvisar %s", (_, fromId, intoId, message) => {
     expect(() => mergeCategories({ categories: CATEGORY_TEMPLATE, fromId, intoId, transactions, rules })).toThrow(message);
+  });
+});
+
+const MAT = ["mat-livsmedel", "mat-restaurang-cafe", "mat-systembolaget"];
+/** Underkategorierna till Mat i den ordning de visas. */
+const matOrder = (categories: readonly Category[]) =>
+  sortCategories(categories.filter((c) => c.parentId === "mat")).map((c) => c.id);
+
+describe("ordna kategorier (KK-18-A, #251)", () => {
+  it("kategorier utan plats visas på namn, och de med plats först, i sin ordning", () => {
+    expect(matOrder(CATEGORY_TEMPLATE)).toEqual(MAT);
+    const placed = CATEGORY_TEMPLATE.map((c) => (c.id === "mat-systembolaget" ? { ...c, position: 0 } : c));
+    expect(matOrder(placed)).toEqual(["mat-systembolaget", "mat-livsmedel", "mat-restaurang-cafe"]);
+  });
+
+  it("kategorier med samma plats, eller utan plats, ordnas på namn oavsett hur de kommer in", () => {
+    const subs = CATEGORY_TEMPLATE.filter((c) => c.parentId === "mat");
+    expect(sortCategories(subs.toReversed()).map((c) => c.id)).toEqual(MAT);
+    const same = subs.toReversed().map((c) => ({ ...c, position: 3 }));
+    expect(sortCategories(same).map((c) => c.id)).toEqual(MAT);
+    const placed = subs.map((c) => (c.id === "mat-systembolaget" ? { ...c, position: 1 } : c.id === "mat-restaurang-cafe" ? { ...c, position: 0 } : c));
+    expect(sortCategories(placed).map((c) => c.id)).toEqual(["mat-restaurang-cafe", "mat-systembolaget", "mat-livsmedel"]);
+  });
+
+  it("flyttar en kategori före en annan bland syskonen och numrerar om från noll", () => {
+    const moved = moveCategory(CATEGORY_TEMPLATE, "mat-systembolaget", "mat-livsmedel");
+    expect(matOrder(moved)).toEqual(["mat-systembolaget", "mat-livsmedel", "mat-restaurang-cafe"]);
+    expect(MAT.map((id) => find(moved, id)?.position).sort()).toEqual([0, 1, 2]);
+  });
+
+  it("utan plats att flytta före hamnar den sist", () => {
+    expect(matOrder(moveCategory(CATEGORY_TEMPLATE, "mat-livsmedel", null))).toEqual(["mat-restaurang-cafe", "mat-systembolaget", "mat-livsmedel"]);
+  });
+
+  it("ändrar bara syskonen: andra huvudkategorier, deras underkategorier och andra typer ligger kvar", () => {
+    const moved = moveCategory(CATEGORY_TEMPLATE, "mat", "boende");
+    const order = sortCategories(moved.filter((c) => c.parentId === null && c.kind === "expense")).map((c) => c.id);
+    expect(order.indexOf("mat") + 1).toBe(order.indexOf("boende"));
+    const untouched = (c: Category) => c.parentId !== null || c.kind !== "expense";
+    expect(moved.filter(untouched)).toEqual(CATEGORY_TEMPLATE.filter(untouched));
+  });
+
+  it("flytten är oförändrad om den görs igen", () => {
+    const once = moveCategory(CATEGORY_TEMPLATE, "mat-systembolaget", "mat-livsmedel");
+    expect(moveCategory(once, "mat-systembolaget", "mat-livsmedel")).toEqual(once);
+  });
+
+  it("avvisar okänd kategori, arkiverad, före sig själv och före någon på en annan nivå eller av en annan typ", () => {
+    expect(() => moveCategory(CATEGORY_TEMPLATE, "finns-inte", null)).toThrow("Okänd kategori: finns-inte");
+    expect(() => moveCategory(CATEGORY_TEMPLATE, "mat", "finns-inte")).toThrow("Okänd kategori: finns-inte");
+    expect(() => moveCategory(archiveCategory(CATEGORY_TEMPLATE, "mat"), "mat", null)).toThrow("Kategorin är arkiverad");
+    expect(() => moveCategory(CATEGORY_TEMPLATE, "mat", "mat")).toThrow("En kategori kan inte flyttas före sig själv");
+    expect(() => moveCategory(CATEGORY_TEMPLATE, "mat-livsmedel", "boende-el")).toThrow("Kategorierna måste ligga på samma nivå och vara av samma typ");
+    expect(() => moveCategory(CATEGORY_TEMPLATE, "mat", "inkomst")).toThrow("Kategorierna måste ligga på samma nivå och vara av samma typ");
+  });
+
+  it("egenskap: efter varje flytt står kategorin precis före målet, och platserna är 0..n-1 utan dubbletter", () => {
+    const ids = CATEGORY_TEMPLATE.filter((c) => c.parentId === "boende").map((c) => c.id);
+    fc.assert(
+      fc.property(fc.array(fc.tuple(fc.constantFrom(...ids), fc.constantFrom(null, ...ids)), { minLength: 1, maxLength: 12 }), (steps) => {
+        let state: readonly Category[] = CATEGORY_TEMPLATE;
+        for (const [id, before] of steps) {
+          if (id === before) continue;
+          state = moveCategory(state, id, before);
+          const order = sortCategories(state.filter((c) => c.parentId === "boende")).map((c) => c.id);
+          expect(order.indexOf(id)).toBe(before === null ? order.length - 1 : order.indexOf(before) - 1);
+          expect(state.filter((c) => c.parentId === "boende").map((c) => c.position).sort()).toEqual(ids.map((_, i) => i));
+        }
+      }),
+    );
   });
 });
