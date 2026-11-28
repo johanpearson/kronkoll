@@ -179,10 +179,12 @@ export {
   type BankAccount,
   type BankAccountType,
   type BankDataProvider,
+  type ProviderBalance,
   type ProviderErrorCode,
   type ProviderTransaction,
   type TransactionPage,
 } from "./bank.ts";
+export { accountBalances, includesPending, type AccountBalances, type BankBalance } from "./balances.ts";
 export { AMOUNT_TOLERANCE_PCT, recurringCharges, type RecurringCharge, type RecurringInterval, type RecurringTransaction } from "./recurring.ts";
 export { ANOMALY_MIN_MINOR, ANOMALY_MIN_PCT, spendingAnomalies, spendingByMainCategory, topExpenses, type CategoryAnomaly, type MainCategorySpending, type TopExpense } from "./insights.ts";
 export { NORMAL_MONTHS, categoryLevels, medianMinor, rollUpToMain, type CategoryLevels, type PeriodSpending } from "./guidelines.ts";

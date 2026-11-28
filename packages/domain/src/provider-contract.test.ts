@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ProviderError, type BankAccount, type BankDataProvider, type ProviderTransaction, type TransactionPage } from "./bank.ts";
+import { ProviderError, type BankAccount, type BankDataProvider, type ProviderBalance, type ProviderTransaction, type TransactionPage } from "./bank.ts";
 import { runProviderContract } from "./provider-contract.ts";
 
 const ACCOUNT: BankAccount = { providerUid: "uid-1", iban: null, name: "Testkonto", type: "checking", currency: "SEK" };
@@ -18,13 +18,13 @@ function tx(overrides: Partial<ProviderTransaction> = {}): ProviderTransaction {
 }
 
 /** En leverantör med påhittade svar. Sidorna lämnas ut i ordning, per konto. */
-function fakeProvider(options: { accounts?: BankAccount[]; balance?: number | null; pages?: TransactionPage[] } = {}) {
+function fakeProvider(options: { accounts?: BankAccount[]; balance?: ProviderBalance | null; pages?: TransactionPage[] } = {}) {
   const steps: string[] = [];
   const queries: { dateFrom: string | null; continuationKey: string | null }[] = [];
   const pages = options.pages ?? [{ transactions: [tx()], continuationKey: null }];
   const provider: BankDataProvider = {
     accounts: () => Promise.resolve(options.accounts ?? [ACCOUNT]),
-    balance: () => Promise.resolve(options.balance === undefined ? 10000 : options.balance),
+    balance: () => Promise.resolve(options.balance === undefined ? { amountMinor: 10000, type: "CLBD" } : options.balance),
     transactions(_uid, query) {
       queries.push(query);
       return Promise.resolve(pages[Math.min(queries.length - 1, pages.length - 1)] ?? { transactions: [], continuationKey: null });
@@ -42,7 +42,7 @@ describe("kontraktssviten för BankDataProvider (KK-14-B, V-c-provider)", () => 
       ],
     });
     expect(await runProviderContract(provider, "s1")).toEqual({
-      accounts: [{ type: "checking", hasBalance: true, pages: 2, booked: 2, pending: 1, oldest: "2026-09-01" }],
+      accounts: [{ type: "checking", balanceType: "CLBD", pages: 2, booked: 2, pending: 1, oldest: "2026-09-01" }],
       failures: [],
     });
     expect(queries).toEqual([
@@ -54,7 +54,7 @@ describe("kontraktssviten för BankDataProvider (KK-14-B, V-c-provider)", () => 
   it("ett konto utan saldo och utan transaktioner är tillåtet", async () => {
     const { provider } = fakeProvider({ balance: null, pages: [{ transactions: [], continuationKey: null }] });
     expect(await runProviderContract(provider, "s1")).toEqual({
-      accounts: [{ type: "checking", hasBalance: false, pages: 1, booked: 0, pending: 0, oldest: null }],
+      accounts: [{ type: "checking", balanceType: null, pages: 1, booked: 0, pending: 0, oldest: null }],
       failures: [],
     });
   });
@@ -73,8 +73,8 @@ describe("kontraktssviten för BankDataProvider (KK-14-B, V-c-provider)", () => 
   });
 
   it("upptäcker id som inte är unika, saldo som inte är heltal och konto utan uid", async () => {
-    const { provider } = fakeProvider({ accounts: [{ ...ACCOUNT, providerUid: "" }], balance: 1.5, pages: [{ transactions: [tx(), tx()], continuationKey: null }] });
-    expect((await runProviderContract(provider, "s1")).failures).toEqual(["kontot har ett uid", "saldot är heltal öre", "bankens id är unika inom kontot"]);
+    const { provider } = fakeProvider({ accounts: [{ ...ACCOUNT, providerUid: "" }], balance: { amountMinor: 1.5, type: "" }, pages: [{ transactions: [tx(), tx()], continuationKey: null }] });
+    expect((await runProviderContract(provider, "s1")).failures).toEqual(["kontot har ett uid", "saldot är heltal öre", "saldot har en saldotyp", "bankens id är unika inom kontot"]);
   });
 
   it("samma regel listas en gång även när många rader bryter mot den", async () => {

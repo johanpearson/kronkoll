@@ -7,7 +7,7 @@
  * Portarna uppfylls av adapter-d1 (körningslogg och kopplingsstatus) och av en liten
  * saldo-metod på kontorepositoryt. Bankdata når aldrig loggen, bara antal och felkoder (KK-13).
  */
-import { ProviderError, type BankDataProvider } from "./bank.ts";
+import { ProviderError, type BankDataProvider, type ProviderBalance } from "./bank.ts";
 import { todayInStockholm, type Clock } from "./clock.ts";
 import { consentStatus, type ConnectionStatus } from "./consent.ts";
 import { syncAccount, type TransactionStore } from "./sync-account.ts";
@@ -34,7 +34,8 @@ export interface ConnectionSyncState {
 }
 
 export interface BalanceStore {
-  setBalance(accountId: string, balanceMinor: number): Promise<void>;
+  /** Sparar saldot med bankens saldotyp, så att bokfört och disponibelt kan räknas (KK-56-F). */
+  setBalance(accountId: string, balance: ProviderBalance): Promise<void>;
 }
 
 export interface SyncConnectionInput {
@@ -64,7 +65,7 @@ export type SyncConnectionOutcome =
 
 /** Ett konto: saldot hämtas först, och sparas först när transaktionerna också gått bra. */
 async function syncOneAccount(input: SyncConnectionInput, account: { id: string; providerUid: string }): Promise<AccountSyncResult> {
-  let balance: number | null;
+  let balance: ProviderBalance | null;
   try {
     balance = await input.provider.balance(account.providerUid);
   } catch (error) {
