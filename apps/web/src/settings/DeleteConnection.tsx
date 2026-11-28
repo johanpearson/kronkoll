@@ -3,6 +3,9 @@
 // återställningspunkter finns kvar i några dagar. Går det inte att återkalla hos banken ändras ingenting.
 import { useState } from "react";
 import { deleteJson, field } from "../api.ts";
+import { Button } from "../ui/Button.tsx";
+import { Dialog } from "../ui/Modal.tsx";
+import { Switch } from "../ui/Switch.tsx";
 
 export interface HistoryCounts {
   readonly accounts: number;
@@ -42,32 +45,52 @@ export function DeleteConnection(props: { id: string; bank: string; history: His
     else setError("Det gick inte att radera kopplingen. Ingenting är raderat. Försök igen.");
   };
 
-  if (!asking) {
-    return (
-      <p>
-        <button type="button" className="danger" onClick={() => { setAsking(true); }}>
-          Radera koppling
-        </button>
-      </p>
-    );
-  }
+  // Farliga åtgärder bekräftas i en dialog, med vad som händer på knappen (#259).
   return (
-    <section className="card tx-editor" aria-label={`Radera ${props.bank}-koppling`}>
-      <h2>Radera {props.bank}-kopplingen?</h2>
-      <p>Sessionen hos Enable Banking återkallas, och Kronkoll kan inte längre läsa dina {props.bank}-konton.</p>
-      <label>
-        <input type="checkbox" checked={purge} onChange={(e) => { setPurge(e.target.checked); }} /> Radera även historik: {describeHistory(props.history)}
-      </label>
-      <p>Regler, kategorier och budgetar behålls.</p>
-      {error && <p role="alert">{error}</p>}
-      <p>
-        <button type="button" className="danger" disabled={busy} onClick={() => void remove()}>
-          {busy ? "Raderar…" : purge ? "Radera permanent" : "Återkalla"}
-        </button>
-        <button type="button" disabled={busy} onClick={() => { setAsking(false); }}>
-          Avbryt
-        </button>
-      </p>
-    </section>
+    <>
+      <Button
+        variant="danger"
+        block
+        onClick={() => {
+          setAsking(true);
+        }}
+      >
+        Radera koppling
+      </Button>
+      <Dialog
+        open={asking}
+        title={`Radera ${props.bank}-kopplingen?`}
+        onClose={() => {
+          if (!busy) setAsking(false);
+        }}
+        actions={
+          <>
+            <Button
+              variant="quiet"
+              disabled={busy}
+              onClick={() => {
+                setAsking(false);
+              }}
+            >
+              Avbryt
+            </Button>
+            <Button variant="danger" busy={busy} onClick={() => void remove()}>
+              {busy ? "Raderar…" : purge ? "Radera permanent" : "Återkalla"}
+            </Button>
+          </>
+        }
+      >
+        <p>Sessionen hos Enable Banking återkallas, och Kronkoll kan inte längre läsa dina {props.bank}-konton.</p>
+        <Switch checked={purge} onChange={setPurge}>
+          Radera även historik: {describeHistory(props.history)}
+        </Switch>
+        <p className="ui-caption">Regler, kategorier och budgetar behålls.</p>
+        {error && (
+          <p role="alert" className="ui-field-error">
+            {error}
+          </p>
+        )}
+      </Dialog>
+    </>
   );
 }

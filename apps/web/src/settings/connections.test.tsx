@@ -51,35 +51,35 @@ async function open() {
 }
 
 const rows = () => within(screen.getByRole("list", { name: "Bankkopplingar" })).getAllByRole("listitem");
-const badge = (row: HTMLElement | undefined) => row?.querySelector(".badge");
+const badge = (row: HTMLElement | undefined) => row?.querySelector(".ui-chip");
 
 describe("bankkopplingar i Inställningar (#34, KK-7-A, KK-8-A)", () => {
   it("visar banken, status, antal konton, samtyckets slut och senaste synk", async () => {
     api([200, { items: [connection()] }]);
     await open();
-    expect(rows()[0]?.querySelector(".tx-name")?.textContent).toBe("Skandia");
+    expect(rows()[0]?.querySelector(".ui-row-label")?.textContent).toBe("Skandia");
     expect(badge(rows()[0])?.textContent).toBe("Aktiv");
-    expect(rows()[0]?.querySelector(".tx-notes")?.textContent).toBe(`4 konton · samtycke till ${formatDateShort("2027-05-01")} · senast synkad 15 nov. 06:02`);
+    expect(rows()[0]?.querySelector(".ui-row-detail")?.textContent).toBe(`4 konton · samtycke till ${formatDateShort("2027-05-01")} · senast synkad 15 nov. 06:02`);
     expect(screen.getByRole("link", { name: "Koppla en till bank" }).getAttribute("href")).toBe("/koppla");
   });
 
   it.each([
-    [{ consent_days_left: 10, consent_expires_on: "2026-11-25" }, "Går snart ut", "warn", "10 dagar kvar"],
-    [{ consecutive_failures: 3 }, "Synken misslyckas", "bad", "3 misslyckade synkar i rad"],
-    [{ status: "expired", consent_days_left: -2 }, "Utgången", "bad", "4 konton"],
-    [{ status: "revoked" }, "Återkallad", "bad", "4 konton"],
+    [{ consent_days_left: 10, consent_expires_on: "2026-11-25" }, "Går snart ut", "ui-chip-warning", "10 dagar kvar"],
+    [{ consecutive_failures: 3 }, "Synken misslyckas", "ui-chip-danger", "3 misslyckade synkar i rad"],
+    [{ status: "expired", consent_days_left: -2 }, "Utgången", "ui-chip-danger", "4 konton"],
+    [{ status: "revoked" }, "Återkallad", "ui-chip-danger", "4 konton"],
   ])("ett problem står i text, inte bara i färg: %j", async (overrides, text, tone, detail) => {
     api([200, { items: [connection(overrides)] }]);
     await open();
     expect(badge(rows()[0])?.textContent).toBe(text);
     expect(badge(rows()[0])?.className).toContain(tone);
-    expect(rows()[0]?.querySelector(".tx-notes")?.textContent).toContain(detail);
+    expect(rows()[0]?.querySelector(".ui-row-detail")?.textContent).toContain(detail);
   });
 
   it("en koppling med ett konto som aldrig synkats säger det", async () => {
     api([200, { items: [connection({ account_count: 1, last_success_at: null, consent_expires_on: null, consent_days_left: null })] }]);
     await open();
-    expect(rows()[0]?.querySelector(".tx-notes")?.textContent).toBe("1 konto · inte synkad än");
+    expect(rows()[0]?.querySelector(".ui-row-detail")?.textContent).toBe("1 konto · inte synkad än");
   });
 
   it("utan kopplingar finns bara länken Koppla bank", async () => {
