@@ -9,6 +9,8 @@ const file = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
 export default defineConfig({
   plugins: [react()],
+  // Versionen i Om appen: committen som bygget görs från. GITHUB_SHA finns i Actions, lokalt är den tom.
+  define: { "import.meta.env.VITE_COMMIT": JSON.stringify(process.env.GITHUB_SHA ?? "") },
   publicDir: "public",
   build: {
     outDir: "dist",
