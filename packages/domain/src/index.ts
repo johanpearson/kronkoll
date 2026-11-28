@@ -29,6 +29,15 @@ export {
   type TransferInput,
 } from "./transfers.ts";
 export { bufferTotals, bufferTrend, savingCategoryChanges, savingCategoryId, savingKindOf, type BufferTotals, type BufferTransaction, type SavingKind } from "./buffer.ts";
+export {
+  knownAccountFor,
+  knownAccountHits,
+  knownAccountRules,
+  normalizeKnownPattern,
+  validateKnownAccount,
+  type KnownAccount,
+  type KnownAccountTransaction,
+} from "./known-accounts.ts";
 export { learnPattern, matchesWordPrefix, normalizeCounterparty } from "./normalize.ts";
 export {
   applyAllRules,
