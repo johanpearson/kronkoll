@@ -73,7 +73,7 @@ describe("sidan om en bankkoppling (#34, KK-7-A, KK-8-A)", () => {
   it("Bank under Inställningar länkar till kopplingen", async () => {
     api();
     await open("/installningar/bank");
-    fireEvent.click(screen.getByRole("link", { name: "Skandia" }));
+    fireEvent.click(screen.getByRole("link", { name: /^Skandia/u }));
     await settle();
     expect(screen.getByRole("heading", { level: 1, name: "Skandia" })).toBeTruthy();
   });

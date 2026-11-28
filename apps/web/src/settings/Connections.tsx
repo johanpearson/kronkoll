@@ -5,6 +5,9 @@ import { formatDateShort } from "@kronkoll/domain";
 import { useEffect, useState } from "react";
 import { field, getJson } from "../api.ts";
 import { Link } from "../router.tsx";
+import { Chip, type Tone } from "../ui/Chip.tsx";
+import { List, ListRow } from "../ui/ListRow.tsx";
+import { Skeleton } from "../ui/Surface.tsx";
 
 /** Varning när samtycket har så här många dagar kvar eller färre, som på översikten (KK-8-A). */
 const CONSENT_WARNING_DAYS = 14;
@@ -42,12 +45,12 @@ function toConnection(raw: unknown): Connection | null {
 const syncTime = new Intl.DateTimeFormat("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "Europe/Stockholm" });
 
 /** Statusen i ord, och om den ska märkas som ett problem. */
-function badge(c: Connection): { text: string; tone: "ok" | "warn" | "bad" } {
-  if (c.status === "expired" || (c.consentDaysLeft !== null && c.consentDaysLeft < 0)) return { text: "Utgången", tone: "bad" };
-  if (c.status === "revoked") return { text: "Återkallad", tone: "bad" };
-  if (c.failures > 0) return { text: "Synken misslyckas", tone: "bad" };
-  if (c.consentDaysLeft !== null && c.consentDaysLeft <= CONSENT_WARNING_DAYS) return { text: "Går snart ut", tone: "warn" };
-  return { text: "Aktiv", tone: "ok" };
+function badge(c: Connection): { text: string; tone: Tone } {
+  if (c.status === "expired" || (c.consentDaysLeft !== null && c.consentDaysLeft < 0)) return { text: "Utgången", tone: "danger" };
+  if (c.status === "revoked") return { text: "Återkallad", tone: "danger" };
+  if (c.failures > 0) return { text: "Synken misslyckas", tone: "danger" };
+  if (c.consentDaysLeft !== null && c.consentDaysLeft <= CONSENT_WARNING_DAYS) return { text: "Går snart ut", tone: "warning" };
+  return { text: "Aktiv", tone: "success" };
 }
 
 function details(c: Connection): string[] {
@@ -78,29 +81,20 @@ export function Connections() {
 
   return (
     <>
-      {state.kind === "loading" && <p>Hämtar…</p>}
+      {state.kind === "loading" && <Skeleton lines={2} />}
       {state.kind === "error" && <p role="alert">Det gick inte att hämta bankkopplingarna. Försök igen om en stund.</p>}
       {state.kind === "ready" && state.items.length > 0 && (
-        <ul aria-label="Bankkopplingar">
+        <List label="Bankkopplingar">
           {state.items.map((c) => {
             const b = badge(c);
-            return (
-              <li key={c.id} className="tx">
-                <div className="tx-main">
-                  <span className="tx-name">
-                    <Link to={`/installningar/koppling/${encodeURIComponent(c.id)}`}>{c.bank}</Link>
-                  </span>
-                  <span className={`badge ${b.tone}`}>{b.text}</span>
-                </div>
-                <small className="tx-notes">{details(c).join(" · ")}</small>
-              </li>
-            );
+            return <ListRow key={c.id} label={c.bank} detail={details(c).join(" · ")} value={<Chip tone={b.tone}>{b.text}</Chip>} to={`/installningar/koppling/${encodeURIComponent(c.id)}`} />;
           })}
-        </ul>
+        </List>
       )}
-      <p>
-        <Link to="/koppla">{state.kind === "ready" && state.items.length > 0 ? "Koppla en till bank" : "Koppla bank"}</Link>
-      </p>
+      {/* Att koppla en bank är att gå till en annan sida, så det är en länk som ser ut som en knapp. */}
+      <Link to="/koppla" className="ui-button ui-button-primary ui-button-block">
+        {state.kind === "ready" && state.items.length > 0 ? "Koppla en till bank" : "Koppla bank"}
+      </Link>
     </>
   );
 }
