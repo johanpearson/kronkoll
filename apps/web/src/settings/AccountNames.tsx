@@ -1,10 +1,12 @@
 // Egna namn på konton (#34, KK-37) och kontots roll (KK-53): Inkomst/Utgift, Buffert eller Uteslutet. Varje
 // konto visar sitt namn och, under, bankens maskerade namn och banken, så att det går att känna igen. Namnet är användarens text och renderas som text (KK-37-C).
 import { Pencil } from "lucide-react";
-import { useEffect, useRef, useState, type SyntheticEvent } from "react";
+import { useEffect, useId, useRef, useState, type SyntheticEvent } from "react";
 import { field, getJson, patchJson } from "../api.ts";
-import { IconButton } from "../icon-button.tsx";
+import { Button, IconButton } from "../ui/Button.tsx";
+import { Sheet } from "../ui/Modal.tsx";
 import { SegmentedControl } from "../ui/SegmentedControl.tsx";
+import { Card, EmptyState, Skeleton } from "../ui/Surface.tsx";
 
 /** Samma gräns som API:t. */
 const MAX_LENGTH = 40;
@@ -59,13 +61,15 @@ function toAccount(raw: unknown): Account | null {
 
 type State = { readonly kind: "loading" } | { readonly kind: "error" } | { readonly kind: "ready"; readonly accounts: readonly Account[] };
 
+/** Byt namn i ett ark (#259): fältet får fokus direkt, och felet visas vid fältet. */
 function NameForm(props: { account: Account; onSaved: (nickname: string | null) => void; onClose: () => void }) {
   const [value, setValue] = useState(props.account.nickname ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
+  const id = useId();
 
-  // Fältet får fokus när formuläret öppnas, så att det går att skriva direkt.
+  // Fältet får fokus när arket öppnas, så att det går att skriva direkt.
   useEffect(() => {
     input.current?.focus();
   }, []);
@@ -81,21 +85,26 @@ function NameForm(props: { account: Account; onSaved: (nickname: string | null) 
   };
 
   return (
-    <form className="tx-editor" aria-label={`Namn på ${props.account.bankName}`} onSubmit={(e) => void save(e)}>
-      <label>
-        Namn
-        <input ref={input} value={value} maxLength={MAX_LENGTH} placeholder={props.account.bankName} onChange={(e) => { setValue(e.target.value); }} />
-      </label>
-      <small>Lämna tomt för bankens namn.</small>
-      {error && <p role="alert">{error}</p>}
-      <p>
-        <button type="submit" className="primary small" disabled={busy}>
-          Spara
-        </button>
-        <button type="button" className="small" onClick={props.onClose}>
-          Avbryt
-        </button>
-      </p>
+    <form className="ui-stack" aria-label={`Namn på ${props.account.bankName}`} onSubmit={(e) => void save(e)}>
+      <div className="ui-field">
+        <label htmlFor={id} className="ui-label">
+          Namn
+        </label>
+        <input id={id} ref={input} data-autofocus className="ui-input" value={value} maxLength={MAX_LENGTH} placeholder={props.account.bankName} onChange={(e) => { setValue(e.target.value); }} />
+        {error ? (
+          <p role="alert" className="ui-field-error">
+            {error}
+          </p>
+        ) : (
+          <p className="ui-caption">Lämna tomt för bankens namn.</p>
+        )}
+      </div>
+      <Button type="submit" variant="primary" block busy={busy}>
+        Spara
+      </Button>
+      <Button variant="quiet" block onClick={props.onClose}>
+        Avbryt
+      </Button>
     </form>
   );
 }
@@ -118,9 +127,9 @@ export function AccountNames() {
     };
   }, []);
 
-  if (state.kind === "loading") return <p>Hämtar…</p>;
+  if (state.kind === "loading") return <Skeleton lines={3} />;
   if (state.kind === "error") return <p role="alert">Det gick inte att hämta kontona. Försök igen om en stund.</p>;
-  if (state.accounts.length === 0) return <p>Inga konton än. Koppla en bank först.</p>;
+  if (state.accounts.length === 0) return <EmptyState title="Inga konton än">Inga konton än. Koppla en bank först.</EmptyState>;
 
   const saved = (id: string, nickname: string | null) => {
     setState({ kind: "ready", accounts: state.accounts.map((a) => (a.id === id ? { ...a, nickname, name: nickname ?? a.bankName } : a)) });
@@ -140,36 +149,35 @@ export function AccountNames() {
     setState((current) => (current.kind === "ready" ? { kind: "ready", accounts: current.accounts.map((a) => (a.id === id ? { ...a, role } : a)) } : current));
   };
 
+  const renaming = state.accounts.find((a) => a.id === editing);
   return (
     <>
-    {error && <p role="alert">{error}</p>}
-    <ul aria-label="Konton">
-      {state.accounts.map((a) => {
-        // Under ett eget namn står bankens namn, så att kontot går att känna igen.
-        const notes = [a.nickname === null ? null : a.bankName, a.bank].filter((s) => s !== null).join(" · ");
-        return (
-        <li key={a.id} className="tx">
-          <div className="tx-main">
-            <span className="tx-name">{a.name}</span>
-            {editing !== a.id && <IconButton label={`Byt namn på ${a.name}`} icon={Pencil} onClick={() => { setEditing(a.id); }} />}
-          </div>
-          {notes !== "" && <small className="tx-notes">{notes}</small>}
-          <div className="account-role">
-            <SegmentedControl
-              label={`Roll för ${a.name}`}
-              options={ROLES}
-              value={a.role}
-              onChange={(role) => {
-                if (saving === null && role !== a.role) void setRole(a.id, role);
-              }}
-            />
-            <small className="ui-caption">{EXPLAINED[a.role]}</small>
-          </div>
-          {editing === a.id && <NameForm account={a} onSaved={(nickname) => { saved(a.id, nickname); }} onClose={() => { setEditing(null); }} />}
-        </li>
-        );
-      })}
-    </ul>
+      {error && <p role="alert">{error}</p>}
+      <ul className="account-list" aria-label="Konton">
+        {state.accounts.map((a) => {
+          // Under ett eget namn står bankens namn, så att kontot går att känna igen.
+          const notes = [a.nickname === null ? null : a.bankName, a.bank].filter((s) => s !== null).join(" · ");
+          return (
+            <li key={a.id}>
+              <Card title={a.name} action={<IconButton label={`Byt namn på ${a.name}`} icon={Pencil} onClick={() => { setEditing(a.id); }} />}>
+                {notes !== "" && <p className="ui-caption account-bank">{notes}</p>}
+                <SegmentedControl
+                  label={`Roll för ${a.name}`}
+                  options={ROLES}
+                  value={a.role}
+                  onChange={(role) => {
+                    if (saving === null && role !== a.role) void setRole(a.id, role);
+                  }}
+                />
+                <p className="ui-caption">{EXPLAINED[a.role]}</p>
+              </Card>
+            </li>
+          );
+        })}
+      </ul>
+      <Sheet open={renaming !== undefined} title="Byt namn" onClose={() => { setEditing(null); }}>
+        {renaming && <NameForm account={renaming} onSaved={(nickname) => { saved(renaming.id, nickname); }} onClose={() => { setEditing(null); }} />}
+      </Sheet>
     </>
   );
 }

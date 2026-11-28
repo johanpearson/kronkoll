@@ -834,3 +834,35 @@ html.ui-own-pull body {
   transform: rotate(180deg);
   transition: transform var(--duration) var(--easing-out);
 }
+
+/* Textfält i formulär och ark (#259). */
+.ui-input {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-small);
+  background: var(--input);
+  color: var(--text);
+  font: inherit;
+}
+
+/* Kontona som kort under varandra, utan listans egen ram (#259). */
+main ul.account-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  background: none;
+  border: 0;
+  box-shadow: none;
+  overflow: visible;
+}
+
+main ul.account-list > li {
+  padding: 0;
+  border: 0;
+}
+
+main ul.account-list .ui-card {
+  margin: 0;
+}

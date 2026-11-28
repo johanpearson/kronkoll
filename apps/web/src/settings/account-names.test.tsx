@@ -69,10 +69,10 @@ describe("egna kontonamn i Inställningar (KK-37)", () => {
   it("visar kontots namn, och bankens namn och bank under ett eget namn", async () => {
     api();
     await open();
-    expect(rows().map((r) => r.querySelector(".tx-name")?.textContent)).toEqual(["Privat kort", "Sparkonto ••7712", "Kort"]);
-    expect(rows()[0]?.querySelector(".tx-notes")?.textContent).toBe("Privatkonto ••4821 · Skandia");
-    expect(rows()[1]?.querySelector(".tx-notes")?.textContent).toBe("Skandia");
-    expect(rows()[2]?.querySelector(".tx-notes")).toBeNull();
+    expect(rows().map((r) => r.querySelector("h2")?.textContent)).toEqual(["Privat kort", "Sparkonto ••7712", "Kort"]);
+    expect(rows()[0]?.querySelector(".account-bank")?.textContent).toBe("Privatkonto ••4821 · Skandia");
+    expect(rows()[1]?.querySelector(".account-bank")?.textContent).toBe("Skandia");
+    expect(rows()[2]?.querySelector(".account-bank")).toBeNull();
   });
 
   it("sätter ett eget namn med CSRF-skydd och visar det direkt (KK-37-A)", async () => {
@@ -80,8 +80,8 @@ describe("egna kontonamn i Inställningar (KK-37)", () => {
     await open();
     await rename("Byt namn på Sparkonto ••7712", "Buffert");
     expect(patches).toEqual([{ path: "/api/accounts/acc_2", body: { nickname: "Buffert" }, csrf: "1" }]);
-    expect(rows()[1]?.querySelector(".tx-name")?.textContent).toBe("Buffert");
-    expect(rows()[1]?.querySelector(".tx-notes")?.textContent).toBe("Sparkonto ••7712 · Skandia");
+    expect(rows()[1]?.querySelector("h2")?.textContent).toBe("Buffert");
+    expect(rows()[1]?.querySelector(".account-bank")?.textContent).toBe("Sparkonto ••7712 · Skandia");
     expect(screen.queryByLabelText("Namn")).toBeNull();
   });
 
@@ -95,14 +95,14 @@ describe("egna kontonamn i Inställningar (KK-37)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Spara" }));
     await settle();
     expect(patches[0]?.body).toEqual({ nickname: null });
-    expect(rows()[0]?.querySelector(".tx-name")?.textContent).toBe("Privatkonto ••4821");
+    expect(rows()[0]?.querySelector("h2")?.textContent).toBe("Privatkonto ••4821");
   });
 
   it("ett namn med HTML visas som text (KK-37-C)", async () => {
     api(undefined, () => [200, { id: "acc_3", name: "<img src=x onerror=alert(1)>", nickname: "<img src=x onerror=alert(1)>" }]);
     await open();
     await rename("Byt namn på Kort", "<img src=x onerror=alert(1)>");
-    expect(rows()[2]?.querySelector(".tx-name")?.textContent).toBe("<img src=x onerror=alert(1)>");
+    expect(rows()[2]?.querySelector("h2")?.textContent).toBe("<img src=x onerror=alert(1)>");
     expect(document.querySelector("main img")).toBeNull();
   });
 
@@ -118,7 +118,7 @@ describe("egna kontonamn i Inställningar (KK-37)", () => {
     expect(screen.getByRole("alert").textContent).toBe("Det gick inte att spara namnet. Försök igen.");
     fireEvent.click(screen.getByRole("button", { name: "Avbryt" }));
     expect(screen.queryByLabelText("Namn")).toBeNull();
-    expect(rows()[2]?.querySelector(".tx-name")?.textContent).toBe("Kort");
+    expect(rows()[2]?.querySelector("h2")?.textContent).toBe("Kort");
   });
 
   it("säger till när kontona inte går att hämta, och när det inte finns några", async () => {

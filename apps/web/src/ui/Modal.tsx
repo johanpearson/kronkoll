@@ -16,6 +16,8 @@ function useModal(open: boolean, onClose: () => void) {
     if (!dialog || !open) return;
     if (typeof dialog.showModal === "function") dialog.showModal();
     else dialog.setAttribute("open", "");
+    // showModal flyttar fokus till första knappen. Ett fält märkt data-autofocus får det i stället.
+    dialog.querySelector<HTMLElement>("[data-autofocus]")?.focus();
     // Esc: vyn bestämmer själv när den stänger, via open.
     const onCancel = (event: Event) => {
       event.preventDefault();
