@@ -6,11 +6,12 @@ import {
   connectionRepository,
   deriveKeys,
   incomeRepository,
+  loanLinkRepository,
   ruleRepository,
   syncRunRepository,
   transactionRepository,
 } from "@kronkoll/adapter-d1";
-import { applyIncomeRules, applyRules, syncConnection, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
+import { addDays, applyIncomeRules, applyRules, linkLoans, syncConnection, todayInStockholm, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
 import type { Logger } from "@kronkoll/logging";
 import { notifyBudgetOver, notifySyncFailure, remindConsent, type PushSender } from "./notify.ts";
 import { recomputeTransfers } from "./transfers.ts";
@@ -86,6 +87,7 @@ export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps, only
       }
     }
     await categorizeNew(env.DB, logger);
+    await linkLoanPayments(env.DB, deps);
     await classifyIncome(env.DB, logger);
     await markTransfers(env.DB, logger);
     await sendNotices(env.DB, deps, kind, failed);
@@ -124,6 +126,26 @@ async function categorizeNew(db: D1Database, logger: Logger): Promise<void> {
     if (changes.length > 0) logger.info("sync.categorized", { count: changes.length });
   } catch {
     logger.error("sync.categorize_failed", { error_code: "FAILED" });
+  }
+}
+
+/** Så långt bakåt synken letar efter lånebetalningar. En ändring av lånets texter kopplar om hela historiken. */
+export const LOAN_LINK_DAYS = 60;
+
+/**
+ * Kopplar nya betalningar till lån efter lånens matchningstexter (KK-59-B). Körs efter kategoriseringen, så att
+ * lånets kategori vinner över reglerna. Ett fel här stoppar inte synken.
+ */
+async function linkLoanPayments(db: D1Database, deps: SyncDeps): Promise<void> {
+  try {
+    const repo = loanLinkRepository(db);
+    const matching = await repo.matchers();
+    if (matching.every((m) => m.patterns.length === 0)) return;
+    const changes = linkLoans(await repo.candidates(addDays(todayInStockholm(deps.clock), -LOAN_LINK_DAYS)), matching);
+    await repo.apply(changes, matching);
+    if (changes.length > 0) deps.logger.info("sync.loans_linked", { count: changes.length });
+  } catch {
+    deps.logger.error("sync.loans_failed", { error_code: "FAILED" });
   }
 }
 
