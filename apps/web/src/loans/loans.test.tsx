@@ -15,10 +15,12 @@ afterEach(() => {
 const BOLAN = {
   id: "l1", name: "Bolån del 1", lender: "Exempelbanken", balance_minor: 120_000_000, interest_rate_bp: 350, rate_fixed_until: "2026-12-15", amortization_minor: 200_000,
   monthly_interest_minor: 350_000, monthly_amortization_minor: 200_000, monthly_cost_minor: 550_000, rate_fixed: true, rate_fixed_days_left: 41, rate_fixed_ending: true,
+  match_patterns: ["9020-12 345 67"], category_id: "boende-laneranta", paid: { paid_minor: 550_000, last_paid_on: "2026-11-02", missing: false },
 };
 const BIL = {
   id: "l2", name: "Billån", lender: null, balance_minor: 8_600_000, interest_rate_bp: 695, rate_fixed_until: null, amortization_minor: 245_000,
   monthly_interest_minor: 49_808, monthly_amortization_minor: 245_000, monthly_cost_minor: 294_808, rate_fixed: false, rate_fixed_days_left: null, rate_fixed_ending: false,
+  match_patterns: [], category_id: null, paid: { paid_minor: 0, last_paid_on: null, missing: false },
 };
 const LIST = { loans: [BOLAN, BIL], total_balance_minor: 128_600_000, total_monthly_interest_minor: 399_808, total_monthly_amortization_minor: 445_000, total_monthly_cost_minor: 844_808 };
 
@@ -55,7 +57,8 @@ async function open(path = "/lan") {
   await settle();
 }
 
-const rows = () => within(screen.getByRole("list", { name: "Dina lån" })).getAllByRole("listitem");
+/** Lånen, utan diagrammens dolda värdelistor. */
+const rows = () => [...screen.getByRole("list", { name: "Dina lån" }).querySelectorAll<HTMLElement>(":scope > li")];
 const type = (scope: HTMLElement, label: string, value: string) => {
   fireEvent.change(within(scope).getByLabelText(label), { target: { value } });
 };
@@ -65,10 +68,11 @@ describe("Lån (#72, KK-36)", () => {
     api();
     await open();
     expect(screen.getAllByRole("definition").map((d) => d.textContent)).toEqual([formatSek(128_600_000), formatSek(844_808)]);
-    expect(rows()[0]?.textContent).toContain(`Bolån del 1 · Exempelbanken${formatSek(550_000)}/mån`);
+    expect(rows()[0]?.querySelector("h2")?.textContent).toBe("Bolån del 1");
+    expect(rows()[0]?.textContent).toContain(`Exempelbanken${formatSek(550_000)}/mån`);
     expect(rows()[0]?.textContent).toContain(`Skuld ${formatSek(120_000_000)} · 3,50 % · ränta ${formatSek(350_000)} + amortering ${formatSek(200_000)}`);
     expect(rows()[1]?.textContent).toContain("Billån");
-    expect(rows()[1]?.textContent).not.toContain("·  ·");
+    expect(rows()[1]?.textContent).not.toContain("Exempelbanken");
     expect(screen.getByRole("note").textContent).toBe(
       `Varje månad: ${formatSek(399_808)} ränta och ${formatSek(445_000)} amortering. Lånebetalningarna räknas hela som boendekostnad i budgeten.`,
     );
@@ -78,10 +82,10 @@ describe("Lån (#72, KK-36)", () => {
     api([200, { ...LIST, loans: [BOLAN, BIL, { ...BOLAN, id: "l3", name: "Del 2", rate_fixed_days_left: 0 }, { ...BOLAN, id: "l4", name: "Del 3", rate_fixed_days_left: 400, rate_fixed_ending: false }] }]);
     await open();
     const [del1, bil, del2, del3] = rows();
-    expect(del1?.querySelector(".badge")?.textContent).toBe("Bindningstiden slutar om 41 dagar");
-    expect(del1?.querySelector(".badge")?.className).toBe("badge warn");
-    expect(del2?.querySelector(".badge")?.textContent).toBe("Bindningstiden slutar i dag");
-    expect(bil?.querySelector(".badge")).toBeNull();
+    expect(del1?.querySelector(".ui-chip")?.textContent).toBe("Bindningstiden slutar om 41 dagar");
+    expect(del1?.querySelector(".ui-chip")?.className).toBe("ui-chip ui-chip-warning");
+    expect(del2?.querySelector(".ui-chip")?.textContent).toBe("Bindningstiden slutar i dag");
+    expect(bil?.querySelector(".ui-chip")).toBeNull();
     expect(bil?.textContent).toContain("Rörlig ränta");
     expect(del3?.textContent).toContain("Bunden ränta i 400 dagar till");
   });
@@ -163,6 +167,7 @@ describe("Lån (#72, KK-36)", () => {
   it("utan lån visas en uppmaning, och fel vid hämtning och borttagning syns", async () => {
     api([200, { loans: [], total_balance_minor: 0 }]);
     await open();
+    expect(screen.getByRole("heading", { name: "Inga lån än" })).toBeTruthy();
     expect(screen.getByRole("main").textContent).toContain("Ett bolån i flera delar läggs in som ett lån per del.");
     cleanup();
     api([503, { error: "unavailable" }]);
@@ -178,9 +183,26 @@ describe("Lån (#72, KK-36)", () => {
     expect(screen.getByRole("alert").textContent).toBe("Det gick inte att ta bort lånet. Försök igen.");
   });
 
+  it("visar Betalt denna period, en varning när inget har kommit och ett diagram över ränta och amortering (KK-59-C)", async () => {
+    const tom = { ...BOLAN, id: "l3", name: "Del 2", paid: { paid_minor: 0, last_paid_on: null, missing: false } };
+    const saknas = { ...BOLAN, id: "l4", name: "Del 3", paid: { paid_minor: 0, last_paid_on: null, missing: true } };
+    api([200, { ...LIST, loans: [BOLAN, BIL, tom, saknas] }]);
+    await open();
+    const [del1, bil, del2, del3] = rows();
+    expect(del1?.querySelector(".loan-paid")?.textContent).toBe(`Betalt denna period: ${formatSek(550_000)} av ${formatSek(550_000)}, senast 2 nov. 2026`);
+    // Utan kontouppgifter sägs inget om perioden. Med kontouppgifter men utan betalning står det i text.
+    expect(bil?.textContent).not.toContain("denna period");
+    expect(del2?.textContent).toContain("Ingen betalning än denna period");
+    expect(del3?.querySelector(".ui-chip-danger")?.textContent).toBe("Ingen betalning har kommit denna period");
+    const chart = within(del1 as HTMLElement).getByRole("img", { name: "Månadskostnaden för Bolån del 1" });
+    expect(chart.querySelectorAll("rect")).toHaveLength(2);
+    expect(within(del1 as HTMLElement).getByRole("list", { name: "Månadskostnaden för Bolån del 1" }).textContent).toContain(`Ränta: ${formatSek(350_000)}`);
+  });
+
   it("tål svar med saknade fält och visar räntan med två decimaler", () => {
     expect(toLoan({ name: "x" })).toBeNull();
-    expect(toLoan({ id: "x", name: "Lån" })).toMatchObject({ lender: null, balanceMinor: 0, daysLeft: null, ending: false, rateFixed: false });
+    expect(toLoan({ id: "x", name: "Lån" })).toMatchObject({ lender: null, balanceMinor: 0, daysLeft: null, ending: false, rateFixed: false, matchPatterns: [], categoryId: null, paid: { paidMinor: 0, lastPaidOn: null, missing: false } });
+    expect(toLoan({ id: "x", name: "Lån", match_patterns: ["ok", 5], paid: { paid_minor: 1.5, missing: true } })).toMatchObject({ matchPatterns: ["ok"], paid: { paidMinor: 0, missing: true } });
     expect(formatRate(695)).toBe("6,95 %");
     expect(formatRate(0)).toBe("0,00 %");
   });

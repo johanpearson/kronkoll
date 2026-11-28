@@ -191,8 +191,10 @@ test("lägg till ett lån och se det i lånöversikten (V-e2e-loans, KK-36)", as
   await useFakeApi(page);
   await page.goto("/");
   await page.getByRole("navigation", { name: "Huvudmeny" }).getByRole("link", { name: "Lån" }).click();
-  const loans = page.getByRole("list", { name: "Dina lån" }).getByRole("listitem");
+  // Lånens egna rader, utan diagrammens dolda värdelistor.
+  const loans = page.getByRole("list", { name: "Dina lån" }).locator(":scope > li");
   await expect(loans.first()).toContainText("Bindningstiden slutar om 41 dagar");
+  await expect(loans.first()).toContainText("Betalt denna period");
 
   await page.getByRole("button", { name: "Lägg till lån" }).click();
   const form = page.getByRole("form", { name: "Nytt lån" });
