@@ -22,7 +22,7 @@ import {
 } from "@kronkoll/domain";
 import { and, desc, eq, gte, inArray, isNull, lt, max, ne, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/d1";
-import { accounts, loans, transactions } from "./schema.ts";
+import { accounts, knownAccounts, loans, transactions } from "./schema.ts";
 
 /** Kontots namn som det visas: användarens eget namn, annars bankens maskerade (KK-37). */
 const accountName = sql<string>`coalesce(${accounts.nickname}, ${accounts.displayName})`;
@@ -98,6 +98,8 @@ export interface TransactionDetail {
   readonly transferPair: { id: string; accountName: string; amountMinor: number; transactionDate: string } | null;
   /** Lånet som betalningen är kopplad till, och om kopplingen gjordes för hand (KK-59-B). Null utan koppling. */
   readonly loan: { id: string; name: string; source: "auto" | "manual" } | null;
+  /** Det kända kontot överföringen är kopplad till, och om kopplingen gjordes för hand (KK-54-B). Null utan koppling. */
+  readonly knownAccount: { id: string; name: string; source: "auto" | "manual" } | null;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/u;
@@ -286,8 +288,8 @@ export function transactionRepository(d1: D1Database) {
           categorySource: transactions.categorySource,
         })
         .from(transactions)
-        // En betalning som är kopplad till ett lån har lånets kategori, och den vinner över reglerna (KK-59-B).
-        .where(and(eq(transactions.categorySource, "none"), ne(transactions.status, "removed"), isNull(transactions.loanId)))
+        // En betalning som är kopplad till ett lån eller ett känt konto har dess kategori, och den vinner över reglerna (KK-59-B, KK-54-B).
+        .where(and(eq(transactions.categorySource, "none"), ne(transactions.status, "removed"), isNull(transactions.loanId), isNull(transactions.knownAccountId)))
         .all();
     },
 
@@ -319,7 +321,7 @@ export function transactionRepository(d1: D1Database) {
         })
         .from(transactions)
         // Lånets kategori vinner över reglerna, så kopplade betalningar räknas inte om (KK-59-B).
-        .where(and(ne(transactions.status, "removed"), isNull(transactions.loanId)))
+        .where(and(ne(transactions.status, "removed"), isNull(transactions.loanId), isNull(transactions.knownAccountId)))
         .all();
     },
 
@@ -438,10 +440,14 @@ export function transactionRepository(d1: D1Database) {
           loanId: loans.id,
           loanName: loans.name,
           loanSource: transactions.loanSource,
+          knownAccountId: knownAccounts.id,
+          knownAccountName: knownAccounts.name,
+          knownAccountSource: transactions.knownAccountSource,
         })
         .from(transactions)
         .innerJoin(accounts, eq(accounts.id, transactions.accountId))
         .leftJoin(loans, eq(loans.id, transactions.loanId))
+        .leftJoin(knownAccounts, eq(knownAccounts.id, transactions.knownAccountId))
         .where(and(eq(transactions.id, id), ne(transactions.status, "removed")))
         .all();
       if (!row) return null;
@@ -475,6 +481,10 @@ export function transactionRepository(d1: D1Database) {
         incomeSource: row.incomeSource,
         transferPair: pair ?? null,
         loan: row.loanId === null || row.loanName === null ? null : { id: row.loanId, name: row.loanName, source: row.loanSource === "manual" ? "manual" : "auto" },
+        knownAccount:
+          row.knownAccountId === null || row.knownAccountName === null
+            ? null
+            : { id: row.knownAccountId, name: row.knownAccountName, source: row.knownAccountSource === "manual" ? "manual" : "auto" },
       };
     },
 

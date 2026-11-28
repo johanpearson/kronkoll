@@ -6,12 +6,13 @@ import {
   connectionRepository,
   deriveKeys,
   incomeRepository,
+  knownAccountRepository,
   loanLinkRepository,
   ruleRepository,
   syncRunRepository,
   transactionRepository,
 } from "@kronkoll/adapter-d1";
-import { addDays, applyIncomeRules, applyRules, linkLoans, syncConnection, todayInStockholm, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
+import { addDays, applyIncomeRules, applyRules, linkKnownAccounts, linkLoans, syncConnection, todayInStockholm, type BankDataProvider, type Clock, type SyncKind } from "@kronkoll/domain";
 import type { Logger } from "@kronkoll/logging";
 import { notifyBudgetOver, notifySyncFailure, remindConsent, type PushSender } from "./notify.ts";
 import { recomputeTransfers } from "./transfers.ts";
@@ -87,6 +88,7 @@ export async function runSync(env: SyncEnv, kind: SyncKind, deps: SyncDeps, only
       }
     }
     await categorizeNew(env.DB, logger);
+    await linkKnownAccountTransfers(env.DB, deps);
     await linkLoanPayments(env.DB, deps);
     await classifyIncome(env.DB, logger);
     await markTransfers(env.DB, logger);
@@ -126,6 +128,26 @@ async function categorizeNew(db: D1Database, logger: Logger): Promise<void> {
     if (changes.length > 0) logger.info("sync.categorized", { count: changes.length });
   } catch {
     logger.error("sync.categorize_failed", { error_code: "FAILED" });
+  }
+}
+
+/** Så långt bakåt synken letar efter överföringar till kända konton. En ändring av kontots texter kopplar om hela historiken. */
+export const KNOWN_ACCOUNT_LINK_DAYS = 60;
+
+/**
+ * Kopplar nya överföringar till kända konton efter deras matchningstexter (KK-54-B). Körs efter kategoriseringen, så att
+ * kontots kategori vinner över reglerna. Ett fel här stoppar inte synken.
+ */
+async function linkKnownAccountTransfers(db: D1Database, deps: SyncDeps): Promise<void> {
+  try {
+    const repo = knownAccountRepository(db);
+    const accounts = await repo.list();
+    if (accounts.every((a) => a.patterns.length === 0)) return;
+    const changes = linkKnownAccounts(await repo.candidates(addDays(todayInStockholm(deps.clock), -KNOWN_ACCOUNT_LINK_DAYS)), accounts);
+    await repo.apply(changes, accounts);
+    if (changes.length > 0) deps.logger.info("sync.known_accounts_linked", { count: changes.length });
+  } catch {
+    deps.logger.error("sync.known_accounts_failed", { error_code: "FAILED" });
   }
 }
 

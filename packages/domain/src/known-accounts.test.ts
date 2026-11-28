@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   knownAccountFor,
   knownAccountHits,
+  linkKnownAccounts,
   knownAccountRules,
   normalizeKnownPattern,
   validateKnownAccount,
@@ -74,6 +75,12 @@ describe("kända konton som regler (KK-54-B, KK-58)", () => {
   });
 });
 
+describe("konto utan kategori", () => {
+  it("kopplar ändå, så att namnet visas", () => {
+    expect(knownAccountFor(tx("t1", "BARNSPAR"), [{ ...barn, categoryId: null }])?.id).toBe("k2");
+  });
+});
+
 describe("förhandsvisning av träffar (KK-54-A)", () => {
   it("räknar transaktionerna som träffar kontot, där kontot vinner", () => {
     const txs = [tx("a", "Swish till a"), tx("b", "ÖVERFÖRING A 2"), tx("c", "ICA"), tx("d", "BARNSPAR")];
@@ -84,5 +91,36 @@ describe("förhandsvisning av träffar (KK-54-A)", () => {
   it("räknar mot ett konto som inte sparats än, med ett nytt id", () => {
     const nytt: KnownAccount = { id: "ny", name: "Nytt", patterns: ["ICA"], categoryId: "mat" };
     expect(knownAccountHits([tx("c", "ICA"), tx("d", "COOP")], [annas, nytt], "ny")).toBe(1);
+  });
+});
+
+describe("koppla om efter synk (KK-54-B, KK-54-C)", () => {
+  const link = (id: string, description: string, knownAccountId: string | null = null, knownAccountSource: "auto" | "manual" | null = null) => ({
+    id,
+    description,
+    counterpartyNorm: "",
+    knownAccountId,
+    knownAccountSource,
+  });
+
+  it("kopplar de som träffar och lämnar övriga", () => {
+    expect(linkKnownAccounts([link("a", "Swish till a"), link("b", "ICA")], [annas, barn])).toEqual([{ id: "a", knownAccountId: "k1" }]);
+  });
+
+  it("ändrar bara det som skiljer: en redan rätt koppling ger ingen ändring", () => {
+    expect(linkKnownAccounts([link("a", "Swish till a", "k1", "auto")], [annas])).toEqual([]);
+  });
+
+  it("tar bort en automatisk koppling som inte längre träffar, och byter när ett annat konto vinner", () => {
+    expect(linkKnownAccounts([link("a", "ICA", "k1", "auto"), link("b", "BARNSPAR", "k1", "auto")], [annas, barn])).toEqual([
+      { id: "a", knownAccountId: null },
+      { id: "b", knownAccountId: "k2" },
+    ]);
+  });
+
+  it("rör aldrig en manuell koppling eller en koppling som användaren tagit bort", () => {
+    expect(
+      linkKnownAccounts([link("a", "ICA", "k2", "manual"), link("b", "Swish till a", null, "manual")], [annas, barn]),
+    ).toEqual([]);
   });
 });

@@ -199,6 +199,10 @@ export const transactions = sqliteTable(
      * betyder att användaren har tagit bort kopplingen. Ingen CHECK, av samma skäl som income_source.
      */
     loanSource: text("loan_source", { enum: ["auto", "manual"] }),
+    /** Det kända kontot överföringen hör till (KK-54-B). Tas kontot bort blir den null. */
+    knownAccountId: text("known_account_id").references((): AnySQLiteColumn => knownAccounts.id, { onDelete: "set null" }),
+    /** Som `loan_source`: "auto" av kontots texter, "manual" av användaren. "manual" med id null är en borttagen koppling. */
+    knownAccountSource: text("known_account_source", { enum: ["auto", "manual"] }),
   },
   (t) => [
     check("transactions_status", oneOf("status", ["pending", "booked", "removed"])),
@@ -334,6 +338,24 @@ export const loans = sqliteTable(
     check("loans_amortization", sql`amortization_minor >= 0`),
     check("loans_rate_fixed_until", sql`rate_fixed_until IS NULL OR ${isoDate("rate_fixed_until")}`),
   ],
+);
+
+/**
+ * Kända konton (KK-54): konton utanför appen, t.ex. en partners. Överföringar känns igen på användarens
+ * matchningstexter (JSON-lista, Innehåller) och får kontots namn och standardkategori. Texterna är användarens
+ * egna och renderas som text (KK-30). Kontonummer sparas bara om användaren själv skriver in dem (KK-54-E).
+ */
+export const knownAccounts = sqliteTable(
+  "known_accounts",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    matchPatterns: text("match_patterns").notNull().default("[]"),
+    /** Standardkategorin (KK-54-B). Tas kategorin bort eller töms listan blir den null, och kontot kopplar bara. */
+    categoryId: text("category_id").references(() => categories.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  () => [check("known_accounts_name", sql`length(trim(name)) BETWEEN 1 AND 60`)],
 );
 
 /**

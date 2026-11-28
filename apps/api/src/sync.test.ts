@@ -1,5 +1,5 @@
 import type { D1Database } from "@cloudflare/workers-types";
-import { accountRepository, connectionRepository, deriveKeys, loanLinkRepository, loanRepository, pushRepository, type Keys } from "@kronkoll/adapter-d1";
+import { accountRepository, connectionRepository, deriveKeys, knownAccountRepository, loanLinkRepository, loanRepository, pushRepository, type Keys } from "@kronkoll/adapter-d1";
 import { migratedDb, randomSecret } from "@kronkoll/adapter-d1/test-support";
 import { fixedClock, ProviderError, type BankDataProvider, type Notice, type ProviderBalance, type ProviderTransaction } from "@kronkoll/domain";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -194,6 +194,45 @@ describe("lånebetalningar efter synken (KK-59-B)", () => {
     const again = setup(fakeBank({ transactions: [] }));
     await runSync(env(), "manual", again.deps);
     expect(again.logs.lines.some((l) => l.event === "sync.loans_linked")).toBe(false);
+  });
+});
+
+describe("överföringar till kända konton efter synken (KK-54-B)", () => {
+  it("kopplar en överföring till kontot med dess kategori, som vinner över en regel, och loggar bara antalet", async () => {
+    await seedConnection("c1");
+    // Påhittat konto och meddelande (KK-13). Meddelandet träffar också mallregeln för SL, men kontot vinner.
+    await db.prepare(`DELETE FROM known_accounts`).run();
+    await knownAccountRepository(db).save({ id: "ka1", name: "Konto A", patterns: ["SWISH TILL EXEMPELKONTO A"], categoryId: "boende-laneranta" });
+    const { deps, logs } = setup(
+      fakeBank({
+        transactions: [
+          bankTx({ providerTxId: "swish", counterparty: "", description: "SL Swish till Exempelkonto A", amountMinor: -200_000 }),
+          bankTx({ providerTxId: "kaffe" }),
+        ],
+      }),
+    );
+    await runSync(env(), "cron", deps);
+    const rows = await db.prepare(`SELECT provider_tx_id AS id, known_account_id AS ka, category_id AS c, category_source AS s FROM transactions ORDER BY id`).all();
+    expect(rows.results).toEqual([
+      { id: "kaffe", ka: null, c: null, s: "none" },
+      { id: "swish", ka: "ka1", c: "boende-laneranta", s: "learned" },
+    ]);
+    expect(logs.lines).toContainEqual({ level: "info", event: "sync.known_accounts_linked", fields: { count: 1 } });
+    const again = setup(fakeBank({ transactions: [] }));
+    await runSync(env(), "manual", again.deps);
+    expect(again.logs.lines.some((l) => l.event === "sync.known_accounts_linked")).toBe(false);
+  });
+
+  it("ett fel stoppar inte synken", async () => {
+    await seedConnection("c1");
+    await db.prepare(`DELETE FROM known_accounts`).run();
+    await knownAccountRepository(db).save({ id: "ka1", name: "Konto A", patterns: ["X"], categoryId: null });
+    await db.prepare(`ALTER TABLE known_accounts RENAME TO known_accounts_tmp`).run();
+    const { deps, logs } = setup(fakeBank({ transactions: [bankTx({ providerTxId: "kaffe" })] }));
+    await runSync(env(), "cron", deps);
+    await db.prepare(`ALTER TABLE known_accounts_tmp RENAME TO known_accounts`).run();
+    expect(logs.lines).toContainEqual({ level: "error", event: "sync.known_accounts_failed", fields: { error_code: "FAILED" } });
+    expect((await db.prepare(`SELECT count(*) AS n FROM transactions`).first<{ n: number }>())?.n).toBe(1);
   });
 });
 

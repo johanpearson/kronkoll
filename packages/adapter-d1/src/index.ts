@@ -25,6 +25,7 @@ export { guidelineRepository, type GuidelineState } from "./guidelines.ts";
 export { overviewRepository, type ConnectionAccount, type OverviewAccountRow, type OverviewConnection, type SyncRunRow } from "./overview.ts";
 export { incomeRepository, type IncomeItem, type IncomeMonth } from "./income.ts";
 export { loanRepository, type LoanRecord } from "./loans.ts";
+export { knownAccountRepository } from "./known-accounts.ts";
 export { loanLinkRepository, type LoanMatching } from "./loan-links.ts";
 export { pushRepository, type PushSubscriptionRecord } from "./push.ts";
 export { insightsRepository, type ChargeRow } from "./insights.ts";

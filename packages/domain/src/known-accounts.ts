@@ -14,7 +14,8 @@ export interface KnownAccount {
   readonly name: string;
   /** Normaliserade texter (versaler, ett mellanslag mellan orden). Träffar om transaktionen innehåller någon. */
   readonly patterns: readonly string[];
-  readonly categoryId: string;
+  /** Standardkategorin, eller null om den tagits bort eller inte valts: kontot kopplar då bara. */
+  readonly categoryId: string | null;
 }
 
 export interface KnownAccountTransaction {
@@ -49,7 +50,8 @@ export function knownAccountRules(accounts: readonly KnownAccount[]): CategoryRu
       id: ruleId(a.id, i),
       match: "description_contains",
       pattern,
-      categoryId: a.categoryId,
+      // Reglerna används bara för villkoret (`matchingRule`); kategorin sätts av adaptern, och bara om kontot har en.
+      categoryId: a.categoryId ?? "",
       source: "learned",
     })),
   );
@@ -77,4 +79,33 @@ export function knownAccountHits(
   accountId: string,
 ): number {
   return transactions.filter((tx) => knownAccountFor(tx, accounts)?.id === accountId).length;
+}
+
+/** Hur kopplingen kom till: av matchningen, eller av användaren (satt eller borttagen för hand). */
+export type KnownAccountLinkSource = "auto" | "manual";
+
+export interface LinkableTransaction extends KnownAccountTransaction {
+  readonly knownAccountId: string | null;
+  /** Null när ingen koppling har satts. "manual" med id null betyder att användaren har tagit bort kopplingen. */
+  readonly knownAccountSource: KnownAccountLinkSource | null;
+}
+
+export interface KnownAccountLinkChange {
+  readonly id: string;
+  readonly knownAccountId: string | null;
+}
+
+/**
+ * Räknar om kopplingarna, t.ex. efter en synk eller när ett kontos texter ändras. Kopplingar som användaren har
+ * satt eller tagit bort för hand rörs aldrig (KK-54-C). Returnerar bara de som ändras.
+ */
+export function linkKnownAccounts(
+  transactions: readonly LinkableTransaction[],
+  accounts: readonly KnownAccount[],
+): KnownAccountLinkChange[] {
+  return transactions.flatMap((tx) => {
+    if (tx.knownAccountSource === "manual") return [];
+    const knownAccountId = knownAccountFor(tx, accounts)?.id ?? null;
+    return knownAccountId === tx.knownAccountId ? [] : [{ id: tx.id, knownAccountId }];
+  });
 }
