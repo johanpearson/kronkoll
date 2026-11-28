@@ -146,6 +146,8 @@ export const categories = sqliteTable(
     kind: text("kind", { enum: ["expense", "income", "transfer"] }).notNull(),
     archived: integer("archived", { mode: "boolean" }).notNull().default(false),
     color: text("color"),
+    /** Platsen bland syskonen, lägst först (#251). Null: kategorin ordnas på namn, efter dem som har en plats. */
+    position: integer("position"),
   },
   (t) => [
     check("categories_kind", oneOf("kind", ["expense", "income", "transfer"])),
