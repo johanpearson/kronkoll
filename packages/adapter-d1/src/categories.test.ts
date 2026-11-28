@@ -36,11 +36,11 @@ async function seedForMerge() {
 }
 
 describe("kategorier i D1 (KK-18-A)", () => {
-  it("ger startmallens kategorier med förälder, namn, typ, arkivering och ingen plats än", async () => {
+  it("ger startmallens kategorier med förälder, namn, typ och arkivering, utan plats än", async () => {
     const list = await categoryRepository(db).list();
     const byId = (a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id);
     expect([...list].sort(byId)).toEqual(
-      [...CATEGORY_TEMPLATE].map((c) => ({ id: c.id, parentId: c.parentId, name: c.name, kind: c.kind, archived: c.archived, position: null })).sort(byId),
+      [...CATEGORY_TEMPLATE].map((c) => ({ id: c.id, parentId: c.parentId, name: c.name, kind: c.kind, archived: c.archived })).sort(byId),
     );
   });
 
@@ -52,11 +52,11 @@ describe("kategorier i D1 (KK-18-A)", () => {
       { id: "noje-spel", parentId: "noje", name: "Spel", kind: "expense", archived: true },
     ]);
     const list = await repo.list();
-    expect(list.find((c) => c.id === "barn-simskola")).toEqual({ id: "barn-simskola", parentId: "fritid", name: "Simskola & bad", kind: "expense", archived: false, position: null });
+    expect(list.find((c) => c.id === "barn-simskola")).toEqual({ id: "barn-simskola", parentId: "fritid", name: "Simskola & bad", kind: "expense", archived: false });
     expect(list.find((c) => c.id === "noje-spel")?.archived).toBe(true);
   });
 
-  it("sparar kategoriernas plats, och null tar bort den (#251)", async () => {
+  it("sparar kategoriernas plats, och utan plats tas den bort (#251)", async () => {
     const repo = categoryRepository(db);
     const mat = { parentId: "mat", kind: "expense", archived: false } as const;
     await repo.save([
@@ -64,9 +64,9 @@ describe("kategorier i D1 (KK-18-A)", () => {
       { id: "mat-livsmedel", name: "Livsmedel", position: 1, ...mat },
     ]);
     const place = async (id: string) => (await repo.list()).find((c) => c.id === id)?.position;
-    expect([await place("mat-systembolaget"), await place("mat-livsmedel"), await place("mat-restaurang-cafe")]).toEqual([0, 1, null]);
+    expect([await place("mat-systembolaget"), await place("mat-livsmedel"), await place("mat-restaurang-cafe")]).toEqual([0, 1, undefined]);
     await repo.save([{ id: "mat-systembolaget", name: "Systembolaget", ...mat }]);
-    expect(await place("mat-systembolaget")).toBeNull();
+    expect(await place("mat-systembolaget")).toBeUndefined();
     await repo.save([{ id: "mat-livsmedel", name: "Livsmedel", ...mat }]);
   });
 

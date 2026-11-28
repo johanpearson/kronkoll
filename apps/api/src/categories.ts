@@ -21,10 +21,6 @@ function json(body: unknown, status: number): Response {
 const invalid = () => json({ error: "invalid_request" }, 400);
 const toItem = (c: CategoryRow) => ({ id: c.id, parent_id: c.parentId, name: c.name, kind: c.kind, archived: c.archived, position: c.position ?? null });
 
-/** Kategorierna som domänen räknar med: en plats som saknas är utelämnad, inte null. */
-const toDomain = (c: CategoryRow): Category => ({ id: c.id, parentId: c.parentId, name: c.name, kind: c.kind, archived: c.archived, ...(c.position == null ? {} : { position: c.position }) });
-const loadCategories = async (repo: ReturnType<typeof categoryRepository>) => (await repo.list()).map(toDomain);
-
 /** Kör en ändring. En RangeError från domänen blir 400 med förklaringen, annat fel 503. */
 async function attempt(change: () => Promise<Response>): Promise<Response> {
   try {
@@ -66,7 +62,7 @@ export async function createCategory(request: Request, env: { DB: D1Database }, 
   if (name === null || (parentId !== null && typeof parentId !== "string")) return invalid();
   return attempt(async () => {
     const repo = categoryRepository(env.DB);
-    const { category } = addCategory(await loadCategories(repo), { parentId, name, newId: sync.newId });
+    const { category } = addCategory(await repo.list(), { parentId, name, newId: sync.newId });
     await repo.insert(category);
     return json(toItem(category), 201);
   });
@@ -80,7 +76,7 @@ export async function patchCategory(request: Request, env: { DB: D1Database }, i
   if (name === null || (name === undefined) === !archive) return invalid();
   return attempt(async () => {
     const repo = categoryRepository(env.DB);
-    const before = await loadCategories(repo);
+    const before = await repo.list();
     if (!before.some((c) => c.id === id)) return json({ error: "not_found" }, 404);
     const after = name === undefined ? archiveCategory(before, id) : renameCategory(before, id, name);
     await repo.save(changedRows(before, after));
@@ -94,7 +90,7 @@ export async function mergeCategory(request: Request, env: { DB: D1Database }, f
   if (typeof intoId !== "string") return invalid();
   return attempt(async () => {
     const repo = categoryRepository(env.DB);
-    const before = await loadCategories(repo);
+    const before = await repo.list();
     if (!before.some((c) => c.id === fromId)) return json({ error: "not_found" }, 404);
     // Domänen kontrollerar reglerna och räknar fram kategorierna. Transaktioner och regler flyttas i
     // databasen i en batch, så att inget behöver läsas in.
@@ -115,7 +111,7 @@ export async function moveCategoryTo(request: Request, env: { DB: D1Database }, 
   if (input === null || !("before_id" in input) || (beforeId !== null && typeof beforeId !== "string")) return invalid();
   return attempt(async () => {
     const repo = categoryRepository(env.DB);
-    const before = await loadCategories(repo);
+    const before = await repo.list();
     if (!before.some((c) => c.id === id)) return json({ error: "not_found" }, 404);
     const changed = changedRows(before, moveCategory(before, id, beforeId));
     await repo.save(changed);

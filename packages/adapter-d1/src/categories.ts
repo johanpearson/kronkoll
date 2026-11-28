@@ -14,8 +14,8 @@ export interface CategoryRow {
   readonly name: string;
   readonly kind: "expense" | "income" | "transfer";
   readonly archived: boolean;
-  /** Platsen bland syskonen (#251). Null eller utelämnad: ordnas på namn, efter dem som har en plats. */
-  readonly position?: number | null;
+  /** Platsen bland syskonen (#251). Utelämnad: ordnas på namn, efter dem som har en plats. */
+  readonly position?: number;
 }
 
 /** Vad en rensning av alla kategorier berör (KK-48-A). */
@@ -41,10 +41,12 @@ export function categoryRepository(d1: D1Database) {
 
   return {
     async list(): Promise<CategoryRow[]> {
-      return db
+      const rows = await db
         .select({ id: categories.id, parentId: categories.parentId, name: categories.name, kind: categories.kind, archived: categories.archived, position: categories.position })
         .from(categories)
         .all();
+      // En plats som saknas utelämnas, så att raden också är en `Category` i domänen.
+      return rows.map(({ position, ...row }) => (position === null ? row : { ...row, position }));
     },
 
     async insert(category: CategoryRow): Promise<void> {
