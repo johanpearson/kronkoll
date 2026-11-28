@@ -455,9 +455,43 @@ describe("ordning och överskrivning av manuella (KK-58-B, KK-58-C)", () => {
   it("räknar först hur många manuella som skrivs över, utan att spara något (KK-58-B)", async () => {
     const res = await call("POST", undefined, { pattern: "IKEA", category_id: "hushall-forbrukning", override_manual: true, preview: true });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ applied: 3, protected_manual: 0, overridden_manual: 1 });
+    expect(await res.json()).toMatchObject({ applied: 3, protected_manual: 0, overridden_manual: 1 });
     expect((await items()).some((r) => r.pattern === "IKEA")).toBe(false);
     expect(await categoryOf("k1")).toEqual({ c: null, s: "none" });
+  });
+
+  it("förhandsvisningen listar också träffarna, som GET /matches, för en regel som inte är sparad (#251)", async () => {
+    const res = await call("POST", undefined, { pattern: "IKEA", category_id: "hushall-forbrukning", preview: true });
+    const { matches } = await res.json<{ matches: { total: number; change: number; unchanged: number; manual: number; items: { id: string; name: string; effect: string; transaction_date: string; amount_minor: number }[] } }>();
+    expect({ total: matches.total, change: matches.change, unchanged: matches.unchanged, manual: matches.manual }).toEqual({ total: 3, change: 2, unchanged: 0, manual: 1 });
+    expect(matches.items.map((i) => [i.id, i.effect]).sort()).toEqual([["k1", "change"], ["k2", "change"], ["k3", "manual"]]);
+    expect(matches.items.find((i) => i.id === "k3")).toMatchObject({ name: "IKEA BARKARBY, JARFALLA", transaction_date: "2026-11-02", amount_minor: -100, effect: "manual" });
+    // Inget är sparat, och en text som inget träffar ger inga träffar.
+    expect((await items()).some((r) => r.pattern === "IKEA")).toBe(false);
+    const none = await (await call("POST", undefined, { pattern: "FINNS INTE", category_id: "hushall-forbrukning", preview: true })).json<{ matches: { total: number; items: unknown[] } }>();
+    expect(none.matches).toMatchObject({ total: 0, items: [] });
+  });
+
+  it("en ändring kan förhandsvisas utan att sparas, och räknar regeln på sin egen plats (#251)", async () => {
+    const { rule } = await (await call("POST", undefined, { pattern: "ICA", category_id: "boende" })).json<{ rule: { id: string } }>();
+    const res = await call("PATCH", `/api/rules/${rule.id}`, { pattern: "IKEA", category_id: "hushall-forbrukning", preview: true });
+    expect(res.status).toBe(200);
+    const body = await res.json<{ applied: number; matches: { total: number; items: { id: string }[] } }>();
+    expect(body.matches.total).toBe(3);
+    expect(body.matches.items.map((i) => i.id).sort()).toEqual(["k1", "k2", "k3"]);
+    // Regeln är kvar som den var.
+    expect((await items()).find((r) => r.id === rule.id)).toMatchObject({ pattern: "ICA", category_id: "boende" });
+    expect(await categoryOf("k1")).toEqual({ c: null, s: "none" });
+  });
+
+  it("en mallregel som förhandsvisas kommer efter de egna reglerna, och en Räkna inte-regel kan inte förhandsvisas med PATCH", async () => {
+    await db.prepare(`INSERT INTO category_rules (id, match, pattern, category_id, source) VALUES ('mall-ikea', 'counterparty_prefix', 'IKEA', 'boende', 'template')`).run();
+    await call("POST", undefined, { pattern: "IKEA", category_id: "hushall-forbrukning" });
+    const res = await call("PATCH", "/api/rules/mall-ikea", { category_id: "fritid-hobby", preview: true });
+    // Den egna IKEA-regeln vinner över mallregeln, så mallregeln träffar inget.
+    expect((await res.json<{ matches: { total: number } }>()).matches.total).toBe(0);
+    const exclude = await (await call("POST", undefined, { action: "exclude", pattern: "amazon" })).json<{ rule: { id: string } }>();
+    expect((await call("PATCH", `/api/rules/${exclude.rule.id}`, { pattern: "amazon ab", preview: true })).status).toBe(400);
   });
 
   it("skriver över även manuellt kategoriserade när valet är gjort, och sedan skyddas nya manuella val", async () => {
