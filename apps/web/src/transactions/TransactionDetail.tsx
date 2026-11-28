@@ -8,6 +8,7 @@ import { field, getJson, putJson } from "../api.ts";
 import { Link } from "../router.tsx";
 import { CategoryEditor } from "./CategoryEditor.tsx";
 import { INCOME_TYPES, IncomeTypePicker, incomeLabel, type IncomeType } from "./IncomeType.tsx";
+import { LoanLink, loanLabel, toLinkedLoan, type LinkedLoan } from "./LoanLink.tsx";
 import { SplitEditor } from "./SplitEditor.tsx";
 import { fetchCategories, NO_CATEGORIES, type Categories } from "./TransactionsView.tsx";
 
@@ -29,6 +30,8 @@ interface Detail {
   readonly incomeSource: string;
   readonly pair: { accountName: string; amountMinor: number; transactionDate: string } | null;
   readonly splits: readonly { categoryId: string; amountMinor: number }[];
+  /** Lånet betalningen är kopplad till (KK-59-B). */
+  readonly loan: LinkedLoan | null;
 }
 
 const text = (value: unknown) => (typeof value === "string" ? value : "");
@@ -68,6 +71,7 @@ function toDetail(body: unknown): Detail | null {
           return typeof c === "string" && typeof a === "number" ? [{ categoryId: c, amountMinor: a }] : [];
         })
       : [],
+    loan: toLinkedLoan(field(body, "loan")),
   };
 }
 
@@ -145,6 +149,7 @@ export function TransactionDetail({ id }: { id: string }) {
         <div><dt>Konto</dt><dd>{d.accountName}</dd></div>
         <div><dt>Kategori</dt><dd>{category}</dd></div>
         <div><dt>Räknas</dt><dd>{counting(d)}</dd></div>
+        {d.loan && <div><dt>Lån</dt><dd>{loanLabel(d.loan)}</dd></div>}
         {income && <div><dt>Inkomsttyp</dt><dd>{incomeLabel(d.incomeType, d.incomeSource)}</dd></div>}
         {d.pair && (
           <div><dt>Motpost</dt><dd>{`${d.pair.accountName} · ${formatSek(d.pair.amountMinor)} · ${formatDateShort(d.pair.transactionDate)}`}</dd></div>
@@ -171,6 +176,8 @@ export function TransactionDetail({ id }: { id: string }) {
           {d.manualTransfer !== null && <button type="button" disabled={busy} onClick={() => void setTransfer(null)}>Låt Kronkoll avgöra</button>}
         </p>
       )}
+      {/* En lånebetalning är en utgift, men en som redan är kopplad kan alltid kopplas loss. */}
+      {mode === null && (d.loan !== null || d.amountMinor < 0) && <LoanLink transactionId={d.id} loan={d.loan} onSaved={() => void load()} />}
       {mode === null && income && <IncomeTypePicker transactionId={d.id} value={d.incomeType} onSaved={() => void load()} />}
       {mode === "category" && (
         <section className="card tx-editor">
