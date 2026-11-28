@@ -260,6 +260,26 @@ export async function useFakeApi(
       siblings.forEach((c, i) => { c.position = i; });
       return [200, { items: siblings.map((c) => ({ ...c })) }];
     }
+    const ruleMatches = /^\/api\/rules\/([^/]+)\/matches$/u.exec(path);
+    if (ruleMatches && method === "GET") {
+      const rule = state.rules.find((r) => r.id === ruleMatches[1]);
+      if (!rule) return [404, { error: "not_found" }];
+      // De senaste träffarna (#251): fyra transaktioner, av vilka tre listas.
+      return [
+        200,
+        {
+          total: 4,
+          change: 2,
+          unchanged: 1,
+          manual: 1,
+          items: [
+            { id: "m1", transaction_date: "2026-11-02", name: `${rule.pattern} KARLSTAD`, amount_minor: -49900, category_id: null, effect: "change" },
+            { id: "m2", transaction_date: "2026-10-20", name: "", amount_minor: -12000, category_id: rule.category_id, effect: "unchanged" },
+            { id: "m3", transaction_date: "2026-10-01", name: `${rule.pattern} JARFALLA`, amount_minor: -30000, category_id: "fritid", effect: "manual" },
+          ],
+        },
+      ];
+    }
     if (path === "/api/rules" && method === "POST" && body["preview"] === true) {
       // Träffarna för regeln som den skulle bli (#251), utan att spara den. Fyra transaktioner, varav en är manuellt vald.
       const name = String(body["pattern"]).trim().toUpperCase();

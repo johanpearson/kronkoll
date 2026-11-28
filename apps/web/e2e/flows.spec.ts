@@ -322,3 +322,22 @@ test("regelformuläret visar träffarna medan man skriver och valet att skriva �
   await expect(page.getByRole("status")).toContainText("Regeln är sparad");
   await expect(page.getByRole("list", { name: "Regler" }).getByRole("listitem")).toHaveCount(1);
 });
+
+test("Visa träffar listar de senaste transaktionerna regeln gäller, med vad som händer med var och en (V-e2e-rule-matches, KK-18-C)", async ({ page }) => {
+  await useFakeApi(page);
+  await page.goto("/installningar/regler");
+  await page.getByRole("button", { name: "Ny regel" }).click();
+  await page.getByLabel("Text").fill("Ikea");
+  await page.getByLabel("Får kategorin").selectOption({ label: "Hushåll › Förbrukning" });
+  await page.getByRole("button", { name: "Spara" }).click();
+  await expect(page.getByRole("status")).toContainText("Regeln är sparad");
+  await page.getByRole("list", { name: "Regler" }).getByRole("button").click();
+  await page.getByRole("dialog").getByRole("button", { name: "Visa träffar" }).click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet).toContainText("Regeln träffar 4 transaktioner: 2 får kategorin, 1 har redan kategorin, 1 är manuellt valda. Visar de 3 senaste.");
+  const rows = sheet.getByRole("list", { name: "Träffar" }).getByRole("listitem");
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0)).toContainText("IKEA KARLSTAD");
+  await expect(rows.nth(1)).toContainText("Okänd motpart");
+  await expect(rows.nth(2)).toContainText("Manuellt vald, ändras inte");
+});

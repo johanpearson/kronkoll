@@ -101,7 +101,7 @@ describe("regelformuläret visar träffarna medan man skriver (KK-58-B)", () => 
     // Antalen gäller alla träffar, men bara de tre första visas som exempel.
     expect(examples).toHaveLength(3);
     expect(examples.map((li) => li.querySelector(".ui-row-label")?.textContent)).toEqual(["IKEA KARLSTAD, KARLSTAD", "Okänd motpart", "IKEA BARKARBY, JARFALLA"]);
-    expect(examples.map((li) => li.querySelector(".ui-row-detail")?.textContent)).toEqual(["2 nov. 2026 · Får kategorin", "20 okt. 2026 · Har redan kategorin", "1 okt. 2026 · Manuellt vald"]);
+    expect(examples.map((li) => li.querySelector(".ui-row-detail")?.textContent)).toEqual(["2 nov. 2026 · Får kategorin", "20 okt. 2026 · Har redan kategorin", "1 okt. 2026 · Manuellt vald, ändras inte"]);
   });
 
   it("frågar en gång för det som skrivs i ett svep, och det sista svaret gäller även om ett äldre kommer efter", async () => {

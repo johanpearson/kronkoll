@@ -86,11 +86,11 @@ describe("förhandsvisa regler (#34, KK-18-C)", () => {
     await open();
     await openRule();
     await click("Visa träffar");
-    expect(screen.getByText("3 träffar: 1 får kategorin, 1 manuellt valda ändras inte.")).toBeTruthy();
+    expect(screen.getByText("Regeln träffar 3 transaktioner: 1 får kategorin, 1 har redan kategorin, 1 är manuellt valda.")).toBeTruthy();
     const rows = within(screen.getByRole("list", { name: "Träffar" })).getAllByRole("listitem");
-    expect(rows.map((r) => r.querySelector(".tx-notes")?.textContent.split(" · ").at(1))).toEqual(["Får kategorin", "Har redan kategorin", "Manuellt vald, ändras inte"]);
-    expect(rows[0]?.textContent).toContain(formatSek(-49900));
-    expect(rows[1]?.querySelector(".tx-name")?.textContent).toBe("Okänd motpart");
+    expect(rows.map((r) => r.querySelector(".ui-row-detail")?.textContent.split(" · ").at(1))).toEqual(["Får kategorin", "Har redan kategorin", "Manuellt vald, ändras inte"]);
+    expect(rows[0]?.querySelector(".ui-row-value")?.textContent).toBe(formatSek(-49900));
+    expect(rows.map((r) => r.querySelector(".ui-row-label")?.textContent)).toEqual(["IKEA KARLSTAD, KARLSTAD", "Okänd motpart", "IKEA BARKARBY, JARFALLA"]);
     await click("Stäng");
     expect(screen.queryByRole("list", { name: "Träffar" })).toBeNull();
   });

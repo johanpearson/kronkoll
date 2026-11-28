@@ -3,14 +3,13 @@
 // exempel, innan något sparas (KK-58-B). Finns manuellt valda bland träffarna kan man välja att skriva över dem,
 // ett engångsval vid sparandet. En Räkna inte-regel gäller hela historiken direkt, så den visar först hur många
 // den träffar och sparas när användaren bekräftar (KK-39-C). Bankens text visas som text (KK-30).
-import { formatDateShort, formatSek } from "@kronkoll/domain";
 import { useEffect, useId, useState, type SyntheticEvent } from "react";
 import { field, patchJson, postJson, type ApiResult } from "../api.ts";
 import type { Categories } from "../transactions/TransactionsView.tsx";
 import { Button } from "../ui/Button.tsx";
-import { List, ListRow } from "../ui/ListRow.tsx";
 import { SegmentedControl } from "../ui/SegmentedControl.tsx";
 import { Switch } from "../ui/Switch.tsx";
+import { HitList, summary, toHits, type Hits } from "./RuleHits.tsx";
 
 /** Värdet i kategorivalet som betyder Räkna inte i stället för en kategori. */
 export const EXCLUDE = "exclude";
@@ -27,68 +26,12 @@ export interface FormRule {
   readonly contains: boolean;
 }
 
-interface Hit {
-  readonly id: string;
-  readonly date: string;
-  readonly name: string;
-  readonly amountMinor: number;
-  readonly effect: string;
-}
-
-interface Preview {
-  readonly total: number;
-  readonly change: number;
-  readonly unchanged: number;
-  readonly manual: number;
-  readonly items: readonly Hit[];
-}
-
-const EFFECT: Record<string, string> = {
-  change: "Får kategorin",
-  unchanged: "Har redan kategorin",
-  manual: "Manuellt vald",
-};
-
-const count = (value: unknown) => (typeof value === "number" ? value : 0);
-
-/** Träffarna i svaret på en förhandsvisning, eller null om svaret inte har dem. */
-function toPreview(body: unknown): Preview | null {
-  const matches = field(body, "matches");
-  const items = field(matches, "items");
-  if (!Array.isArray(items)) return null;
-  return {
-    total: count(field(matches, "total")),
-    change: count(field(matches, "change")),
-    unchanged: count(field(matches, "unchanged")),
-    manual: count(field(matches, "manual")),
-    items: items.flatMap((raw): Hit[] => {
-      const id = field(raw, "id");
-      const date = field(raw, "transaction_date");
-      const amount = field(raw, "amount_minor");
-      if (typeof id !== "string" || typeof date !== "string" || typeof amount !== "number") return [];
-      const name = field(raw, "name");
-      return [{ id, date, name: typeof name === "string" && name !== "" ? name : "Okänd motpart", amountMinor: amount, effect: String(field(raw, "effect")) }];
-    }),
-  };
-}
-
 /** Svaret på en sparad regel: hur många tidigare transaktioner som fick kategorin (KK-58-A), eller ett fel som text. */
 function outcome({ status, body }: ApiResult): number | string {
   if (status === 400) return field(body, "error") === "unknown_category" ? "Välj en kategori som finns." : "Skriv en text, till exempel IKEA.";
   if (status !== 200 && status !== 201) return "Det gick inte att spara regeln. Försök igen.";
   const applied = field(body, "applied");
   return typeof applied === "number" ? applied : 0;
-}
-
-/** Sammanfattningen av träffarna i en mening: bara det som inte är noll. */
-function summary(p: Preview): string {
-  if (p.total === 0) return "Regeln träffar inga transaktioner än.";
-  const parts = [
-    p.change > 0 ? `${String(p.change)} får kategorin` : null,
-    p.unchanged > 0 ? `${String(p.unchanged)} har redan kategorin` : null,
-    p.manual > 0 ? `${String(p.manual)} är manuellt valda` : null,
-  ].filter((part) => part !== null);
-  return `Regeln träffar ${String(p.total)} transaktioner: ${parts.join(", ")}.`;
 }
 
 /** Mönster och kategori (eller Räkna inte), för en ny regel eller en som ändras. */
@@ -101,7 +44,7 @@ export function RuleForm(props: { title: string; rule?: FormRule; categories: Ca
   const [error, setError] = useState<string | null>(null);
   /** Antalet träffar för en ny Räkna inte-regel, som visas innan den sparas. */
   const [confirm, setConfirm] = useState<number | null>(null);
-  const [preview, setPreview] = useState<Preview | null>(null);
+  const [preview, setPreview] = useState<Hits | null>(null);
   const [previewFailed, setPreviewFailed] = useState(false);
   const textId = useId();
   const categoryFieldId = useId();
@@ -125,7 +68,7 @@ export function RuleForm(props: { title: string; rule?: FormRule; categories: Ca
       const send = ruleId === undefined ? postJson("/api/rules", request) : patchJson(`/api/rules/${encodeURIComponent(ruleId)}`, request);
       void send.then(({ status, body }) => {
         if (!current) return;
-        const next = status === 200 ? toPreview(body) : null;
+        const next = status === 200 ? toHits(field(body, "matches")) : null;
         setPreview(next);
         // Ett fel i texten eller kategorin (400) har sitt eget besked när man sparar.
         setPreviewFailed(next === null && status !== 400);
@@ -235,13 +178,7 @@ export function RuleForm(props: { title: string; rule?: FormRule; categories: Ca
         {preview && (
           <>
             <p className="ui-body">{summary(preview)}</p>
-            {preview.items.length > 0 && (
-              <List label="Exempel på träffar">
-                {preview.items.slice(0, EXAMPLES).map((hit) => (
-                  <ListRow key={hit.id} label={hit.name} detail={`${formatDateShort(hit.date)} · ${EFFECT[hit.effect] ?? hit.effect}`} value={formatSek(hit.amountMinor)} />
-                ))}
-              </List>
-            )}
+            {preview.items.length > 0 && <HitList label="Exempel på träffar" hits={preview.items.slice(0, EXAMPLES)} />}
           </>
         )}
         {previewFailed && <p className="ui-caption">Det gick inte att räkna träffarna. Du kan ändå spara regeln.</p>}
