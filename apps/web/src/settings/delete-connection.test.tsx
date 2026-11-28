@@ -65,8 +65,10 @@ describe("radera en bankkoppling (#28, KK-11)", () => {
     await openQuestion();
     expect(screen.getByRole("heading", { name: "Radera Skandia-kopplingen?" })).toBeTruthy();
     expect(screen.getByText(/Sessionen hos Enable Banking återkallas/u)).toBeTruthy();
-    const box = screen.getByRole<HTMLInputElement>("checkbox", { name: /Radera även historik: 4 konton, 1\s842 transaktioner och 1 uppdelning/u });
-    expect(box.checked).toBe(true);
+    // Frågan är en dialog, och valet är en brytare (#259).
+    expect(screen.getByRole("dialog", { name: "Radera Skandia-kopplingen?" })).toBeTruthy();
+    const toggle = screen.getByRole("switch", { name: /Radera även historik: 4 konton, 1\s842 transaktioner och 1 uppdelning/u });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
     expect(deletes(calls)).toEqual([]);
   });
 
@@ -83,7 +85,7 @@ describe("radera en bankkoppling (#28, KK-11)", () => {
   it("utan historik återkallas bara kopplingen", async () => {
     const calls = api([200, { revoked: true, deleted: null, backup_expiry_days: 7 }]);
     await openQuestion();
-    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("switch"));
     fireEvent.click(screen.getByRole("button", { name: "Återkalla" }));
     await settle();
     expect(deletes(calls)[0]?.url).toBe("/api/connections/c1?purge=false");
