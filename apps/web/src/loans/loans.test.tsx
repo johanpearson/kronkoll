@@ -24,15 +24,26 @@ const BIL = {
 };
 const LIST = { loans: [BOLAN, BIL], total_balance_minor: 128_600_000, total_monthly_interest_minor: 399_808, total_monthly_amortization_minor: 445_000, total_monthly_cost_minor: 844_808 };
 
-function api(list: [number, unknown] = [200, LIST], write: number = 201) {
+/** Påhittade träffar i förhandsvisningen, med bankens text som den kom (KK-30). */
+const PREVIEW = {
+  count: 4,
+  examples: [
+    { id: "t1", date: "2026-11-02", amount_minor: -550_000, counterparty: "", description: "<b>Betalning</b> 9020 1234567" },
+    { id: "t2", date: "2026-10-02", amount_minor: -550_000, counterparty: "EXEMPELBANKEN", description: "" },
+  ],
+};
+
+function api(list: [number, unknown] = [200, LIST], write: number = 201, preview: [number, unknown] = [200, PREVIEW], matching = 200) {
   const writes: { method: string; path: string; body: unknown }[] = [];
   vi.stubGlobal(
     "fetch",
     vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, "https://app.test");
       const json = (status: number, body: unknown) => Promise.resolve(new Response(status === 204 ? null : JSON.stringify(body), { status }));
-      if (init?.method === "PUT" || init?.method === "DELETE") {
+      if (init?.method === "PUT" || init?.method === "DELETE" || init?.method === "POST") {
         writes.push({ method: init.method, path: url.pathname, body: init.body ? (JSON.parse(init.body as string) as unknown) : null });
+        if (url.pathname === "/api/loans/preview") return json(...preview);
+        if (url.pathname.endsWith("/matching")) return json(matching, { linked: 3 });
         return json(write, {});
       }
       if (url.pathname === "/api/loans") return json(...list);
@@ -128,7 +139,7 @@ describe("Lån (#72, KK-36)", () => {
     await open();
     fireEvent.click(screen.getByRole("button", { name: "Ändra Billån" }));
     fireEvent.click(screen.getByRole("button", { name: "Ta bort" }));
-    expect(screen.getByRole("form", { name: "Ändra Billån" }).textContent).toContain("Ta bort lånet? Det försvinner ur lånöversikten. Inget hos banken ändras.");
+    expect(screen.getByRole("form", { name: "Ändra Billån" }).textContent).toContain("Ta bort lånet? Det försvinner ur lånöversikten och betalningarna kopplas loss. Inget hos banken ändras.");
     fireEvent.click(screen.getByRole("button", { name: "Behåll" }));
     expect(screen.queryByRole("button", { name: "Behåll" })).toBeNull();
     expect(deletes).toEqual([]);
@@ -197,6 +208,74 @@ describe("Lån (#72, KK-36)", () => {
     const chart = within(del1 as HTMLElement).getByRole("img", { name: "Månadskostnaden för Bolån del 1" });
     expect(chart.querySelectorAll("rect")).toHaveLength(2);
     expect(within(del1 as HTMLElement).getByRole("list", { name: "Månadskostnaden för Bolån del 1" }).textContent).toContain(`Ränta: ${formatSek(350_000)}`);
+  });
+
+  it("förhandsvisar kontouppgifterna och sparar dem efter lånet, som kopplar om historiken (KK-59-A)", async () => {
+    const writes = api();
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Lägg till lån" }));
+    const form = screen.getByRole("form", { name: "Nytt lån" });
+    expect(within(form).getByRole<HTMLButtonElement>("button", { name: "Visa träffar" }).disabled).toBe(true);
+    type(form, "Kontouppgifter (valfritt)", " 9020-12 345 67 \n\nEXEMPELBANKEN");
+    fireEvent.click(within(form).getByRole("button", { name: "Visa träffar" }));
+    await settle();
+    expect(writes.at(-1)).toEqual({ method: "POST", path: "/api/loans/preview", body: { match_patterns: ["9020-12 345 67", "EXEMPELBANKEN"] } });
+    const preview = within(form).getByRole("status");
+    expect(preview.textContent).toContain("4 betalningar träffar.");
+    // Bankens text visas som text, även när den ser ut som HTML.
+    expect(within(preview).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      `2 nov. 2026 · ${formatSek(-550_000)} · <b>Betalning</b> 9020 1234567`,
+      `2 okt. 2026 · ${formatSek(-550_000)} · EXEMPELBANKEN`,
+    ]);
+    // En ändrad text tar bort förhandsvisningen, som inte längre stämmer.
+    type(form, "Kontouppgifter (valfritt)", "9020-12 345 67");
+    expect(within(form).queryByRole("status")).toBeNull();
+    type(form, "Namn", "Bolån del 2");
+    type(form, "Skuld (kr)", "1 000 000");
+    type(form, "Ränta (%)", "4");
+    fireEvent.click(within(form).getByRole("button", { name: "Spara" }));
+    await settle();
+    const [, put, matching] = writes;
+    expect(matching).toEqual({ method: "PUT", path: `${String(put?.path)}/matching`, body: { match_patterns: ["9020-12 345 67"] } });
+    expect(screen.getByRole("status").textContent).toBe("Lånet är sparat. 3 betalningar kopplades om.");
+  });
+
+  it("sparar inte kontouppgifterna när de är oförändrade, och behåller lånets kategori när de ändras", async () => {
+    const writes = api(undefined, 200);
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Ändra Bolån del 1" }));
+    let form = screen.getByRole("form", { name: "Ändra Bolån del 1" });
+    expect(within(form).getByLabelText<HTMLTextAreaElement>("Kontouppgifter (valfritt)").value).toBe("9020-12 345 67");
+    fireEvent.click(within(form).getByRole("button", { name: "Spara" }));
+    await settle();
+    expect(writes.map((w) => w.path)).toEqual(["/api/loans/l1"]);
+    fireEvent.click(screen.getByRole("button", { name: "Ändra Bolån del 1" }));
+    form = screen.getByRole("form", { name: "Ändra Bolån del 1" });
+    type(form, "Kontouppgifter (valfritt)", "");
+    fireEvent.click(within(form).getByRole("button", { name: "Spara" }));
+    await settle();
+    expect(writes.at(-1)).toEqual({ method: "PUT", path: "/api/loans/l1/matching", body: { match_patterns: [], category_id: "boende-laneranta" } });
+  });
+
+  it("säger till när förhandsvisningen eller kontouppgifterna inte går att spara, och när de är för många", async () => {
+    api(undefined, 201, [503, {}], 503);
+    await open();
+    fireEvent.click(screen.getByRole("button", { name: "Lägg till lån" }));
+    const form = screen.getByRole("form", { name: "Nytt lån" });
+    type(form, "Kontouppgifter (valfritt)", Array.from({ length: 11 }, (_, i) => `konto ${String(i)}`).join("\n"));
+    fireEvent.click(within(form).getByRole("button", { name: "Visa träffar" }));
+    await settle();
+    expect(within(form).getByRole("alert").textContent).toBe("Skriv högst tio kontouppgifter, var och en på högst 60 tecken.");
+    type(form, "Kontouppgifter (valfritt)", "9020-12 345 67");
+    fireEvent.click(within(form).getByRole("button", { name: "Visa träffar" }));
+    await settle();
+    expect(within(form).getByRole("alert").textContent).toBe("Det gick inte att visa träffarna. Försök igen.");
+    type(form, "Namn", "Lån");
+    type(form, "Skuld (kr)", "1 000");
+    type(form, "Ränta (%)", "4");
+    fireEvent.click(within(form).getByRole("button", { name: "Spara" }));
+    await settle();
+    expect(within(form).getByRole("alert").textContent).toBe("Lånet är sparat, men inte kontouppgifterna. Försök igen.");
   });
 
   it("tål svar med saknade fält och visar räntan med två decimaler", () => {

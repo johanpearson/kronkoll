@@ -202,6 +202,10 @@ test("lägg till ett lån och se det i lånöversikten (V-e2e-loans, KK-36)", as
   await form.getByLabel("Skuld (kr)").fill("86 000");
   await form.getByLabel("Ränta (%)").fill("6,95");
   await form.getByLabel("Amortering (kr/mån)").fill("2 450");
+  // Kontouppgifter förhandsvisas innan de sparas (KK-59-A). Det påhittade API:t har inga träffar.
+  await form.getByLabel("Kontouppgifter (valfritt)").fill("9020-12 345 67");
+  await form.getByRole("button", { name: "Visa träffar" }).click();
+  await expect(form.getByRole("status")).toHaveText("Inga betalningar träffar.");
   await form.getByRole("button", { name: "Spara" }).click();
 
   await expect(page.getByRole("status")).toHaveText("Lånet är sparat.");
