@@ -35,6 +35,8 @@ export const FAKE_BANK = "https://bank.example.test";
 const OVERVIEW = {
   period: NOVEMBER,
   balance_minor: 4831240,
+  // Ett preliminärt köp på Vardag på 412,50 kr (KK-56-F).
+  balances: { booked_minor: 4831240, available_minor: 4789990, pending_minor: -41250 },
   income_minor: 4125000,
   expense_minor: 2341800,
   net_minor: 1783200,
@@ -47,9 +49,9 @@ const OVERVIEW = {
   connections: [{ id: "c1", bank: "Exempelbanken", status: "active", consent_expires_on: "2027-05-01", consent_days_left: 167 }],
   // Ett konto utan saldo, så att axe och Lighthouse även granskar "Saldo saknas" (KK-38-B).
   accounts: [
-    { id: "acc_1", name: "Vardag", bank: "Exempelbanken", balance_minor: 1852790 },
-    { id: "acc_2", name: "Sparkonto ••7712", bank: "Exempelbanken", balance_minor: 2978450 },
-    { id: "acc_3", name: "Kort ••1190", bank: "Exempelbanken", balance_minor: null },
+    { id: "acc_1", name: "Vardag", bank: "Exempelbanken", balance_minor: 1852790, booked_minor: 1852790, available_minor: 1811540 },
+    { id: "acc_2", name: "Sparkonto ••7712", bank: "Exempelbanken", balance_minor: 2978450, booked_minor: 2978450, available_minor: 2978450 },
+    { id: "acc_3", name: "Kort ••1190", bank: "Exempelbanken", balance_minor: null, booked_minor: null, available_minor: null },
   ],
   trend: [
     { period: "2026-10", income_minor: 3300000, expense_minor: 2900000, net_minor: 400000 },
@@ -286,7 +288,14 @@ export async function useFakeApi(
     }
     if (path === "/api/transactions") {
       const wantHidden = query.get("hidden") === "true";
-      return [200, { period: NOVEMBER, items: transactions.filter((t) => hiddenIds.has(t.id) === wantHidden).map((t) => ({ ...t, hidden: hiddenIds.has(t.id) })), next_cursor: null }];
+      const status = query.get("status");
+      const items = transactions.filter((t) => hiddenIds.has(t.id) === wantHidden && (status === null || t.status === status));
+      return [200, { period: NOVEMBER, items: items.map((t) => ({ ...t, hidden: hiddenIds.has(t.id) })), next_cursor: null }];
+    }
+    // Gruppen Preliminärt (KK-56-A): alla preliminära som inte är dolda, med summa.
+    if (path === "/api/transactions/pending") {
+      const items = transactions.filter((t) => t.status === "pending" && !hiddenIds.has(t.id));
+      return [200, { items: items.map((t) => ({ ...t, hidden: false })), total_minor: items.reduce((sum, t) => sum + t.amount_minor, 0), count: items.length }];
     }
     const tx = /^\/api\/transactions\/([^/]+)$/u.exec(path);
     // En påhittad löneinbetalning som bara nås via sin adress, för inkomsttypen på detaljsidan (KK-22-A).

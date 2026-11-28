@@ -155,6 +155,39 @@ describe("preliminär blir bokförd (KK-9-B)", () => {
   });
 });
 
+describe("Skandias format: ingen motpart, butiken står i meddelandet (KK-56-B, KK-56-E)", () => {
+  // Påhittade rader i Skandias format: tom motpart, butik och ort i meddelandet, preliminära utan id.
+  const skandia = (overrides: Partial<ImportedTransaction>) =>
+    imported({ counterpartyNorm: "", counterparty: "", providerTxId: null, ...overrides });
+
+  it("en preliminär utgift blir bokförd med nytt id, ort i meddelandet, annat datum och några kronor mer", () => {
+    const pending = stored({ ...skandia({ status: "pending", amountMinor: -25000, description: "LIDL123EXEMPEL" }), id: "tx_kept", bookingDate: "2026-11-10" });
+    const booked = skandia({ providerTxId: "b1", amountMinor: -25400, transactionDate: "2026-11-11", bookingDate: "2026-11-12", description: "LIDL123EXEMPEL, STOCKHOLM" });
+    const { result, state } = importInto([pending], [booked]);
+    expect(result.inserted).toEqual([]);
+    expect(state).toEqual([{ ...booked, id: "tx_kept", lastSeenOn: TODAY }]);
+    expect(state[0]?.amountMinor).toBeLessThan(0);
+  });
+
+  it("en preliminär insättning är positiv och blir bokförd som positiv", () => {
+    const pending = stored({ ...skandia({ status: "pending", amountMinor: 50000, description: "Swish från Exempel" }), id: "tx_in" });
+    const { state } = importInto([pending], [skandia({ amountMinor: 50000, description: "Swish från Exempel" })]);
+    expect(state).toEqual([expect.objectContaining({ id: "tx_in", status: "booked", amountMinor: 50000 })]);
+  });
+
+  it("två butiker med liknande belopp samma dag paras aldrig ihop, fast motparten är tom för båda", () => {
+    const pending = stored({ ...skandia({ status: "pending", amountMinor: -25000, description: "LIDL123EXEMPEL" }), id: "tx_lidl" });
+    const { state } = importInto([pending], [skandia({ amountMinor: -24000, description: "ICA NARA EXEMPEL, MALMO" })]);
+    expect(state).toHaveLength(2);
+    expect(state.find((t) => t.id === "tx_lidl")?.status).toBe("pending");
+  });
+
+  it("en preliminär som försvinner hos banken tas bort efter tio dagar (KK-56-C)", () => {
+    const pending = stored({ ...skandia({ status: "pending", description: "AmazonMktplc*AB12CD3, www.amazon.se" }), lastSeenOn: "2026-11-09" });
+    expect(importInto([pending], []).state).toEqual([{ ...pending, status: "removed" }]);
+  });
+});
+
 describe("preliminär blir bokförd med annat belopp (KK-9-B, 20 % tolerans)", () => {
   const pending = (overrides: Partial<StoredTransaction> = {}) =>
     stored({ id: "tx_kept", status: "pending", bookingDate: null, amountMinor: -10000, ...overrides });
