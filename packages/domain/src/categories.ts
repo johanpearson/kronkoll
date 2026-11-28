@@ -15,6 +15,8 @@ export interface Category {
   readonly name: string;
   readonly kind: CategoryKind;
   readonly archived: boolean;
+  /** Platsen bland syskonen, lägst först. Saknas den visas kategorin efter de placerade, på namn (#251). */
+  readonly position?: number;
 }
 
 function slug(text: string): string {
@@ -166,4 +168,34 @@ export function mergeCategories(input: MergeInput): MergeResult {
       .map((t) => ({ id: t.id, categoryId: into.id })),
     ruleChanges: input.rules.filter((r) => r.categoryId === from.id).map((r) => ({ ...r, categoryId: into.id })),
   };
+}
+
+/** Syskon är kategorier med samma huvudkategori och typ, de som visas i samma lista. */
+const isSibling = (a: Category, b: Category) => a.parentId === b.parentId && a.kind === b.kind;
+
+/** Platsen som sortering går på: de utan plats kommer efter alla med plats. */
+const placeOf = (c: Category) => c.position ?? Number.POSITIVE_INFINITY;
+
+/** Kategorierna i visningsordning: de med plats först i sin ordning, sedan resten på namn (#251). */
+export function sortCategories(categories: readonly Category[]): Category[] {
+  return categories.toSorted((a, b) => (placeOf(a) < placeOf(b) ? -1 : placeOf(a) > placeOf(b) ? 1 : a.name.localeCompare(b.name, "sv")));
+}
+
+/**
+ * Flyttar en kategori före en annan bland sina syskon, eller sist om `beforeId` är null (#251). Syskonen
+ * numreras om från noll, så att ordningen blir fast även för dem som inte hade någon plats. Övriga
+ * kategorier ändras inte. Arkiverade syskon räknas inte, eftersom de inte visas.
+ */
+export function moveCategory(categories: readonly Category[], id: string, beforeId: string | null): Category[] {
+  const moving = get(categories, id);
+  if (moving.archived) throw new RangeError("Kategorin är arkiverad");
+  if (beforeId === id) throw new RangeError("En kategori kan inte flyttas före sig själv");
+  const before = beforeId === null ? null : get(categories, beforeId);
+  if (before !== null && (before.archived || !isSibling(moving, before))) {
+    throw new RangeError("Kategorierna måste ligga på samma nivå och vara av samma typ");
+  }
+  const others = sortCategories(categories.filter((c) => !c.archived && c.id !== id && isSibling(moving, c)));
+  const at = before === null ? others.length : others.findIndex((c) => c.id === before.id);
+  const order = [...others.slice(0, at), moving, ...others.slice(at)].map((c) => c.id);
+  return categories.map((c) => (order.includes(c.id) ? { ...c, position: order.indexOf(c.id) } : c));
 }
