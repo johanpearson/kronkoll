@@ -128,22 +128,6 @@ describe("appskalet (#30, KK-4)", () => {
     });
   });
 
-  it("dra nedåt högst upp i Översikt visar en indikator, och webbläsarens egen omladdning är avstängd (KK-63-D, E)", () => {
-    const { container } = at("/");
-    expect(document.documentElement.classList.contains("ui-own-pull")).toBe(true);
-    const view = container.querySelector(".ui-view") as HTMLElement;
-    fireEvent.touchStart(view, { touches: [{ clientX: 200, clientY: 100 }] });
-    fireEvent.touchMove(view, { touches: [{ clientX: 200, clientY: 130 }], cancelable: true });
-    fireEvent.touchMove(view, { touches: [{ clientX: 200, clientY: 420 }], cancelable: true });
-    expect(container.querySelector(".ui-pull")).not.toBeNull();
-    expect(container.querySelector(".ui-pull-ready")).not.toBeNull();
-    fireEvent.touchCancel(view, { touches: [] });
-    expect(container.querySelector(".ui-pull")).toBeNull();
-    cleanup();
-    at("/budget");
-    expect(document.documentElement.classList.contains("ui-own-pull")).toBe(false);
-  });
-
   it("en länk med modifierare öppnas som vanligt av webbläsaren", () => {
     at("/finns-inte");
     const link = screen.getByRole("link", { name: "Till start" });

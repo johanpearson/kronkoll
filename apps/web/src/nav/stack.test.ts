@@ -38,6 +38,7 @@ describe("canonicalStack: stegen bakåt från en djuplänk (KK-62-G)", () => {
   it("sidor under Inställningar har Inställningar och Översikt bakom sig", () => {
     expect(canonicalStack("/installningar/regler")).toEqual(["/", "/installningar", "/installningar/regler"]);
     expect(canonicalStack("/installningar/koppling/k-1")).toEqual(["/", "/installningar", "/installningar/bank", "/installningar/koppling/k-1"]);
+    expect(canonicalStack("/installningar/kategorier/mat")).toEqual(["/", "/installningar", "/installningar/kategorier", "/installningar/kategorier/mat"]);
     expect(canonicalStack("/installningar/konton")).toEqual(["/", "/installningar", "/installningar/konton"]);
     expect(canonicalStack("/insikter")).toEqual(["/", "/insikter"]);
   });

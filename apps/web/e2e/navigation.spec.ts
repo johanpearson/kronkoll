@@ -108,7 +108,7 @@ test("ett svep i sidled byter flik i menyns ordning, utan nytt steg bakåt (KK-6
   await expect(page).toHaveURL(/\/transaktioner$/u);
 });
 
-test("dra nedåt högst upp i Översikt startar en synk, som syns i synkikonen (KK-63-D)", async ({ page }) => {
+test("dra nedåt i Översikt startar ingen synk, det gör bara synkikonen (KK-63-D struken)", async ({ page }) => {
   await useFakeApi(page);
   const syncs: string[] = [];
   page.on("request", (request) => {
@@ -117,10 +117,6 @@ test("dra nedåt högst upp i Översikt startar en synk, som syns i synkikonen (
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Översikt" })).toBeVisible();
   await drag(page, [200, 200], [200, 520]);
-  await expect.poll(() => syncs.length).toBe(1);
-  await expect(page.locator(".ui-pull")).toHaveCount(0);
-  // Ett kort drag synkar inte.
-  await drag(page, [200, 200], [200, 260]);
   await page.waitForTimeout(300);
-  expect(syncs).toHaveLength(1);
+  expect(syncs).toHaveLength(0);
 });
