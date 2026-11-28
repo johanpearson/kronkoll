@@ -187,6 +187,16 @@ export function transactionRepository(d1: D1Database) {
     /** Sparar nya och ändrade rader i en batch. Ett fel rullar tillbaka alltihop. */
     async save(result: ReconcileResult): Promise<void> {
       const statements = [
+        // En preliminär som bokförs släpper kategorin från en regel, så att synken sätter reglerna igen
+        // på bankens bokförda text (KK-56-B). En manuell kategori rörs aldrig. Måste gå före uppdateringen av status.
+        ...result.updated
+          .filter((tx) => tx.status === "booked")
+          .map((tx) =>
+            db
+              .update(transactions)
+              .set({ categoryId: null, categorySource: "none" })
+              .where(and(eq(transactions.id, tx.id), eq(transactions.status, "pending"), inArray(transactions.categorySource, ["learned", "template"]))),
+          ),
         ...result.inserted.map((tx) => db.insert(transactions).values({ id: tx.id, ...toSyncColumns(tx) })),
         ...result.updated.map((tx) => db.update(transactions).set(toSyncColumns(tx)).where(eq(transactions.id, tx.id))),
       ];
