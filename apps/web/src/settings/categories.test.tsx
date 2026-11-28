@@ -46,8 +46,8 @@ async function settle() {
   });
 }
 
-async function open() {
-  window.history.replaceState(null, "", "/installningar/kategorier");
+async function open(path = "/installningar/kategorier") {
+  window.history.replaceState(null, "", path);
   await act(async () => {
     render(<App />);
     await Promise.resolve();
@@ -55,61 +55,81 @@ async function open() {
   await settle();
 }
 
-const names = (list: string) => within(screen.getByRole("list", { name: list })).getAllByRole("listitem").map((li) => li.querySelector(".tx-name")?.textContent);
+const rows = (list: string) => within(screen.getByRole("list", { name: list })).getAllByRole("listitem").map((li) => li.querySelector(".ui-row-label")?.textContent);
 const changes = (calls: Call[]) => calls.filter((c) => c.method !== "GET").map(({ method, path, body, csrf }) => ({ method, path, body, csrf }));
+const sheet = () => within(screen.getByRole("dialog"));
 
 async function submit(button: string) {
-  fireEvent.click(screen.getByRole("button", { name: button }));
+  fireEvent.click(sheet().getByRole("button", { name: button }));
   await settle();
 }
 
-describe("kategorier i Inställningar (#34, KK-18-A)", () => {
-  it("visar huvudkategorier med sina underkategorier per typ, utan arkiverade", async () => {
+/** Öppnar arket för en underkategori i Mat och väljer en åtgärd. */
+async function action(name: string, choice: string) {
+  await open("/installningar/kategorier/mat");
+  fireEvent.click(screen.getByRole("button", { name }));
+  fireEvent.click(sheet().getByRole("button", { name: choice }));
+}
+
+describe("kategorier i Inställningar (#251, KK-18-A)", () => {
+  it("visar huvudkategorierna per typ med antal underkategorier, utan arkiverade, och länkar till undervyn", async () => {
     api();
     await open();
-    expect(names("Utgifter")).toEqual(["Boende", "Mat", "Livsmedel", "Restaurang"]);
-    expect(names("Inkomster")).toEqual(["Inkomst", "Lön"]);
+    expect(rows("Utgifter")).toEqual(["Boende", "Mat"]);
+    expect(rows("Inkomster")).toEqual(["Inkomst"]);
     expect(screen.queryByText("Gammal")).toBeNull();
-    // Åtgärderna visas först när raden öppnas, och Stäng döljer dem igen.
-    expect(screen.queryByRole("button", { name: "Byt namn på Mat" })).toBeNull();
+    const mat = screen.getByRole("link", { name: /Mat/u });
+    expect(mat.textContent).toContain("2 underkategorier");
+    expect(mat.getAttribute("href")).toBe("/installningar/kategorier/mat");
+    expect(screen.getByRole("link", { name: /Boende/u }).textContent).toContain("Inga underkategorier");
+    // Färgen är bara en ledtråd och döljs för skärmläsare (KK-26-D).
+    expect(mat.querySelector(".cat-dot")?.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("undervyn visar underkategorierna, och ett tryck öppnar ett ark med åtgärderna", async () => {
+    api();
+    await open("/installningar/kategorier/mat");
+    expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Mat");
+    expect(rows("Underkategorier")).toEqual(["Livsmedel", "Restaurang"]);
+    fireEvent.click(screen.getByRole("button", { name: "Livsmedel" }));
+    expect(rows("Åtgärder för Livsmedel")).toEqual(["Byt namn", "Slå ihop med en annan", "Arkivera"]);
+    fireEvent.click(sheet().getByRole("button", { name: "Stäng" }));
+    expect(screen.queryByRole("dialog")).toBeNull();
+    // Huvudkategorin ändras med knappen i sidhuvudet, och kan få underkategorier.
     fireEvent.click(screen.getByRole("button", { name: "Ändra Mat" }));
-    expect(screen.getByRole("button", { name: "Byt namn på Mat" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Stäng" }));
-    expect(screen.queryByRole("button", { name: "Byt namn på Mat" })).toBeNull();
-    expect(screen.getByRole("link", { name: "‹ Inställningar" }).getAttribute("href")).toBe("/installningar");
+    expect(rows("Åtgärder för Mat")).toEqual(["Byt namn", "Ny underkategori", "Slå ihop med en annan", "Arkivera"]);
   });
 
   it("byter namn med CSRF-skydd och hämtar listan igen", async () => {
     const calls = api();
-    await open();
-    fireEvent.click(screen.getByRole("button", { name: "Ändra Livsmedel" }));
-    fireEvent.click(screen.getByRole("button", { name: "Byt namn på Livsmedel" }));
-    fireEvent.change(screen.getByLabelText("Nytt namn"), { target: { value: "Mat hemma" } });
+    await action("Livsmedel", "Byt namn");
+    const input = sheet().getByLabelText("Nytt namn");
+    expect(document.activeElement).toBe(input);
+    fireEvent.change(input, { target: { value: "Mat hemma" } });
     await submit("Spara");
     expect(changes(calls)).toEqual([{ method: "PATCH", path: "/api/categories/mat-livsmedel", body: { name: "Mat hemma" }, csrf: "1" }]);
     expect(calls.filter((c) => c.path === "/api/categories" && c.method === "GET")).toHaveLength(2);
-    expect(screen.queryByLabelText("Nytt namn")).toBeNull();
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 
   it("lägger till en underkategori och en huvudkategori", async () => {
     const calls = api([201, {}]);
-    await open();
-    fireEvent.click(screen.getByRole("button", { name: "Ändra Mat" }));
-    fireEvent.click(screen.getByRole("button", { name: "Ny underkategori till Mat" }));
-    fireEvent.change(screen.getByLabelText("Namn på underkategorin"), { target: { value: "Fika" } });
+    await open("/installningar/kategorier/mat");
+    fireEvent.click(screen.getByRole("button", { name: "Ny underkategori" }));
+    fireEvent.change(sheet().getByLabelText("Namn på underkategorin"), { target: { value: "Fika" } });
     await submit("Lägg till");
+    cleanup();
+    await open();
     fireEvent.click(screen.getByRole("button", { name: "Ny huvudkategori" }));
-    fireEvent.change(screen.getByLabelText("Namn på huvudkategorin"), { target: { value: "Husdjur" } });
+    fireEvent.change(sheet().getByLabelText("Namn på huvudkategorin"), { target: { value: "Husdjur" } });
     await submit("Lägg till");
     expect(changes(calls).map((c) => c.body)).toEqual([{ parent_id: "mat", name: "Fika" }, { parent_id: null, name: "Husdjur" }]);
   });
 
   it("slår ihop med en kategori på samma nivå och av samma typ", async () => {
     const calls = api();
-    await open();
-    fireEvent.click(screen.getByRole("button", { name: "Ändra Restaurang" }));
-    fireEvent.click(screen.getByRole("button", { name: "Slå ihop Restaurang" }));
-    const choice = screen.getByLabelText<HTMLSelectElement>("Slå ihop Restaurang med");
+    await action("Restaurang", "Slå ihop med en annan");
+    const choice = sheet().getByLabelText<HTMLSelectElement>("Slå ihop Restaurang med");
     expect([...choice.options].map((o) => o.textContent)).toEqual(["Livsmedel"]);
     await submit("Slå ihop");
     expect(changes(calls)).toEqual([{ method: "POST", path: "/api/categories/mat-restaurang/merge", body: { into_id: "mat-livsmedel" }, csrf: "1" }]);
@@ -117,43 +137,45 @@ describe("kategorier i Inställningar (#34, KK-18-A)", () => {
 
   it("säger till när det inte finns någon att slå ihop med", async () => {
     api();
-    await open();
-    fireEvent.click(screen.getByRole("button", { name: "Ändra Lön" }));
-    fireEvent.click(screen.getByRole("button", { name: "Slå ihop Lön" }));
-    expect(screen.getByText("Det finns ingen annan kategori på samma nivå att slå ihop med.")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Slå ihop" })).toHaveProperty("disabled", true);
+    await open("/installningar/kategorier/inkomst");
+    fireEvent.click(screen.getByRole("button", { name: "Lön" }));
+    fireEvent.click(sheet().getByRole("button", { name: "Slå ihop med en annan" }));
+    expect(sheet().getByText("Det finns ingen annan kategori på samma nivå att slå ihop med.")).toBeTruthy();
+    expect(sheet().getByRole("button", { name: "Slå ihop" })).toHaveProperty("disabled", true);
   });
 
-  it("arkiverar efter en fråga som förklarar vad som händer, och Avbryt ändrar ingenting", async () => {
+  it("arkiverar efter en förklaring, och Avbryt ändrar ingenting", async () => {
     const calls = api();
-    await open();
+    await open("/installningar/kategorier/mat");
     fireEvent.click(screen.getByRole("button", { name: "Ändra Mat" }));
-    fireEvent.click(screen.getByRole("button", { name: "Arkivera Mat" }));
-    expect(screen.getByText(/Arkivera Mat och dess underkategorier\? Äldre transaktioner behåller kategorin/u)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Avbryt" }));
+    fireEvent.click(sheet().getByRole("button", { name: "Arkivera" }));
+    expect(sheet().getByText(/Mat och dess underkategorier går inte att välja längre\. Äldre transaktioner behåller kategorin/u)).toBeTruthy();
+    fireEvent.click(sheet().getByRole("button", { name: "Avbryt" }));
     expect(changes(calls)).toEqual([]);
     fireEvent.click(screen.getByRole("button", { name: "Ändra Mat" }));
-    fireEvent.click(screen.getByRole("button", { name: "Arkivera Mat" }));
-    fireEvent.click(within(screen.getByRole("form")).getByRole("button", { name: "Arkivera" }));
-    await settle();
+    fireEvent.click(sheet().getByRole("button", { name: "Arkivera" }));
+    await submit("Arkivera");
     expect(changes(calls)).toEqual([{ method: "PATCH", path: "/api/categories/mat", body: { archived: true }, csrf: "1" }]);
+    expect(screen.getByRole("status").textContent).toBe("Mat är arkiverad.");
   });
 
-  it("visar serverns förklaring när en ändring inte godtas, och ett allmänt fel annars", async () => {
+  it("en huvudkategori som inte finns säger det", async () => {
+    api();
+    await open("/installningar/kategorier/gammal");
+    expect(screen.getByText("Kategorin finns inte")).toBeTruthy();
+  });
+
+  it("visar serverns förklaring vid fältet när en ändring inte godtas, och ett allmänt fel annars", async () => {
     api([400, { error: "rejected", message: "Det finns redan en kategori som heter Livsmedel" }]);
-    await open();
-    fireEvent.click(screen.getByRole("button", { name: "Ändra Restaurang" }));
-    fireEvent.click(screen.getByRole("button", { name: "Byt namn på Restaurang" }));
-    fireEvent.change(screen.getByLabelText("Nytt namn"), { target: { value: "Livsmedel" } });
+    await action("Restaurang", "Byt namn");
+    fireEvent.change(sheet().getByLabelText("Nytt namn"), { target: { value: "Livsmedel" } });
     await submit("Spara");
-    expect(screen.getByRole("alert").textContent).toBe("Det finns redan en kategori som heter Livsmedel");
+    expect(sheet().getByRole("alert").textContent).toBe("Det finns redan en kategori som heter Livsmedel");
     cleanup();
     api([503, { error: "unavailable" }]);
-    await open();
-    fireEvent.click(screen.getByRole("button", { name: "Ändra Restaurang" }));
-    fireEvent.click(screen.getByRole("button", { name: "Byt namn på Restaurang" }));
+    await action("Restaurang", "Byt namn");
     await submit("Spara");
-    expect(screen.getByRole("alert").textContent).toBe("Det gick inte att spara. Försök igen.");
+    expect(sheet().getByRole("alert").textContent).toBe("Det gick inte att spara. Försök igen.");
   });
 
   it("säger till när kategorierna inte går att hämta", async () => {
@@ -162,9 +184,9 @@ describe("kategorier i Inställningar (#34, KK-18-A)", () => {
     expect(screen.getByRole("alert").textContent).toContain("Det gick inte att hämta kategorierna");
   });
 
-  it("Inställningar länkar hit, och Översikt är markerad i menyn eftersom Inställningar nås därifrån", async () => {
+  it("Översikt är markerad i menyn eftersom Inställningar nås därifrån", async () => {
     api();
-    await open();
+    await open("/installningar/kategorier/mat");
     const tab = within(screen.getByRole("navigation", { name: "Huvudmeny" })).getByRole("link", { name: "Översikt" });
     expect(tab.getAttribute("aria-current")).toBe("page");
   });
